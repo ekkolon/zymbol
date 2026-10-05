@@ -7,9 +7,9 @@ const std = @import("std");
 
 const spec = @import("spec.zig");
 const gf256 = @import("gf256.zig");
-pub const bitstream = @import("bitstream.zig");
+const bitstream = @import("bitstream.zig");
 const reed_solomon = @import("reed_solomon.zig");
-pub const segment = @import("segment.zig");
+const segment = @import("segment.zig");
 const matrix = @import("matrix.zig");
 const encoder = @import("encoder.zig");
 const decoder = @import("decoder.zig");
@@ -24,6 +24,16 @@ pub const EncodeOptions = encoder.Options;
 pub const EncodeError = encoder.Error;
 pub const DecodeError = decoder.Error;
 pub const DecodeResult = decoder.Result;
+pub const BitWriter = bitstream.Writer;
+pub const BitstreamError = bitstream.Error;
+pub const SegmentError = segment.Error;
+
+pub const appendNumeric = segment.appendNumeric;
+pub const appendAlphanumeric = segment.appendAlphanumeric;
+pub const appendByte = segment.appendByte;
+pub const appendKanji = segment.appendKanji;
+pub const appendEci = segment.appendEci;
+pub const finalizeSegments = segment.finalize;
 
 pub const encodeText = encoder.encodeText;
 pub const encodeBytes = encoder.encodeBytes;
