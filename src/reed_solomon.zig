@@ -5,15 +5,9 @@ const gf = @import("gf256.zig");
 
 const debug_trace = false;
 
-/// Largest EC-codewords-per-block value used anywhere in the standard's
-/// tables (see spec.ecc_codewords_per_block); every fixed-size buffer here
-/// is sized off this bound so nothing allocates.
 pub const max_ec_codewords = 30;
 const poly_capacity = 2 * max_ec_codewords + 2;
 
-/// Writes `degree` error-correction codewords for `data` into `ec_out`.
-/// `ec_out.len` must equal `degree`, and `degree` must be within
-/// `1..=max_ec_codewords`.
 pub fn encode(data: []const u8, degree: usize, ec_out: []u8) void {
     std.debug.assert(ec_out.len == degree);
     std.debug.assert(degree >= 1 and degree <= max_ec_codewords);
@@ -32,10 +26,7 @@ pub fn encode(data: []const u8, degree: usize, ec_out: []u8) void {
     }
 }
 
-/// generator polynomials for every degree in 1..=max_ec_codewords, computed
-/// once at comptime. `generatorPolynomial(d)` returns the `d` coefficients
-/// (highest to lowest, excluding the implicit leading 1) of
-/// (x - 2^0)(x - 2^1)...(x - 2^(d-1)).
+/// Generator polynomials for degrees 1..30, excluding the leading coefficient.
 const generators: [max_ec_codewords + 1][max_ec_codewords]u8 = blk: {
     @setEvalBranchQuota(200_000);
     var table: [max_ec_codewords + 1][max_ec_codewords]u8 = undefined;
@@ -68,23 +59,14 @@ fn generatorPolynomial(degree: usize) []const u8 {
 }
 
 pub const DecodeError = error{
-    /// More codewords are wrong than this block's error-correction budget
-    /// can account for; the correction found does not check out.
     UnrecoverableBlock,
 };
 
-/// Result of decoding one block: `errors` is how many codeword positions
-/// were corrected, useful for a caller that wants to report symbol
-/// condition (0 always means the block was read back clean).
 pub const DecodeResult = struct {
     errors: u16,
 };
 
-/// Corrects `block` (data codewords followed by `ec_len` EC codewords, the
-/// same layout `encode` consumes) in place using up to `ec_len / 2` byte
-/// errors at unknown positions. Returns the number of corrections made, or
-/// `UnrecoverableBlock` if the syndromes are inconsistent with any error
-/// pattern this block's EC budget could actually correct.
+/// Corrects one data+EC block in place.
 pub fn decode(block: []u8, ec_len: usize) DecodeError!DecodeResult {
     std.debug.assert(ec_len >= 1 and ec_len <= max_ec_codewords);
 
@@ -152,18 +134,13 @@ pub fn decode(block: []u8, ec_len: usize) DecodeError!DecodeResult {
     return .{ .errors = @intCast(num_errors) };
 }
 
-/// Evaluates the polynomial formed by `codewords` (highest degree first) at
-/// `x`, i.e. treats codewords as coefficients and runs Horner's method.
 fn evaluate(codewords: []const u8, x: u8) u8 {
     var result: u8 = 0;
     for (codewords) |c| result = gf.mul(result, x) ^ c;
     return result;
 }
 
-/// A polynomial over GF(256), coefficients highest-degree-first in
-/// `values[0..len]`; `values[len-1]` is always the constant term. Capacity
-/// is fixed at `poly_capacity`, comfortably above any degree the Euclidean
-/// algorithm below produces for QR's error-correction budgets.
+/// Fixed-capacity GF(256) polynomial, highest-degree coefficient first.
 const Poly = struct {
     values: [poly_capacity]u8 = [_]u8{0} ** poly_capacity,
     len: usize = 1,
@@ -187,7 +164,6 @@ const Poly = struct {
         return self.len == 1 and self.values[0] == 0;
     }
 
-    /// Coefficient of x^power, or 0 if power exceeds this polynomial's degree.
     fn coeffAt(self: Poly, power: usize) u8 {
         if (power > self.degree()) return 0;
         return self.values[self.len - 1 - power];
@@ -225,7 +201,6 @@ const Poly = struct {
         return result;
     }
 
-    /// Multiplies by x^shift (appends `shift` low-order zero coefficients).
     fn shifted(self: Poly, shift: usize) Poly {
         if (self.isZero()) return self;
         var result = Poly.init(self.len + shift);
@@ -245,8 +220,6 @@ const Poly = struct {
         return acc;
     }
 
-    /// Long division: returns (quotient, remainder) such that
-    /// self == quotient*divisor + remainder and deg(remainder) < deg(divisor).
     fn divide(self: Poly, divisor: Poly) struct { quotient: Poly, remainder: Poly } {
         std.debug.assert(!divisor.isZero());
         var quotient = Poly.init(1);
