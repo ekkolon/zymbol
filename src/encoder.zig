@@ -127,7 +127,8 @@ fn encodedBitLength(version: u6, payload: []const u8, utf8_eci: bool) usize {
         .auto => segment.autoBitLength(version, payload),
         .byte => segment.byteBitLength(version, payload.len),
     };
-    return payload_bits + if (utf8_eci) 12 else 0;
+    const eci_bits: usize = if (utf8_eci) 12 else 0;
+    return payload_bits + eci_bits;
 }
 
 pub fn encodeText(
