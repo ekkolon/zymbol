@@ -117,7 +117,8 @@ fn versionBand(version: u6) usize {
 }
 
 fn eciBitLength(utf8_eci: bool) usize {
-    return if (utf8_eci) 12 else 0;
+    const bits: usize = if (utf8_eci) 12 else 0;
+    return bits;
 }
 
 pub fn encodeText(
