@@ -20,7 +20,6 @@ pub const Cell = packed struct(u8) {
     _reserved: u4 = 0,
 };
 
-/// Number of cells the caller's backing slice must have for `version`.
 pub fn requiredCells(version: u6) usize {
     const s: usize = spec.size(version);
     return s * s;
@@ -113,12 +112,7 @@ fn fillAlignment(cells: []Cell, size: u16, cx: i32, cy: i32) void {
     }
 }
 
-/// Lays out every function pattern for `version`: finder patterns and
-/// their separators, timing patterns, alignment patterns, the reserved
-/// format-info area (dark placeholder, overwritten with real bits later),
-/// the reserved version-info area for version >= 7, and the single fixed
-/// dark module. Every other cell is left as `data`/light, ready for
-/// codewords to be drawn into it.
+/// Initializes all function modules; remaining cells are data modules.
 pub fn layoutFunctionPatterns(cells: []Cell, version: u6, ec_level: spec.EcLevel, mask: u3) Symbol {
     const size = spec.size(version);
     @memset(cells[0 .. @as(usize, size) * size], Cell{});
@@ -282,9 +276,6 @@ pub fn drawCodewords(symbol: *Symbol, codewords: []const u8) void {
     }
 }
 
-/// XORs every `data` cell with the given mask pattern's predicate (section
-/// 8.8.1's six formulas plus the two that split evenly, numbered 0-7).
-/// Applying the same mask twice undoes it, since XOR is its own inverse.
 pub fn applyMask(symbol: *Symbol, mask: u3) void {
     var y: usize = 0;
     while (y < symbol.size) : (y += 1) {
@@ -317,10 +308,6 @@ const penalty_n2: i32 = 3;
 const penalty_n3: i32 = 40;
 const penalty_n4: i32 = 10;
 
-/// Lower is better. Used to pick the least-penalized of the 8 masks when
-/// the caller doesn't force one; see section 8.8.2 for the four rules
-/// summed here (same-color runs, 2x2 blocks, finder-like run patterns, and
-/// the overall dark/light balance).
 pub fn penaltyScore(symbol: *const Symbol) i32 {
     var result: i32 = 0;
     const size = symbol.size;
