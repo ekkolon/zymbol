@@ -60,9 +60,9 @@ pub const Symbol = struct {
     pub fn setData(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
         if (!self.contains(x, y)) return SetError.OutOfBounds;
 
-        const index = self.index(x, y);
-        if (self.cells[index].kind != .data) return SetError.ProtectedModule;
-        self.cells[index].dark = dark;
+        const cell_index = self.index(x, y);
+        if (self.cells[cell_index].kind != .data) return SetError.ProtectedModule;
+        self.cells[cell_index].dark = dark;
     }
 
     pub fn set(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
