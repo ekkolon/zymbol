@@ -8,6 +8,7 @@ pub const Error = bitstream.Error || error{
     OddKanjiLength,
     InvalidKanjiByte,
     InvalidEciAssignment,
+    InvalidVersion,
 };
 
 const alphanumeric_charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
@@ -41,12 +42,17 @@ pub fn isAlphanumeric(text: []const u8) bool {
     return true;
 }
 
+fn validVersion(version: u6) bool {
+    return version >= spec.min_version and version <= spec.max_version;
+}
+
 fn maxCharacterCount(mode: spec.Mode, version: u6) usize {
     const bits = spec.charCountBits(mode, version);
     return (@as(usize, 1) << @intCast(bits)) - 1;
 }
 
 fn writeHeader(writer: *bitstream.Writer, mode: spec.Mode, version: u6, char_count: usize) Error!void {
+    if (!validVersion(version)) return Error.InvalidVersion;
     if (char_count > maxCharacterCount(mode, version)) return Error.TooManyCharacters;
     try writer.append(@intFromEnum(mode), 4);
     try writer.append(@intCast(char_count), @intCast(spec.charCountBits(mode, version)));
@@ -240,6 +246,13 @@ test "finalize fills the data codeword buffer" {
     try testing.expectEqual(@as(u8, 0xEC), buf[1]);
     try testing.expectEqual(@as(u8, 0x11), buf[2]);
     try testing.expectEqual(@as(u8, 0xEC), buf[3]);
+}
+
+test "invalid versions are rejected at the segment boundary" {
+    var buf: [8]u8 = undefined;
+    var writer = bitstream.Writer.init(&buf);
+    try std.testing.expectError(Error.InvalidVersion, appendByte(&writer, 0, "x"));
+    try std.testing.expectError(Error.InvalidVersion, appendNumeric(&writer, 41, "1"));
 }
 
 test "numeric packing" {
