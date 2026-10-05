@@ -20,12 +20,18 @@ pub fn maxCodewords(version: u6) usize {
     return encoder.maxCodewords(version);
 }
 
+pub const EciState = union(enum) {
+    none,
+    assignment: u21,
+    multiple,
+};
+
 pub const Result = struct {
     len: usize,
     version: u6,
     ec_level: spec.EcLevel,
     mask: u3,
-    eci: ?u21,
+    eci: EciState,
     errors_corrected: u32,
 };
 
@@ -228,7 +234,7 @@ fn modeFromBits(bits: u4) ?spec.Mode {
 
 const ParsedStream = struct {
     len: usize,
-    eci: ?u21,
+    eci: EciState,
 };
 
 fn readBits(reader: *bitstream.Reader, count: u6) Error!u32 {
@@ -238,7 +244,7 @@ fn readBits(reader: *bitstream.Reader, count: u6) Error!u32 {
 fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream {
     var reader = bitstream.Reader.init(data);
     var written: usize = 0;
-    var eci: ?u21 = null;
+    var eci: EciState = .none;
 
     while (reader.bitsRemaining() >= 4) {
         const mode_bits = try readBits(&reader, 4);
@@ -246,7 +252,15 @@ fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream 
 
         const mode = modeFromBits(@intCast(mode_bits)) orelse return Error.MalformedDataStream;
         if (mode == .eci) {
-            eci = try readEciDesignator(&reader);
+            const assignment = try readEciDesignator(&reader);
+            eci = switch (eci) {
+                .none => .{ .assignment = assignment },
+                .assignment => |current| if (current == assignment)
+                    eci
+                else
+                    .multiple,
+                .multiple => .multiple,
+            };
             continue;
         }
 
@@ -381,6 +395,20 @@ fn decodeKanji(
         try push(out, written, @intCast(value >> 8));
         try push(out, written, @intCast(value & 0xFF));
     }
+}
+
+test "multiple ECI assignments are preserved as mixed state" {
+    var bytes: [16]u8 = undefined;
+    var writer = bitstream.Writer.init(&bytes);
+    try segment.appendEci(&writer, 26);
+    try segment.appendByte(&writer, 1, "a");
+    try segment.appendEci(&writer, 3);
+    try segment.appendByte(&writer, 1, "b");
+
+    var out: [2]u8 = undefined;
+    const parsed = try parseDataStream(writer.filled(), 1, &out);
+    try std.testing.expectEqualSlices(u8, "ab", &out);
+    try std.testing.expect(parsed.eci == .multiple);
 }
 
 test "truncated segment data is rejected" {
