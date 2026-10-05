@@ -310,6 +310,31 @@ test "decode corrects damaged data modules" {
     try testing.expect(result.errors_corrected > 0);
 }
 
+test "HELLO WORLD mask penalties match the reference vector" {
+    const expected = [_]i32{ 347, 470, 506, 441, 539, 516, 314, 558 };
+
+    var mask: u3 = 0;
+    while (true) : (mask += 1) {
+        var cells: [requiredCells(1)]Cell = undefined;
+        var scratch: [requiredEncodeScratch(1)]u8 = undefined;
+        const symbol = try encodeText(
+            "HELLO WORLD",
+            .{
+                .min_version = 1,
+                .max_version = 1,
+                .ec_level = .q,
+                .boost_ec_level = false,
+                .mask = mask,
+            },
+            &cells,
+            &scratch,
+        );
+
+        try std.testing.expectEqual(expected[mask], matrix.penaltyScore(&symbol));
+        if (mask == 7) break;
+    }
+}
+
 test "decode accepts one destroyed format copy" {
     const testing = std.testing;
 
@@ -332,13 +357,13 @@ test "decode accepts one destroyed format copy" {
     var bits: [matrix.requiredCells(4)]bool = undefined;
     for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
 
-    for (0..6) |index| bits[index * symbol.size + 8] = !bits[index * symbol.size + 8];
-    bits[7 * symbol.size + 8] = !bits[7 * symbol.size + 8];
-    bits[8 * symbol.size + 8] = !bits[8 * symbol.size + 8];
-    bits[8 * symbol.size + 7] = !bits[8 * symbol.size + 7];
+    for (0..6) |index| bits[index * symbol.size + 8] = false;
+    bits[7 * symbol.size + 8] = false;
+    bits[8 * symbol.size + 8] = false;
+    bits[8 * symbol.size + 7] = false;
     for (9..15) |index| {
         const x = 14 - index;
-        bits[8 * symbol.size + x] = !bits[8 * symbol.size + x];
+        bits[8 * symbol.size + x] = false;
     }
 
     var decode_cells: [matrix.requiredCells(4)]Cell = undefined;
