@@ -11,5 +11,6 @@
         "examples/terminal_demo.zig",
         "LICENSE",
         "README.md",
+        "docs",
     },
 }
