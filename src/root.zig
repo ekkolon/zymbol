@@ -609,3 +609,54 @@ test "decode rejects version information outside the BCH radius" {
         ),
     );
 }
+
+
+test "decoder handles random structurally valid symbols without trapping" {
+    const cases = [_]struct {
+        version: Version,
+        level: EcLevel,
+        mask: u3,
+    }{
+        .{ .version = 1, .level = .l, .mask = 0 },
+        .{ .version = 7, .level = .m, .mask = 2 },
+        .{ .version = 20, .level = .q, .mask = 5 },
+        .{ .version = 40, .level = .h, .mask = 7 },
+    };
+
+    var prng = std.Random.DefaultPrng.init(0x51525A);
+    const random = prng.random();
+
+    var source_cells: [matrix.requiredCells(max_version)]Cell = undefined;
+    var bits: [matrix.requiredCells(max_version)]bool = undefined;
+    var decode_cells: [matrix.requiredCells(max_version)]Cell = undefined;
+    var decode_scratch: [encoder.maxCodewords(max_version)]u8 = undefined;
+    var out: [4096]u8 = undefined;
+
+    for (cases) |case| {
+        var sample: usize = 0;
+        while (sample < 8) : (sample += 1) {
+            const cell_count = matrix.requiredCells(case.version);
+            var symbol = matrix.layoutFunctionPatterns(
+                source_cells[0..cell_count],
+                case.version,
+                case.level,
+                case.mask,
+            );
+
+            for (0..cell_count) |cell_index| {
+                if (symbol.cells[cell_index].kind == .data) {
+                    symbol.cells[cell_index].dark = random.boolean();
+                }
+                bits[cell_index] = symbol.cells[cell_index].dark;
+            }
+
+            _ = decode(
+                bits[0..cell_count],
+                symbol.size,
+                decode_cells[0..cell_count],
+                decode_scratch[0..encoder.maxCodewords(case.version)],
+                &out,
+            ) catch continue;
+        }
+    }
+}
