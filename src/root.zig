@@ -26,6 +26,7 @@ pub const DecodeError = decoder.Error;
 pub const DecodeResult = decoder.Result;
 
 pub const encodeText = encoder.encodeText;
+pub const encodeBytes = encoder.encodeBytes;
 pub const encodeRaw = encoder.encodeRaw;
 pub const decode = decoder.decode;
 
@@ -46,6 +47,11 @@ pub fn requiredEncodeScratch(version: Version) usize {
 
 pub fn requiredDecodeScratch(version: Version) usize {
     return decoder.maxCodewords(version);
+}
+
+pub fn dataCodewords(version: Version, level: EcLevel) usize {
+    if (version < min_version or version > max_version) return 0;
+    return spec.dataCodewords(version, level);
 }
 
 test {
