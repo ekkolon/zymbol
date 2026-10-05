@@ -172,7 +172,7 @@ fn encodePayload(
     var writer = bitstream.Writer.init(data_buf[0..data_len]);
     if (utf8_eci) try segment.appendEci(&writer, 26);
     try segment.writeAuto(&writer, version, payload);
-    segment.finalize(&writer);
+    try segment.finalize(&writer);
 
     return encodeRaw(
         data_buf[0..data_len],
