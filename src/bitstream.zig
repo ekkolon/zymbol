@@ -21,11 +21,15 @@ pub const Writer = struct {
     }
 
     pub fn byteLength(self: Writer) usize {
-        return (self.bit_len + 7) / 8;
+        const capacity_bits = self.bytes.len * 8;
+        const bounded = @min(self.bit_len, capacity_bits);
+        return (bounded + 7) / 8;
     }
 
     pub fn bitsRemaining(self: Writer) usize {
-        return self.bytes.len * 8 - self.bit_len;
+        const capacity_bits = self.bytes.len * 8;
+        if (self.bit_len >= capacity_bits) return 0;
+        return capacity_bits - self.bit_len;
     }
 
     pub fn filled(self: *const Writer) []const u8 {
@@ -72,7 +76,9 @@ pub const Reader = struct {
     }
 
     pub fn bitsRemaining(self: Reader) usize {
-        return self.bytes.len * 8 - self.bit_pos;
+        const capacity_bits = self.bytes.len * 8;
+        if (self.bit_pos >= capacity_bits) return 0;
+        return capacity_bits - self.bit_pos;
     }
 
     pub fn read(self: *Reader, count: u6) Error!u32 {
@@ -91,6 +97,18 @@ pub const Reader = struct {
         return result;
     }
 };
+
+test "invalid public cursor state fails closed" {
+    var bytes: [1]u8 = .{0};
+    var writer = Writer.init(&bytes);
+    writer.bit_len = 9;
+    try std.testing.expectError(Error.BufferFull, writer.append(1, 1));
+    try std.testing.expectEqual(@as(usize, 1), writer.filled().len);
+
+    var reader = Reader.init(&bytes);
+    reader.bit_pos = 9;
+    try std.testing.expectError(Error.EndOfStream, reader.read(1));
+}
 
 test "writer packs bits MSB-first" {
     const testing = std.testing;
