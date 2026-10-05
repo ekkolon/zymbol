@@ -106,9 +106,12 @@ The decoder corrects one Reed-Solomon block at a time instead of materializing e
 zig build test
 zig build wasm
 zig build example
+zig build qualify
 ```
 
-The package currently supports Zig 0.16.0 as its minimum version.
+The package currently supports Zig 0.16.0 as its minimum version. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall and compiles the core for `wasm32-freestanding` in ReleaseFast.
+
+The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
 
 ## Source layout
 

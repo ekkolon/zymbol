@@ -167,6 +167,63 @@ fn roundTripBytes(data: []const u8, options: EncodeOptions) !void {
     });
 }
 
+test "decoder public boundaries return errors" {
+    var no_cells: [0]Cell = .{};
+    var no_scratch: [0]u8 = .{};
+    var no_out: [0]u8 = .{};
+
+    try std.testing.expectError(
+        DecodeError.InvalidSize,
+        decode(&.{}, 20, &no_cells, &no_scratch, &no_out),
+    );
+
+    try std.testing.expectError(
+        DecodeError.InputTooSmall,
+        decode(&.{}, 21, &no_cells, &no_scratch, &no_out),
+    );
+
+    var bits: [requiredCells(1)]bool = [_]bool{false} ** requiredCells(1);
+    try std.testing.expectError(
+        DecodeError.CellBufferTooSmall,
+        decode(&bits, 21, &no_cells, &no_scratch, &no_out),
+    );
+
+    var decode_cells: [requiredCells(1)]Cell = undefined;
+    try std.testing.expectError(
+        DecodeError.ScratchTooSmall,
+        decode(&bits, 21, &decode_cells, &no_scratch, &no_out),
+    );
+
+    var source_cells: [requiredCells(1)]Cell = undefined;
+    var encode_scratch: [requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try encodeText(
+        "A",
+        .{
+            .min_version = 1,
+            .max_version = 1,
+            .ec_level = .l,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &source_cells,
+        &encode_scratch,
+    );
+
+    for (0..bits.len) |index| bits[index] = symbol.cells[index].dark;
+
+    var decode_scratch: [requiredDecodeScratch(1)]u8 = undefined;
+    try std.testing.expectError(
+        DecodeError.OutputTooSmall,
+        decode(
+            &bits,
+            symbol.size,
+            &decode_cells,
+            &decode_scratch,
+            &no_out,
+        ),
+    );
+}
+
 test "HELLO WORLD matches published version 1-Q matrix" {
     const expected = [_][]const u8{
         "#######....#..#######",
@@ -608,4 +665,55 @@ test "decode rejects version information outside the BCH radius" {
             &out,
         ),
     );
+}
+
+
+test "decoder handles random structurally valid symbols without trapping" {
+    const cases = [_]struct {
+        version: Version,
+        level: EcLevel,
+        mask: u3,
+    }{
+        .{ .version = 1, .level = .l, .mask = 0 },
+        .{ .version = 7, .level = .m, .mask = 2 },
+        .{ .version = 20, .level = .q, .mask = 5 },
+        .{ .version = 40, .level = .h, .mask = 7 },
+    };
+
+    var prng = std.Random.DefaultPrng.init(0x51525A);
+    const random = prng.random();
+
+    var source_cells: [matrix.requiredCells(max_version)]Cell = undefined;
+    var bits: [matrix.requiredCells(max_version)]bool = undefined;
+    var decode_cells: [matrix.requiredCells(max_version)]Cell = undefined;
+    var decode_scratch: [encoder.maxCodewords(max_version)]u8 = undefined;
+    var out: [4096]u8 = undefined;
+
+    for (cases) |case| {
+        var sample: usize = 0;
+        while (sample < 8) : (sample += 1) {
+            const cell_count = matrix.requiredCells(case.version);
+            var symbol = matrix.layoutFunctionPatterns(
+                source_cells[0..cell_count],
+                case.version,
+                case.level,
+                case.mask,
+            );
+
+            for (0..cell_count) |cell_index| {
+                if (symbol.cells[cell_index].kind == .data) {
+                    symbol.cells[cell_index].dark = random.int(u1) != 0;
+                }
+                bits[cell_index] = symbol.cells[cell_index].dark;
+            }
+
+            _ = decode(
+                bits[0..cell_count],
+                symbol.size,
+                decode_cells[0..cell_count],
+                decode_scratch[0..encoder.maxCodewords(case.version)],
+                &out,
+            ) catch continue;
+        }
+    }
 }
