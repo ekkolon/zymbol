@@ -193,6 +193,45 @@ fn nearestFormatCandidate(bits: u15) ?FormatCandidate {
     return best;
 }
 
+test "format BCH recovers every corruption within distance three" {
+    const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
+
+    for (levels) |level| {
+        var mask: u3 = 0;
+        while (true) : (mask += 1) {
+            const expected = FormatInfo{ .level = level, .mask = mask };
+            const codeword = spec.formatInfoBits(level, mask);
+
+            const clean = nearestFormatCandidate(codeword) orelse return error.TestUnexpectedResult;
+            try std.testing.expect(sameFormat(expected, clean.info));
+            try std.testing.expectEqual(@as(u32, 0), clean.distance);
+
+            var first: usize = 0;
+            while (first < 15) : (first += 1) {
+                const one = codeword ^ (@as(u15, 1) << @intCast(first));
+                const recovered_one = nearestFormatCandidate(one) orelse return error.TestUnexpectedResult;
+                try std.testing.expect(sameFormat(expected, recovered_one.info));
+
+                var second = first + 1;
+                while (second < 15) : (second += 1) {
+                    const two = one ^ (@as(u15, 1) << @intCast(second));
+                    const recovered_two = nearestFormatCandidate(two) orelse return error.TestUnexpectedResult;
+                    try std.testing.expect(sameFormat(expected, recovered_two.info));
+
+                    var third = second + 1;
+                    while (third < 15) : (third += 1) {
+                        const three = two ^ (@as(u15, 1) << @intCast(third));
+                        const recovered_three = nearestFormatCandidate(three) orelse return error.TestUnexpectedResult;
+                        try std.testing.expect(sameFormat(expected, recovered_three.info));
+                    }
+                }
+            }
+
+            if (mask == 7) break;
+        }
+    }
+}
+
 fn sameFormat(a: FormatInfo, b: FormatInfo) bool {
     return a.level == b.level and a.mask == b.mask;
 }
