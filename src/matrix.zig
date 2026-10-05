@@ -1,13 +1,4 @@
-//! The module grid itself: laying out finder/timing/alignment patterns,
-//! placing codeword bits in the standard's zigzag order, applying a mask,
-//! and scoring mask candidates by the four penalty rules of section 8.8.2.
-//!
-//! Every function here operates on a caller-supplied `[]Cell` slice sized
-//! for the symbol's version (see `requiredCells`); nothing is allocated.
-//! Each cell carries both its color and its `ModuleKind`, which is what
-//! lets a caller safely recolor a symbol for artistic purposes: `data`
-//! cells can be touched freely within the error-correction budget, and
-//! every other kind is load-bearing for scanning.
+//! QR Code Model 2 module layout, masking, and penalty scoring.
 
 const std = @import("std");
 const spec = @import("spec.zig");
@@ -99,10 +90,6 @@ fn set(cells: []Cell, size: u16, x: i32, y: i32, dark: bool, kind: ModuleKind) v
 }
 
 fn fillFinder(cells: []Cell, size: u16, cx: i32, cy: i32) void {
-    // A 9x9 block centered on the finder's own center, covering the finder
-    // pattern proper (the ring structure out to radius 3) and the light
-    // separator ring at radius 4. Cells outside the symbol are dropped by
-    // `set`, which is what lets one shared routine handle all 3 corners.
     var dy: i32 = -4;
     while (dy <= 4) : (dy += 1) {
         var dx: i32 = -4;
@@ -136,9 +123,6 @@ pub fn layoutFunctionPatterns(cells: []Cell, version: u6, ec_level: spec.EcLevel
     const size = spec.size(version);
     @memset(cells[0 .. @as(usize, size) * size], Cell{});
 
-    // Timing patterns: alternating dark/light along row 6 and column 6,
-    // spanning the full symbol; the finder corners will overwrite their
-    // ends momentarily, same as the reference construction does.
     var i: i32 = 0;
     while (i < size) : (i += 1) {
         const dark = @rem(i, 2) == 0;
@@ -226,13 +210,6 @@ fn drawVersionInfo(symbol: *Symbol) void {
     var i: i32 = 0;
     while (i < 18) : (i += 1) {
         const dark = (bits >> @intCast(i)) & 1 != 0;
-        // i%3 is the fine-grained position within the 3-wide dimension
-        // (combined with the size-11 offset); i/3 is the coarse position
-        // along the 6-long dimension. Getting these two swapped produces a
-        // symbol that looks fine and round-trips against this library's
-        // own decoder, but is wrong per the standard and unreadable by any
-        // other implementation — exactly what independent cross-checking
-        // against a second decoder (not just this library's own) caught.
         const fine = @rem(i, 3);
         const coarse = @divTrunc(i, 3);
         set(symbol.cells, symbol.size, size - 11 + fine, coarse, dark, .version);
@@ -475,15 +452,11 @@ test "function pattern layout marks exactly the modules the standard reserves" {
     var buf: [21 * 21]Cell = undefined;
     const symbol = layoutFunctionPatterns(&buf, 1, .m, 0);
     try testing.expectEqual(@as(u16, 21), symbol.size);
-    // Top-left finder core is dark; the module just outside it (start of
-    // the separator ring) must be light.
     try testing.expect(symbol.isDark(0, 0));
     try testing.expect(!symbol.isDark(7, 7));
     try testing.expectEqual(ModuleKind.finder, symbol.kindAt(0, 0).?);
     try testing.expectEqual(ModuleKind.separator, symbol.kindAt(7, 0).?);
-    // The fixed dark module at (8, size-8) is always dark.
     try testing.expect(symbol.isDark(8, 21 - 8));
-    // A cell in the interior with nothing special going on is untouched data.
     try testing.expectEqual(ModuleKind.data, symbol.kindAt(12, 12).?);
 }
 
