@@ -127,7 +127,7 @@ const FormatCandidate = struct {
 };
 
 fn readFormatBit(symbol: *const matrix.Symbol, x: usize, y: usize) u1 {
-    return @intFromBool(symbol.isDark(x, y));
+    return @intFromBool(matrix.isDarkUnchecked(symbol, x, y));
 }
 
 fn nearestFormatCandidate(bits: u15) ?FormatCandidate {
@@ -209,7 +209,7 @@ fn readCodewords(symbol: *const matrix.Symbol, out: []u8) void {
     var iterator = matrix.DataIterator.init(symbol.size);
     for (0..out.len * 8) |bit_index| {
         const position = iterator.next(symbol) orelse unreachable;
-        if (symbol.isDark(position.x, position.y)) {
+        if (matrix.isDarkUnchecked(symbol, position.x, position.y)) {
             out[bit_index >> 3] |= @as(u8, 1) << @intCast(7 - (bit_index & 7));
         }
     }
