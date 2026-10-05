@@ -46,5 +46,4 @@ pub fn build(b: *std.Build) void {
 
     const example_step = b.step("example", "Run the terminal example");
     example_step.dependOn(&run_example.step);
-    b.installArtifact(example);
 }
