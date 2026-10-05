@@ -9,6 +9,7 @@ pub const Error = bitstream.Error || error{
     InvalidKanjiByte,
     InvalidEciAssignment,
     InvalidVersion,
+    ScratchTooSmall,
 };
 
 const alphanumeric_charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
@@ -139,7 +140,7 @@ pub fn appendEci(writer: *bitstream.Writer, assignment: u21) Error!void {
     }
 }
 
-const Class = enum {
+const Class = enum(u2) {
     numeric,
     alphanumeric,
     byte,
@@ -159,17 +160,151 @@ fn classify(character: u8) Class {
     return .byte;
 }
 
-fn appendRun(writer: *bitstream.Writer, version: u6, class: Class, run: []const u8) Error!void {
-    const max_count = maxCharacterCount(class.mode(), version);
-    var offset: usize = 0;
-    while (offset < run.len) {
-        const end = @min(offset + max_count, run.len);
-        switch (class) {
-            .numeric => try appendNumeric(writer, version, run[offset..end]),
-            .alphanumeric => try appendAlphanumeric(writer, version, run[offset..end]),
-            .byte => try appendByte(writer, version, run[offset..end]),
+fn canEncode(class: Class, character: u8) bool {
+    return switch (class) {
+        .numeric => character >= '0' and character <= '9',
+        .alphanumeric => alphanumericValue(character) != null,
+        .byte => true,
+    };
+}
+
+fn appendClass(
+    writer: *bitstream.Writer,
+    version: u6,
+    class: Class,
+    bytes: []const u8,
+) Error!void {
+    switch (class) {
+        .numeric => try appendNumeric(writer, version, bytes),
+        .alphanumeric => try appendAlphanumeric(writer, version, bytes),
+        .byte => try appendByte(writer, version, bytes),
+    }
+}
+
+fn payloadBits(class: Class, count: usize) usize {
+    return switch (class) {
+        .numeric => (count / 3) * 10 + ([_]usize{ 0, 4, 7 })[count % 3],
+        .alphanumeric => (count / 2) * 11 + (count % 2) * 6,
+        .byte => count * 8,
+    };
+}
+
+pub const max_auto_input_len: usize = blk: {
+    const capacity_bits = @as(usize, spec.dataCodewords(spec.max_version, .l)) * 8;
+    const header_bits = 4 + @as(usize, spec.charCountBits(.numeric, spec.max_version));
+    var count: usize = 0;
+    while (header_bits + payloadBits(.numeric, count + 1) <= capacity_bits) : (count += 1) {}
+    break :blk count;
+};
+
+pub fn optimalScratchBytes(input_len: usize) usize {
+    return (input_len + 1) * 2;
+}
+
+fn readU16(bytes: []const u8, index: usize) u16 {
+    const offset = index * 2;
+    return @as(u16, bytes[offset]) | (@as(u16, bytes[offset + 1]) << 8);
+}
+
+fn writeU16(bytes: []u8, index: usize, value: u16) void {
+    const offset = index * 2;
+    bytes[offset] = @truncate(value);
+    bytes[offset + 1] = @truncate(value >> 8);
+}
+
+fn runPlanner(
+    version: u6,
+    text: []const u8,
+    costs: []u8,
+    trace: ?[]u8,
+) Error!usize {
+    if (!validVersion(version)) return Error.InvalidVersion;
+    if (text.len > max_auto_input_len) return Error.TooManyCharacters;
+
+    const required = optimalScratchBytes(text.len);
+    if (costs.len < required) return Error.ScratchTooSmall;
+    if (trace) |storage| {
+        if (storage.len < required) return Error.ScratchTooSmall;
+    }
+
+    const unreachable_cost = std.math.maxInt(u16);
+    for (0..text.len + 1) |index| writeU16(costs, index, unreachable_cost);
+    writeU16(costs, 0, 0);
+
+    const classes = [_]Class{ .numeric, .alphanumeric, .byte };
+
+    var start: usize = 0;
+    while (start < text.len) : (start += 1) {
+        const prefix_cost = readU16(costs, start);
+        if (prefix_cost == unreachable_cost) continue;
+
+        for (classes) |class| {
+            const max_count = maxCharacterCount(class.mode(), version);
+            const header_bits = 4 + @as(usize, spec.charCountBits(class.mode(), version));
+            const limit = @min(text.len, start + max_count);
+
+            var end = start;
+            while (end < limit and canEncode(class, text[end])) {
+                end += 1;
+                const segment_bits = header_bits + payloadBits(class, end - start);
+                const candidate: usize = @as(usize, prefix_cost) + segment_bits;
+                if (candidate >= unreachable_cost) continue;
+
+                if (candidate < readU16(costs, end)) {
+                    writeU16(costs, end, @intCast(candidate));
+                    if (trace) |storage| {
+                        const predecessor: u16 =
+                            (@as(u16, @intCast(start)) << 2) |
+                            @as(u16, @intFromEnum(class));
+                        writeU16(storage, end, predecessor);
+                    }
+                }
+            }
         }
-        offset = end;
+    }
+
+    return readU16(costs, text.len);
+}
+
+pub fn optimalBitLength(
+    version: u6,
+    text: []const u8,
+    scratch: []u8,
+) Error!usize {
+    return runPlanner(version, text, scratch, null);
+}
+
+pub fn writeOptimal(
+    writer: *bitstream.Writer,
+    version: u6,
+    text: []const u8,
+    costs: []u8,
+    trace: []u8,
+) Error!void {
+    const total_bits = try runPlanner(version, text, costs, trace);
+    if (total_bits == std.math.maxInt(u16)) return Error.TooManyCharacters;
+    if (text.len == 0) return;
+
+    var segment_count: usize = 0;
+    var end = text.len;
+    while (end > 0) {
+        writeU16(costs, segment_count, @intCast(end));
+        segment_count += 1;
+
+        const predecessor = readU16(trace, end);
+        end = predecessor >> 2;
+    }
+
+    var start: usize = 0;
+    var index = segment_count;
+    while (index > 0) {
+        index -= 1;
+        end = readU16(costs, index);
+        const predecessor = readU16(trace, end);
+        const class: Class = @enumFromInt(predecessor & 0b11);
+
+        try appendClass(writer, version, class, text[start..end]);
+        start = end;
     }
 }
 
@@ -179,7 +314,7 @@ pub fn writeAuto(writer: *bitstream.Writer, version: u6, text: []const u8) Error
         const class = classify(text[index]);
         var end = index + 1;
         while (end < text.len and classify(text[end]) == class) : (end += 1) {}
-        try appendRun(writer, version, class, text[index..end]);
+        try appendClass(writer, version, class, text[index..end]);
         index = end;
     }
 }
@@ -210,41 +345,6 @@ pub fn byteBitLength(version: u6, data_len: usize) usize {
     return total;
 }
 
-fn payloadBits(class: Class, count: usize) usize {
-    return switch (class) {
-        .numeric => (count / 3) * 10 + ([_]usize{ 0, 4, 7 })[count % 3],
-        .alphanumeric => (count / 2) * 11 + (count % 2) * 6,
-        .byte => count * 8,
-    };
-}
-
-fn runBitLength(version: u6, class: Class, run_len: usize) usize {
-    const max_count = maxCharacterCount(class.mode(), version);
-    var remaining = run_len;
-    var total: usize = 0;
-
-    while (remaining > 0) {
-        const count = @min(remaining, max_count);
-        total += 4 + spec.charCountBits(class.mode(), version) + payloadBits(class, count);
-        remaining -= count;
-    }
-    return total;
-}
-
-pub fn autoBitLength(version: u6, text: []const u8) usize {
-    var total: usize = 0;
-    var index: usize = 0;
-
-    while (index < text.len) {
-        const class = classify(text[index]);
-        var end = index + 1;
-        while (end < text.len and classify(text[end]) == class) : (end += 1) {}
-        total += runBitLength(version, class, end - index);
-        index = end;
-    }
-    return total;
-}
-
 pub fn finalize(writer: *bitstream.Writer) Error!void {
     const capacity_bits = writer.bytes.len * 8;
     if (writer.bit_len > capacity_bits) return Error.BufferFull;
@@ -259,6 +359,38 @@ pub fn finalize(writer: *bitstream.Writer) Error!void {
     while (writer.bit_len < capacity_bits) {
         try writer.append(pad_byte, 8);
         pad_byte ^= 0xFD;
+    }
+}
+
+test "optimal planner keeps encodable runs together" {
+    var costs: [64]u8 = undefined;
+    var trace: [64]u8 = undefined;
+    var data: [16]u8 = undefined;
+    var writer = bitstream.Writer.init(&data);
+
+    try writeOptimal(&writer, 1, "A123B", &costs, &trace);
+
+    try std.testing.expectEqual(@as(usize, 41), writer.bitLength());
+}
+
+test "optimal bit length and writer agree" {
+    const samples = [_][]const u8{
+        "HELLO WORLD",
+        "A123B",
+        "1234567890abcdef1234567890",
+        "ABC123456789012345XYZ",
+    };
+
+    for (samples) |sample| {
+        var costs: [256]u8 = undefined;
+        var trace: [256]u8 = undefined;
+        var data: [128]u8 = undefined;
+
+        const expected = try optimalBitLength(5, sample, &costs);
+        var writer = bitstream.Writer.init(&data);
+        try writeOptimal(&writer, 5, sample, &costs, &trace);
+
+        try std.testing.expectEqual(expected, writer.bitLength());
     }
 }
 
