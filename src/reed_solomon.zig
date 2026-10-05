@@ -1,21 +1,4 @@
-//! Reed-Solomon coding over the same GF(256) field QR Code error correction
-//! uses (ISO/IEC 18004 section 6.5.2, generator element 2). A codeword
-//! polynomial is a byte sequence read highest-degree coefficient first,
-//! which is the order codewords already appear in a data block, so the
-//! functions below operate on plain `[]u8` wherever the degree convention
-//! doesn't need to be explicit.
-//!
-//! Encoding follows the standard's own construction directly: divide the
-//! shifted message by a generator with roots 2^0..2^(degree-1) and the
-//! remainder is the EC codewords.
-//!
-//! Decoding is the classical syndrome / Euclidean-algorithm / Forney
-//! pipeline, the same shape used by most deployed QR decoders. It is
-//! entirely a general Reed-Solomon technique with nothing QR-specific in
-//! it beyond the choice of field, so it is verified here by property tests
-//! (encode, corrupt up to the guaranteed correction capacity, decode,
-//! compare) rather than by known-answer vectors, which don't meaningfully
-//! exist for arbitrary corruption patterns.
+//! Reed-Solomon encoding and correction over GF(256)/0x11D.
 
 const std = @import("std");
 const gf = @import("gf256.zig");
@@ -36,10 +19,6 @@ pub fn encode(data: []const u8, degree: usize, ec_out: []u8) void {
     std.debug.assert(degree >= 1 and degree <= max_ec_codewords);
     const generator = generatorPolynomial(degree);
 
-    // Polynomial long division of (data padded with `degree` zero low-order
-    // coefficients) by `generator`, keeping only the running remainder: the
-    // classic linear-feedback-shift-register form of the division, so nothing
-    // beyond a `degree`-sized register is ever materialized.
     @memset(ec_out, 0);
     for (data) |coefficient| {
         const factor = coefficient ^ ec_out[0];
@@ -80,9 +59,6 @@ const generators: [max_ec_codewords + 1][max_ec_codewords]u8 = blk: {
     break :blk table;
 };
 
-/// `gf.mul` is already comptime-callable (it only reads comptime tables and
-/// branches), but spelling that out here documents why the generator table
-/// above is allowed to call it inside a `comptime` block.
 inline fn gfMulComptime(a: u8, b: u8) u8 {
     return gf.mul(a, b);
 }
@@ -170,10 +146,6 @@ pub fn decode(block: []u8, ec_len: usize) DecodeError!DecodeResult {
         block[positions[i]] ^= magnitude;
     }
 
-    // A correction that doesn't bring every syndrome back to zero means the
-    // error pattern found is not actually consistent with the received
-    // block; treat that as uncorrectable rather than returning silently
-    // wrong data.
     for (0..ec_len) |i| {
         if (evaluate(block, gf.pow2(@intCast(i))) != 0) return DecodeError.UnrecoverableBlock;
     }
@@ -299,12 +271,6 @@ fn evaluate2(coeffs: []const u8, x: u8) u8 {
 
 const EuclideanResult = struct { sigma: Poly, omega: Poly };
 
-/// Extended Euclidean algorithm run between the modulus `x^ec_len` and the
-/// syndrome polynomial, stopped once the remainder's degree drops below
-/// `ec_len/2`: a standard construction of the error locator (`sigma`) and
-/// error evaluator (`omega`) polynomials for Reed-Solomon decoding, in the
-/// same shape used by (among others) the ZXing-derived decoders that
-/// underpin most deployed QR readers.
 fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) DecodeError!EuclideanResult {
     var r_last = a_in;
     var r = b_in;
@@ -339,9 +305,6 @@ fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) DecodeError!EuclideanResult 
 
 test "generator polynomials are monic products of the right roots" {
     const testing = std.testing;
-    // Degree 2: (x - 1)(x - 2) = x^2 - 3x + 2 = x^2 + x + 2 over GF(2) coeffs... but
-    // arithmetic is in GF(256), so check by evaluating the generator (with implicit
-    // leading 1) at its two roots and expecting zero both times.
     const g = generatorPolynomial(2);
     var full: [3]u8 = .{ 1, g[0], g[1] };
     try testing.expectEqual(@as(u8, 0), evaluate2(&full, gf.pow2(0)));
