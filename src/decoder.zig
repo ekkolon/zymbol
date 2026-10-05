@@ -1,6 +1,7 @@
 const std = @import("std");
 const spec = @import("spec.zig");
 const bitstream = @import("bitstream.zig");
+const segment = @import("segment.zig");
 const reed_solomon = @import("reed_solomon.zig");
 const matrix = @import("matrix.zig");
 const encoder = @import("encoder.zig");
@@ -408,7 +409,10 @@ test "multiple ECI assignments are preserved as mixed state" {
     var out: [2]u8 = undefined;
     const parsed = try parseDataStream(writer.filled(), 1, &out);
     try std.testing.expectEqualSlices(u8, "ab", &out);
-    try std.testing.expect(parsed.eci == .multiple);
+    switch (parsed.eci) {
+        .multiple => {},
+        else => return error.TestExpectedEqual,
+    }
 }
 
 test "truncated segment data is rejected" {
