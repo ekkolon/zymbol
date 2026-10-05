@@ -49,7 +49,7 @@ pub fn build(b: *std.Build) void {
 
     const qualify_step = b.step("qualify", "Run release qualification");
 
-    inline for (.{ .Debug, .ReleaseSafe, .ReleaseFast }) |mode| {
+    inline for ([_]std.builtin.OptimizeMode{ .Debug, .ReleaseSafe, .ReleaseFast }) |mode| {
         const qualification_module = b.createModule(.{
             .root_source_file = b.path("src/root.zig"),
             .target = target,
