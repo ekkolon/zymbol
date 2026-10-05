@@ -24,6 +24,7 @@ pub const EncodeOptions = encoder.Options;
 pub const EncodeError = encoder.Error;
 pub const DecodeError = decoder.Error;
 pub const DecodeResult = decoder.Result;
+pub const EciState = decoder.EciState;
 pub const BitWriter = bitstream.Writer;
 pub const BitstreamError = bitstream.Error;
 pub const SegmentError = segment.Error;
@@ -105,7 +106,47 @@ fn roundTrip(text: []const u8, options: EncodeOptions) !void {
             break;
         }
     }
-    try testing.expectEqual(if (non_ascii) @as(?u21, 26) else null, result.eci);
+    switch (result.eci) {
+        .none => try testing.expect(!non_ascii),
+        .assignment => |assignment| {
+            try testing.expect(non_ascii);
+            try testing.expectEqual(@as(u21, 26), assignment);
+        },
+        .multiple => return error.TestUnexpectedResult,
+    }
+}
+
+fn roundTripBytes(data: []const u8, options: EncodeOptions) !void {
+    const testing = std.testing;
+
+    var cells: [matrix.requiredCells(max_version)]Cell = undefined;
+    var encode_scratch: [encoder.maxCodewords(max_version)]u8 = undefined;
+    const symbol = try encodeBytes(data, options, &cells, &encode_scratch);
+
+    var bits: [matrix.requiredCells(max_version)]bool = undefined;
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
+
+    var decode_cells: [matrix.requiredCells(max_version)]Cell = undefined;
+    var decode_scratch: [encoder.maxCodewords(max_version)]u8 = undefined;
+    var out: [4096]u8 = undefined;
+    const result = try decode(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &decode_scratch,
+        &out,
+    );
+
+    try testing.expectEqualSlices(u8, data, out[0..result.len]);
+    try testing.expectEqual(symbol.version, result.version);
+    try testing.expectEqual(symbol.ec_level, result.ec_level);
+    try testing.expectEqual(symbol.mask, result.mask);
+    try testing.expectEqual(@as(u32, 0), result.errors_corrected);
+    try testing.expect(switch (result.eci) {
+        .none => true,
+        else => false,
+    });
 }
 
 test "round trip all versions and EC levels" {
@@ -154,6 +195,14 @@ test "round trip numeric and byte modes" {
         "lowercase, punctuation & byte mode",
         .{ .ec_level = .q, .boost_ec_level = false },
     );
+}
+
+test "round trip arbitrary binary payload" {
+    const data = [_]u8{
+        0x00, 0xFF, 0x80, 0xC0, 0x7F, 0x01, 0xFE, 0x41,
+        0x31, 0x00, 0x90, 0x10, 0xEF, 0xBE, 0xAD, 0xDE,
+    };
+    try roundTripBytes(&data, .{ .ec_level = .q, .boost_ec_level = false });
 }
 
 test "round trip UTF-8 with ECI" {
