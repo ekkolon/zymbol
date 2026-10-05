@@ -386,8 +386,8 @@ fn decodeKanji(
     written: *usize,
 ) Error!void {
     for (0..character_count) |_| {
-        const packed = try readBits(reader, 13);
-        var value: u32 = (packed / 0xC0) << 8 | (packed % 0xC0);
+        const encoded = try readBits(reader, 13);
+        var value: u32 = (encoded / 0xC0) << 8 | (encoded % 0xC0);
         value += if (value < 0x1F00) @as(u32, 0x8140) else @as(u32, 0xC140);
 
         const valid = (value >= 0x8140 and value <= 0x9FFC) or
