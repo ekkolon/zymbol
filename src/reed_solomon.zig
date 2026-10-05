@@ -303,6 +303,66 @@ fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) DecodeError!EuclideanResult 
     return .{ .sigma = t.scale(inverse), .omega = r.scale(inverse) };
 }
 
+test "HELLO WORLD matches version 1-Q error correction codewords" {
+    const data = [_]u8{
+        0x20, 0x5B, 0x0B, 0x78, 0xD1, 0x72, 0xDC,
+        0x4D, 0x43, 0x40, 0xEC, 0x11, 0xEC,
+    };
+    const expected = [_]u8{
+        0xA8, 0x48, 0x16, 0x52, 0xD9, 0x36, 0x9C,
+        0x00, 0x2E, 0x0F, 0xB4, 0x7A, 0x10,
+    };
+
+    var ec: [expected.len]u8 = undefined;
+    encode(&data, ec.len, &ec);
+    try std.testing.expectEqualSlices(u8, &expected, &ec);
+}
+
+test "decode corrects every QR block layout at its guaranteed limit" {
+    const spec = @import("spec.zig");
+    const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
+
+    var version: u6 = spec.min_version;
+    while (version <= spec.max_version) : (version += 1) {
+        for (levels) |level| {
+            const layout = spec.blockLayout(version, level);
+            const ec_len: usize = layout.ec_per_block;
+            const short_len: usize = layout.short_data_codewords;
+            const lengths = [_]usize{ short_len, short_len + @intFromBool(layout.long_blocks > 0) };
+
+            for (lengths, 0..) |data_len, layout_index| {
+                if (layout_index == 1 and layout.long_blocks == 0) continue;
+
+                var data: [255]u8 = undefined;
+                for (data[0..data_len], 0..) |*byte, index| {
+                    byte.* = @truncate(index * 37 + version);
+                }
+
+                var ec: [max_ec_codewords]u8 = undefined;
+                encode(data[0..data_len], ec_len, ec[0..ec_len]);
+
+                var block: [255]u8 = undefined;
+                @memcpy(block[0..data_len], data[0..data_len]);
+                @memcpy(block[data_len .. data_len + ec_len], ec[0..ec_len]);
+                const block_len = data_len + ec_len;
+
+                var used = [_]bool{false} ** 255;
+                var injected: usize = 0;
+                while (injected < ec_len / 2) : (injected += 1) {
+                    var position = (injected * 17 + version) % block_len;
+                    while (used[position]) position = (position + 1) % block_len;
+                    used[position] = true;
+                    block[position] ^= @intCast(injected + 1);
+                }
+
+                const result = try decode(block[0..block_len], ec_len);
+                try std.testing.expectEqual(@as(u16, @intCast(ec_len / 2)), result.errors);
+                try std.testing.expectEqualSlices(u8, data[0..data_len], block[0..data_len]);
+            }
+        }
+    }
+}
+
 test "generator polynomials are monic products of the right roots" {
     const testing = std.testing;
     const g = generatorPolynomial(2);
