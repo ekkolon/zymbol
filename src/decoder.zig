@@ -12,6 +12,7 @@ pub const Error = error{
     CellBufferTooSmall,
     ScratchTooSmall,
     InvalidFormatInfo,
+    InvalidVersionInfo,
     UnrecoverableBlock,
     MalformedDataStream,
     OutputTooSmall,
@@ -63,6 +64,7 @@ pub fn decode(
         symbol.cells[index].dark = bits[index];
     }
 
+    try validateVersionInfo(&symbol, version);
     const format = try recoverFormatInfo(&symbol);
     symbol.ec_level = format.level;
     symbol.mask = format.mask;
@@ -122,6 +124,33 @@ pub fn decode(
         .eci = parsed.eci,
         .errors_corrected = errors_corrected,
     };
+}
+
+fn validateVersionInfo(symbol: *const matrix.Symbol, version: u6) Error!void {
+    if (version < 7) return;
+
+    const expected = spec.versionInfoBits(version);
+    const size: usize = symbol.size;
+    var first: u18 = 0;
+    var second: u18 = 0;
+
+    var bit_index: usize = 0;
+    while (bit_index < 18) : (bit_index += 1) {
+        const a = size - 11 + bit_index % 3;
+        const b = bit_index / 3;
+        if (matrix.isDarkUnchecked(symbol, a, b)) {
+            first |= @as(u18, 1) << @intCast(bit_index);
+        }
+        if (matrix.isDarkUnchecked(symbol, b, a)) {
+            second |= @as(u18, 1) << @intCast(bit_index);
+        }
+    }
+
+    if (spec.hammingDistance(first, expected) > 3 and
+        spec.hammingDistance(second, expected) > 3)
+    {
+        return Error.InvalidVersionInfo;
+    }
 }
 
 const FormatInfo = struct {
