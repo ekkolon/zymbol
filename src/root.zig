@@ -430,3 +430,92 @@ test "decode rejects conflicting valid format copies" {
         ),
     );
 }
+
+
+test "decode uses redundant version information" {
+    var cells: [matrix.requiredCells(7)]Cell = undefined;
+    var encode_scratch: [encoder.maxCodewords(7)]u8 = undefined;
+    const symbol = try encodeText(
+        "VERSION REDUNDANCY",
+        .{
+            .min_version = 7,
+            .max_version = 7,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 2,
+        },
+        &cells,
+        &encode_scratch,
+    );
+
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    var bits: [matrix.requiredCells(7)]bool = undefined;
+    for (0..cell_count) |cell_index| bits[cell_index] = symbol.cells[cell_index].dark;
+
+    for (0..4) |bit_index| {
+        const x = @as(usize, symbol.size) - 11 + bit_index % 3;
+        const y = bit_index / 3;
+        const cell_index = y * symbol.size + x;
+        bits[cell_index] = !bits[cell_index];
+    }
+
+    var decode_cells: [matrix.requiredCells(7)]Cell = undefined;
+    var decode_scratch: [encoder.maxCodewords(7)]u8 = undefined;
+    var out: [64]u8 = undefined;
+    const result = try decode(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &decode_scratch,
+        &out,
+    );
+
+    try std.testing.expectEqualSlices(u8, "VERSION REDUNDANCY", out[0..result.len]);
+}
+
+test "decode rejects version information outside the BCH radius" {
+    var cells: [matrix.requiredCells(7)]Cell = undefined;
+    var encode_scratch: [encoder.maxCodewords(7)]u8 = undefined;
+    const symbol = try encodeText(
+        "VERSION CHECK",
+        .{
+            .min_version = 7,
+            .max_version = 7,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 2,
+        },
+        &cells,
+        &encode_scratch,
+    );
+
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    var bits: [matrix.requiredCells(7)]bool = undefined;
+    for (0..cell_count) |cell_index| bits[cell_index] = symbol.cells[cell_index].dark;
+
+    for (0..4) |bit_index| {
+        const a = @as(usize, symbol.size) - 11 + bit_index % 3;
+        const b = bit_index / 3;
+
+        const first_index = b * symbol.size + a;
+        bits[first_index] = !bits[first_index];
+
+        const second_index = a * symbol.size + b;
+        bits[second_index] = !bits[second_index];
+    }
+
+    var decode_cells: [matrix.requiredCells(7)]Cell = undefined;
+    var decode_scratch: [encoder.maxCodewords(7)]u8 = undefined;
+    var out: [64]u8 = undefined;
+
+    try std.testing.expectError(
+        DecodeError.InvalidVersionInfo,
+        decode(
+            bits[0..cell_count],
+            symbol.size,
+            &decode_cells,
+            &decode_scratch,
+            &out,
+        ),
+    );
+}
