@@ -46,4 +46,30 @@ pub fn build(b: *std.Build) void {
 
     const example_step = b.step("example", "Run the terminal example");
     example_step.dependOn(&run_example.step);
+
+    const qualify_step = b.step("qualify", "Run release qualification");
+
+    inline for (.{ .Debug, .ReleaseSafe, .ReleaseFast }) |mode| {
+        const qualification_module = b.createModule(.{
+            .root_source_file = b.path("src/root.zig"),
+            .target = target,
+            .optimize = mode,
+        });
+        const qualification_tests = b.addTest(.{
+            .root_module = qualification_module,
+        });
+        qualify_step.dependOn(&b.addRunArtifact(qualification_tests).step);
+    }
+
+    const qualification_wasm_module = b.createModule(.{
+        .root_source_file = b.path("src/root.zig"),
+        .target = wasm_target,
+        .optimize = .ReleaseFast,
+    });
+    const qualification_wasm = b.addLibrary(.{
+        .name = "qrz-qualification",
+        .root_module = qualification_wasm_module,
+        .linkage = .static,
+    });
+    qualify_step.dependOn(&qualification_wasm.step);
 }
