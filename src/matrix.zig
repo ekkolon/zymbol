@@ -52,7 +52,8 @@ pub const Symbol = struct {
     }
 
     pub fn contains(self: Symbol, x: usize, y: usize) bool {
-        return x < self.size and y < self.size;
+        if (x >= self.size or y >= self.size) return false;
+        return self.index(x, y) < self.cells.len;
     }
 
     pub fn isDark(self: Symbol, x: usize, y: usize) bool {
@@ -453,6 +454,21 @@ const RunHistory = struct {
         return self.countPatterns(size);
     }
 };
+
+test "checked symbol access rejects inconsistent public state" {
+    var cell: [1]Cell = .{.{}};
+    var symbol = Symbol{
+        .cells = &cell,
+        .size = 21,
+        .version = 1,
+        .ec_level = .m,
+        .mask = 0,
+    };
+
+    try std.testing.expect(!symbol.isDark(20, 20));
+    try std.testing.expectEqual(@as(?ModuleKind, null), symbol.kindAt(20, 20));
+    try std.testing.expectError(Symbol.SetError.OutOfBounds, symbol.set(20, 20, true));
+}
 
 test "function pattern layout marks exactly the modules the standard reserves" {
     const testing = std.testing;
