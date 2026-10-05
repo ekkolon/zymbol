@@ -250,7 +250,7 @@ fn runPlanner(
                 end += 1;
                 const segment_bits = header_bits + payloadBits(class, end - start);
                 const candidate: usize = @as(usize, prefix_cost) + segment_bits;
-                if (candidate >= unreachable_cost) continue;
+                if (candidate >= @as(usize, unreachable_cost)) continue;
 
                 if (candidate < readU16(costs, end)) {
                     writeU16(costs, end, @intCast(candidate));
@@ -284,7 +284,7 @@ pub fn writeOptimal(
     trace: []u8,
 ) Error!void {
     const total_bits = try runPlanner(version, text, costs, trace);
-    if (total_bits == std.math.maxInt(u16)) return Error.TooManyCharacters;
+    if (total_bits == @as(usize, std.math.maxInt(u16))) return Error.TooManyCharacters;
     if (text.len == 0) return;
 
     var segment_count: usize = 0;
