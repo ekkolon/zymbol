@@ -176,7 +176,7 @@ test "decode corrects damaged data modules" {
     while (flipped < 40) {
         const x = random.uintLessThan(usize, symbol.size);
         const y = random.uintLessThan(usize, symbol.size);
-        if (symbol.kindAt(x, y) != .data) continue;
+        if ((symbol.kindAt(x, y) orelse continue) != .data) continue;
 
         const index = y * symbol.size + x;
         bits[index] = !bits[index];
