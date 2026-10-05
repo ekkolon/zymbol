@@ -335,7 +335,7 @@ test "decode corrects every QR block layout at its guaranteed limit" {
 
                 var data: [255]u8 = undefined;
                 for (data[0..data_len], 0..) |*byte, index| {
-                    byte.* = @truncate(index * 37 + version);
+                    byte.* = @truncate(index * 37 + @as(usize, version));
                 }
 
                 var ec: [max_ec_codewords]u8 = undefined;
@@ -349,7 +349,7 @@ test "decode corrects every QR block layout at its guaranteed limit" {
                 var used = [_]bool{false} ** 255;
                 var injected: usize = 0;
                 while (injected < ec_len / 2) : (injected += 1) {
-                    var position = (injected * 17 + version) % block_len;
+                    var position = (injected * 17 + @as(usize, version)) % block_len;
                     while (used[position]) position = (position + 1) % block_len;
                     used[position] = true;
                     block[position] ^= @intCast(injected + 1);
