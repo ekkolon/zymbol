@@ -149,6 +149,53 @@ fn roundTripBytes(data: []const u8, options: EncodeOptions) !void {
     });
 }
 
+test "HELLO WORLD matches published version 1-Q matrix" {
+    const expected = [_][]const u8{
+        "#######....#..#######",
+        "#.....#.##..#.#.....#",
+        "#.###.#..#.##.#.###.#",
+        "#.###.#.#####.#.###.#",
+        "#.###.#.##.#..#.###.#",
+        "#.....#..#..#.#.....#",
+        "#######.#.#.#.#######",
+        "........##.##........",
+        ".#.####.##..###.##.#.",
+        "#.####.#....####.###.",
+        "..#.#.##...#..##.....",
+        "#.##.#...#.##...##...",
+        "##.########.###.#####",
+        "........#...#..#.#...",
+        "#######..##..##..####",
+        "#.....#.#.#..#..#.###",
+        "#.###.#.##.#..#...###",
+        "#.###.#.#.###...#.#..",
+        "#.###.#..#....#....##",
+        "#.....#.###..###..##.",
+        "#######..#.#.......#.",
+    };
+
+    var cells: [requiredCells(1)]Cell = undefined;
+    var scratch: [requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try encodeText(
+        "HELLO WORLD",
+        .{
+            .min_version = 1,
+            .max_version = 1,
+            .ec_level = .q,
+            .boost_ec_level = false,
+        },
+        &cells,
+        &scratch,
+    );
+
+    try std.testing.expectEqual(@as(u3, 6), symbol.mask);
+    for (expected, 0..) |row, y| {
+        for (row, 0..) |module, x| {
+            try std.testing.expectEqual(module == '#', symbol.isDark(x, y));
+        }
+    }
+}
+
 test "round trip all versions and EC levels" {
     const levels = [_]EcLevel{ .l, .m, .q, .h };
 
