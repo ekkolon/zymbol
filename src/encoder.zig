@@ -120,20 +120,38 @@ pub fn encodeText(
     cells: []matrix.Cell,
     codeword_scratch: []u8,
 ) Error!matrix.Symbol {
-    try validateOptions(options);
     if (!isValidUtf8(text)) return Error.InvalidUtf8;
+    return encodePayload(text, options, cells, codeword_scratch, needsUtf8Eci(text));
+}
 
-    const utf8_eci = needsUtf8Eci(text);
+pub fn encodeBytes(
+    data: []const u8,
+    options: Options,
+    cells: []matrix.Cell,
+    codeword_scratch: []u8,
+) Error!matrix.Symbol {
+    return encodePayload(data, options, cells, codeword_scratch, false);
+}
+
+fn encodePayload(
+    payload: []const u8,
+    options: Options,
+    cells: []matrix.Cell,
+    codeword_scratch: []u8,
+    utf8_eci: bool,
+) Error!matrix.Symbol {
+    try validateOptions(options);
+
     var version = options.min_version;
     while (true) : (version += 1) {
         const capacity_bits = @as(usize, spec.dataCodewords(version, options.ec_level)) * 8;
-        if (encodedBitLength(version, text, utf8_eci) <= capacity_bits) break;
+        if (encodedBitLength(version, payload, utf8_eci) <= capacity_bits) break;
         if (version >= options.max_version) return Error.DataTooLong;
     }
 
     var level = options.ec_level;
     if (options.boost_ec_level) {
-        const used_bits = encodedBitLength(version, text, utf8_eci);
+        const used_bits = encodedBitLength(version, payload, utf8_eci);
         const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
         for (levels) |candidate| {
             const capacity_bits = @as(usize, spec.dataCodewords(version, candidate)) * 8;
@@ -153,8 +171,8 @@ pub fn encodeText(
     var data_buf: [max_data_codewords]u8 = undefined;
     var writer = bitstream.Writer.init(data_buf[0..data_len]);
     if (utf8_eci) try segment.appendEci(&writer, 26);
-    try segment.writeAuto(&writer, version, text);
-    finalizeDataBits(&writer);
+    try segment.writeAuto(&writer, version, payload);
+    segment.finalize(&writer);
 
     return encodeRaw(
         data_buf[0..data_len],
@@ -173,21 +191,6 @@ fn strengthRank(level: spec.EcLevel) u2 {
         .q => 2,
         .h => 3,
     };
-}
-
-fn finalizeDataBits(writer: *bitstream.Writer) void {
-    const capacity_bits = writer.bytes.len * 8;
-    const terminator_bits: u6 = @intCast(@min(4, capacity_bits - writer.bit_len));
-    writer.append(0, terminator_bits) catch unreachable;
-
-    const pad_to_byte: u6 = @intCast((8 - writer.bit_len % 8) % 8);
-    writer.append(0, pad_to_byte) catch unreachable;
-
-    var pad_byte: u8 = 0xEC;
-    while (writer.bit_len < capacity_bits) {
-        writer.append(pad_byte, 8) catch unreachable;
-        pad_byte ^= 0xEC ^ 0x11;
-    }
 }
 
 pub fn encodeRaw(
@@ -280,6 +283,20 @@ pub fn encodeRaw(
     matrix.applyMask(&symbol, chosen_mask);
     matrix.drawFormatInfo(&symbol);
     return symbol;
+}
+
+test "encodeBytes accepts arbitrary binary data" {
+    var cells: [matrix.requiredCells(2)]matrix.Cell = undefined;
+    var scratch: [maxCodewords(2)]u8 = undefined;
+
+    const symbol = try encodeBytes(
+        &.{ 0x00, 0xFF, 0x80, 0xC0, 0x7F },
+        .{ .min_version = 2, .max_version = 2, .boost_ec_level = false },
+        &cells,
+        &scratch,
+    );
+
+    try std.testing.expectEqual(@as(u6, 2), symbol.version);
 }
 
 test "encodeText selects version one for a short value" {
