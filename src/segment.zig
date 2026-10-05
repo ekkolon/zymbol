@@ -262,6 +262,20 @@ pub fn finalize(writer: *bitstream.Writer) Error!void {
     }
 }
 
+test "HELLO WORLD matches version 1-Q data codewords" {
+    const expected = [_]u8{
+        0x20, 0x5B, 0x0B, 0x78, 0xD1, 0x72, 0xDC,
+        0x4D, 0x43, 0x40, 0xEC, 0x11, 0xEC,
+    };
+
+    var data: [expected.len]u8 = undefined;
+    var writer = bitstream.Writer.init(&data);
+    try appendAlphanumeric(&writer, 1, "HELLO WORLD");
+    try finalize(&writer);
+
+    try std.testing.expectEqualSlices(u8, &expected, &data);
+}
+
 test "finalize rejects invalid writer state" {
     var buf: [1]u8 = .{0};
     var writer = bitstream.Writer.init(&buf);
