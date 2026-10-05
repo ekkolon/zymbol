@@ -257,7 +257,7 @@ fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream 
             eci = switch (eci) {
                 .none => .{ .assignment = assignment },
                 .assignment => |current| if (current == assignment)
-                    eci
+                    .{ .assignment = current }
                 else
                     .multiple,
                 .multiple => .multiple,
@@ -409,10 +409,10 @@ test "multiple ECI assignments are preserved as mixed state" {
     var out: [2]u8 = undefined;
     const parsed = try parseDataStream(writer.filled(), 1, &out);
     try std.testing.expectEqualSlices(u8, "ab", &out);
-    switch (parsed.eci) {
-        .multiple => {},
-        else => return error.TestExpectedEqual,
-    }
+    try std.testing.expect(switch (parsed.eci) {
+        .multiple => true,
+        else => false,
+    });
 }
 
 test "truncated segment data is rejected" {
