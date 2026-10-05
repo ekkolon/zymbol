@@ -42,40 +42,54 @@ pub const Symbol = struct {
     ec_level: spec.EcLevel,
     mask: u3,
 
+    pub const SetError = error{
+        OutOfBounds,
+        ProtectedModule,
+    };
+
     fn index(self: Symbol, x: usize, y: usize) usize {
         return y * self.size + x;
     }
 
+    pub fn contains(self: Symbol, x: usize, y: usize) bool {
+        return x < self.size and y < self.size;
+    }
+
     pub fn isDark(self: Symbol, x: usize, y: usize) bool {
+        if (!self.contains(x, y)) return false;
         return self.cells[self.index(x, y)].dark;
     }
 
-    pub fn kindAt(self: Symbol, x: usize, y: usize) ModuleKind {
+    pub fn kindAt(self: Symbol, x: usize, y: usize) ?ModuleKind {
+        if (!self.contains(x, y)) return null;
         return self.cells[self.index(x, y)].kind;
     }
 
-    pub const ProtectedModuleError = error{ProtectedModule};
+    pub fn setData(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
+        if (!self.contains(x, y)) return SetError.OutOfBounds;
 
-    /// Sets a module the caller intends to recolor. Refuses to touch
-    /// anything but a `data` module, since finder/timing/alignment/format/
-    /// version modules and the fixed dark module are what a scanner relies
-    /// on to locate and calibrate the symbol at all.
-    pub fn setData(self: *Symbol, x: usize, y: usize, dark: bool) ProtectedModuleError!void {
-        const i = self.index(x, y);
-        if (self.cells[i].kind != .data) return ProtectedModuleError.ProtectedModule;
-        self.cells[i].dark = dark;
+        const index = self.index(x, y);
+        if (self.cells[index].kind != .data) return SetError.ProtectedModule;
+        self.cells[index].dark = dark;
     }
 
-    /// Sets any module regardless of kind. Overriding a function module
-    /// will very likely make the symbol unscannable; overriding a data
-    /// module beyond what the chosen EC level can recover will corrupt the
-    /// payload. This exists for callers who have already accounted for
-    /// that (for example, punching a small logo well within the EC budget)
-    /// and accept the risk explicitly, by name, at the call site.
-    pub fn setUnchecked(self: *Symbol, x: usize, y: usize, dark: bool) void {
+    pub fn set(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
+        if (!self.contains(x, y)) return SetError.OutOfBounds;
         self.cells[self.index(x, y)].dark = dark;
     }
 };
+
+pub inline fn isDarkUnchecked(symbol: *const Symbol, x: usize, y: usize) bool {
+    return symbol.cells[y * symbol.size + x].dark;
+}
+
+pub inline fn kindAtUnchecked(symbol: *const Symbol, x: usize, y: usize) ModuleKind {
+    return symbol.cells[y * symbol.size + x].kind;
+}
+
+pub inline fn setUnchecked(symbol: *Symbol, x: usize, y: usize, dark: bool) void {
+    symbol.cells[y * symbol.size + x].dark = dark;
+}
 
 fn set(cells: []Cell, size: u16, x: i32, y: i32, dark: bool, kind: ModuleKind) void {
     if (x < 0 or y < 0 or x >= size or y >= size) return;
@@ -259,7 +273,7 @@ pub const DataIterator = struct {
                     else
                         self.vertical;
 
-                    if (symbol.kindAt(@intCast(x), @intCast(y)) == .data) {
+                    if (kindAtUnchecked(symbol, @intCast(x), @intCast(y)) == .data) {
                         return .{ .x = @intCast(x), .y = @intCast(y) };
                     }
                 }
@@ -286,7 +300,7 @@ pub fn drawCodewords(symbol: *Symbol, codewords: []const u8) void {
         const position = iterator.next(symbol) orelse unreachable;
         const byte = codewords[bit_index >> 3];
         const bit = (byte >> @intCast(7 - (bit_index & 7))) & 1;
-        symbol.setUnchecked(position.x, position.y, bit != 0);
+        setUnchecked(symbol, position.x, position.y, bit != 0);
     }
 }
 
@@ -298,7 +312,7 @@ pub fn applyMask(symbol: *Symbol, mask: u3) void {
     while (y < symbol.size) : (y += 1) {
         var x: usize = 0;
         while (x < symbol.size) : (x += 1) {
-            if (symbol.kindAt(x, y) != .data) continue;
+            if (kindAtUnchecked(symbol, x, y) != .data) continue;
             if (maskInvert(mask, x, y)) {
                 const i = symbol.index(x, y);
                 symbol.cells[i].dark = !symbol.cells[i].dark;
@@ -340,13 +354,13 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
         var run_len: i32 = 0;
         var x: usize = 0;
         while (x < size) : (x += 1) {
-            if (symbol.isDark(x, y) == run_color) {
+            if (isDarkUnchecked(symbol, x, y) == run_color) {
                 run_len += 1;
                 if (run_len == 5) result += penalty_n1 else if (run_len > 5) result += 1;
             } else {
                 history.push(run_len, size);
                 if (!run_color) result += history.countPatterns(size) * penalty_n3;
-                run_color = symbol.isDark(x, y);
+                run_color = isDarkUnchecked(symbol, x, y);
                 run_len = 1;
             }
         }
@@ -360,13 +374,13 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
         var run_len: i32 = 0;
         y = 0;
         while (y < size) : (y += 1) {
-            if (symbol.isDark(x, y) == run_color) {
+            if (isDarkUnchecked(symbol, x, y) == run_color) {
                 run_len += 1;
                 if (run_len == 5) result += penalty_n1 else if (run_len > 5) result += 1;
             } else {
                 history.push(run_len, size);
                 if (!run_color) result += history.countPatterns(size) * penalty_n3;
-                run_color = symbol.isDark(x, y);
+                run_color = isDarkUnchecked(symbol, x, y);
                 run_len = 1;
             }
         }
@@ -377,8 +391,8 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
     while (y + 1 < size) : (y += 1) {
         x = 0;
         while (x + 1 < size) : (x += 1) {
-            const c = symbol.isDark(x, y);
-            if (c == symbol.isDark(x + 1, y) and c == symbol.isDark(x, y + 1) and c == symbol.isDark(x + 1, y + 1)) {
+            const c = isDarkUnchecked(symbol, x, y);
+            if (c == isDarkUnchecked(symbol, x + 1, y) and c == isDarkUnchecked(symbol, x, y + 1) and c == isDarkUnchecked(symbol, x + 1, y + 1)) {
                 result += penalty_n2;
             }
         }
@@ -389,7 +403,7 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
     while (y < size) : (y += 1) {
         x = 0;
         while (x < size) : (x += 1) {
-            if (symbol.isDark(x, y)) dark += 1;
+            if (isDarkUnchecked(symbol, x, y)) dark += 1;
         }
     }
     const total: i32 = @as(i32, size) * @as(i32, size);
@@ -449,12 +463,12 @@ test "function pattern layout marks exactly the modules the standard reserves" {
     // the separator ring) must be light.
     try testing.expect(symbol.isDark(0, 0));
     try testing.expect(!symbol.isDark(7, 7));
-    try testing.expectEqual(ModuleKind.finder, symbol.kindAt(0, 0));
-    try testing.expectEqual(ModuleKind.separator, symbol.kindAt(7, 0));
+    try testing.expectEqual(ModuleKind.finder, symbol.kindAt(0, 0).?);
+    try testing.expectEqual(ModuleKind.separator, symbol.kindAt(7, 0).?);
     // The fixed dark module at (8, size-8) is always dark.
     try testing.expect(symbol.isDark(8, 21 - 8));
     // A cell in the interior with nothing special going on is untouched data.
-    try testing.expectEqual(ModuleKind.data, symbol.kindAt(12, 12));
+    try testing.expectEqual(ModuleKind.data, symbol.kindAt(12, 12).?);
 }
 
 test "format info is written as two matching, position-consistent copies" {
@@ -484,9 +498,10 @@ test "setData refuses to touch a function module but allows a data module" {
     const testing = std.testing;
     var buf: [21 * 21]Cell = undefined;
     var symbol = layoutFunctionPatterns(&buf, 1, .m, 0);
-    try testing.expectError(Symbol.ProtectedModuleError.ProtectedModule, symbol.setData(0, 0, false));
+    try testing.expectError(Symbol.SetError.ProtectedModule, symbol.setData(0, 0, false));
     try symbol.setData(12, 12, true);
     try testing.expect(symbol.isDark(12, 12));
+    try testing.expectError(Symbol.SetError.OutOfBounds, symbol.setData(21, 0, true));
 }
 
 
