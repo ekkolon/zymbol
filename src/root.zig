@@ -380,3 +380,53 @@ test "decode accepts one destroyed format copy" {
     try testing.expectEqualSlices(u8, "FORMAT REDUNDANCY", out[0..result.len]);
     try testing.expectEqual(@as(u3, 5), result.mask);
 }
+
+
+test "decode rejects conflicting valid format copies" {
+    var cells: [matrix.requiredCells(4)]Cell = undefined;
+    var encode_scratch: [encoder.maxCodewords(4)]u8 = undefined;
+    const symbol = try encodeText(
+        "FORMAT CONFLICT",
+        .{
+            .min_version = 4,
+            .max_version = 4,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 5,
+        },
+        &cells,
+        &encode_scratch,
+    );
+
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    var bits: [matrix.requiredCells(4)]bool = undefined;
+    for (0..cell_count) |cell_index| bits[cell_index] = symbol.cells[cell_index].dark;
+
+    for (0..6) |format_index| {
+        const cell_index = format_index * symbol.size + 8;
+        bits[cell_index] = !bits[cell_index];
+    }
+    bits[7 * symbol.size + 8] = !bits[7 * symbol.size + 8];
+    bits[8 * symbol.size + 8] = !bits[8 * symbol.size + 8];
+    bits[8 * symbol.size + 7] = !bits[8 * symbol.size + 7];
+    for (9..15) |format_index| {
+        const x = 14 - format_index;
+        const cell_index = 8 * symbol.size + x;
+        bits[cell_index] = !bits[cell_index];
+    }
+
+    var decode_cells: [matrix.requiredCells(4)]Cell = undefined;
+    var decode_scratch: [encoder.maxCodewords(4)]u8 = undefined;
+    var out: [64]u8 = undefined;
+
+    try std.testing.expectError(
+        DecodeError.InvalidFormatInfo,
+        decode(
+            bits[0..cell_count],
+            symbol.size,
+            &decode_cells,
+            &decode_scratch,
+            &out,
+        ),
+    );
+}
