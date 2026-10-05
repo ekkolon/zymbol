@@ -310,7 +310,7 @@ pub fn encodeRaw(
 test "byte capacity boundary is exact for every version and EC level" {
     const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
     var payload: [max_data_codewords]u8 = undefined;
-    @memset(&payload, 0x80);
+    @memset(payload[0..], 0x80);
 
     var cells: [matrix.requiredCells(spec.max_version)]matrix.Cell = undefined;
     var scratch: [maxCodewords(spec.max_version)]u8 = undefined;
