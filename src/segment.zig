@@ -192,12 +192,14 @@ fn payloadBits(class: Class, count: usize) usize {
 pub const max_auto_input_len: usize = blk: {
     const capacity_bits = @as(usize, spec.dataCodewords(spec.max_version, .l)) * 8;
     const header_bits = 4 + @as(usize, spec.charCountBits(.numeric, spec.max_version));
-    var count: usize = 0;
-    while (header_bits + payloadBits(.numeric, count + 1) <= capacity_bits) : (count += 1) {}
-    break :blk count;
+    const payload_capacity = capacity_bits - header_bits;
+    const full_groups = payload_capacity / 10;
+    const remainder = payload_capacity % 10;
+    break :blk full_groups * 3 + if (remainder >= 7) 2 else if (remainder >= 4) 1 else 0;
 };
 
 pub fn optimalScratchBytes(input_len: usize) usize {
+    if (input_len > max_auto_input_len) return std.math.maxInt(usize);
     return (input_len + 1) * 2;
 }
 
