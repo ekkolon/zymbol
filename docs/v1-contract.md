@@ -49,4 +49,4 @@ The `cells` slice is exposed for zero-copy integration. Direct mutation has the 
 
 ## Stability
 
-After the 1.0.0 release, incompatible changes to the exported root API require a major version change. Internal modules are not part of the compatibility contract.
+Starting with 1.0.0, incompatible changes to the exported root API require a major version change. Internal modules are not part of the compatibility contract.
