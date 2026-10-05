@@ -44,24 +44,32 @@ pub const decode = decoder.decode;
 pub const min_version = spec.min_version;
 pub const max_version = spec.max_version;
 
+pub fn isValidVersion(version: Version) bool {
+    return version >= min_version and version <= max_version;
+}
+
 pub fn size(version: Version) u16 {
+    if (!isValidVersion(version)) return 0;
     return spec.size(version);
 }
 
 pub fn requiredCells(version: Version) usize {
+    if (!isValidVersion(version)) return 0;
     return matrix.requiredCells(version);
 }
 
 pub fn requiredEncodeScratch(version: Version) usize {
+    if (!isValidVersion(version)) return 0;
     return encoder.maxCodewords(version);
 }
 
 pub fn requiredDecodeScratch(version: Version) usize {
+    if (!isValidVersion(version)) return 0;
     return decoder.maxCodewords(version);
 }
 
 pub fn dataCodewords(version: Version, level: EcLevel) usize {
-    if (version < min_version or version > max_version) return 0;
+    if (!isValidVersion(version)) return 0;
     return spec.dataCodewords(version, level);
 }
 
@@ -69,6 +77,16 @@ test {
     std.testing.refAllDecls(@This());
     _ = gf256;
     _ = reed_solomon;
+}
+
+test "public sizing helpers reject invalid versions" {
+    try std.testing.expect(!isValidVersion(0));
+    try std.testing.expect(!isValidVersion(41));
+    try std.testing.expectEqual(@as(u16, 0), size(0));
+    try std.testing.expectEqual(@as(usize, 0), requiredCells(41));
+    try std.testing.expectEqual(@as(usize, 0), requiredEncodeScratch(0));
+    try std.testing.expectEqual(@as(usize, 0), requiredDecodeScratch(41));
+    try std.testing.expectEqual(@as(usize, 0), dataCodewords(0, .m));
 }
 
 fn roundTrip(text: []const u8, options: EncodeOptions) !void {
