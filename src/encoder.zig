@@ -230,48 +230,51 @@ pub fn encodeRaw(
     if (codeword_scratch.len < total_codewords) return Error.ScratchTooSmall;
 
     const layout = spec.blockLayout(version, level);
-    const total_blocks = layout.totalBlocks();
+    const total_blocks: usize = layout.totalBlocks();
+    const short_blocks: usize = layout.short_blocks;
+    const short_data_len: usize = layout.short_data_codewords;
+    const ec_len: usize = layout.ec_per_block;
     std.debug.assert(total_blocks <= max_blocks);
 
-    var block_data_start: [max_blocks]usize = undefined;
-    var block_data_len: [max_blocks]usize = undefined;
-    var ec_buf: [max_blocks * reed_solomon.max_ec_codewords]u8 = undefined;
-
-    var offset: usize = 0;
+    var ec: [reed_solomon.max_ec_codewords]u8 = undefined;
     for (0..total_blocks) |block| {
-        const len: usize = if (block < layout.short_blocks)
-            layout.short_data_codewords
+        const long_block = block >= short_blocks;
+        const data_len = short_data_len + @intFromBool(long_block);
+        const data_start = if (long_block)
+            short_blocks * short_data_len +
+                (block - short_blocks) * (short_data_len + 1)
         else
-            layout.short_data_codewords + 1;
+            block * short_data_len;
 
-        block_data_start[block] = offset;
-        block_data_len[block] = len;
         reed_solomon.encode(
-            data[offset .. offset + len],
-            layout.ec_per_block,
-            ec_buf[block * layout.ec_per_block .. (block + 1) * layout.ec_per_block],
+            data[data_start .. data_start + data_len],
+            ec_len,
+            ec[0..ec_len],
         );
-        offset += len;
+
+        for (0..ec_len) |index| {
+            codeword_scratch[data.len + index * total_blocks + block] = ec[index];
+        }
     }
 
     var position: usize = 0;
-    const max_data_len = layout.short_data_codewords + 1;
-    for (0..max_data_len) |index| {
+    for (0..short_data_len + 1) |index| {
         for (0..total_blocks) |block| {
-            if (index < block_data_len[block]) {
-                codeword_scratch[position] = data[block_data_start[block] + index];
-                position += 1;
-            }
-        }
-    }
+            const long_block = block >= short_blocks;
+            const block_len = short_data_len + @intFromBool(long_block);
+            if (index >= block_len) continue;
 
-    for (0..layout.ec_per_block) |index| {
-        for (0..total_blocks) |block| {
-            codeword_scratch[position] = ec_buf[block * layout.ec_per_block + index];
+            const data_start = if (long_block)
+                short_blocks * short_data_len +
+                    (block - short_blocks) * (short_data_len + 1)
+            else
+                block * short_data_len;
+
+            codeword_scratch[position] = data[data_start + index];
             position += 1;
         }
     }
-    std.debug.assert(position == total_codewords);
+    std.debug.assert(position == data.len);
 
     var symbol = matrix.layoutFunctionPatterns(cells[0..required_cells], version, level, 0);
     matrix.drawCodewords(&symbol, codeword_scratch[0..total_codewords]);
