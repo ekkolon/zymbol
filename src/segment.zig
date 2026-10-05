@@ -154,12 +154,6 @@ const Class = enum(u2) {
     }
 };
 
-fn classify(character: u8) Class {
-    if (character >= '0' and character <= '9') return .numeric;
-    if (alphanumericValue(character) != null) return .alphanumeric;
-    return .byte;
-}
-
 fn canEncode(class: Class, character: u8) bool {
     return switch (class) {
         .numeric => character >= '0' and character <= '9',
@@ -227,6 +221,28 @@ fn runPlanner(
     if (costs.len < required) return Error.ScratchTooSmall;
     if (trace) |storage| {
         if (storage.len < required) return Error.ScratchTooSmall;
+    }
+
+    if (isNumeric(text)) {
+        const max_count = maxCharacterCount(.numeric, version);
+        const header_bits = 4 + @as(usize, spec.charCountBits(.numeric, version));
+        var total: usize = 0;
+        var start: usize = 0;
+
+        while (start < text.len) {
+            const end = @min(text.len, start + max_count);
+            total += header_bits + payloadBits(.numeric, end - start);
+
+            if (trace) |storage| {
+                const predecessor: u16 =
+                    (@as(u16, @intCast(start)) << 2) |
+                    @as(u16, @intFromEnum(Class.numeric));
+                writeU16(storage, end, predecessor);
+            }
+            start = end;
+        }
+
+        return total;
     }
 
     const unreachable_cost = std.math.maxInt(u16);
@@ -308,43 +324,6 @@ pub fn writeOptimal(
         try appendClass(writer, version, class, text[start..end]);
         start = end;
     }
-}
-
-pub fn writeAuto(writer: *bitstream.Writer, version: u6, text: []const u8) Error!void {
-    var index: usize = 0;
-    while (index < text.len) {
-        const class = classify(text[index]);
-        var end = index + 1;
-        while (end < text.len and classify(text[end]) == class) : (end += 1) {}
-        try appendClass(writer, version, class, text[index..end]);
-        index = end;
-    }
-}
-
-pub fn writeBytes(writer: *bitstream.Writer, version: u6, data: []const u8) Error!void {
-    if (!validVersion(version)) return Error.InvalidVersion;
-
-    const max_count = maxCharacterCount(.byte, version);
-    var offset: usize = 0;
-    while (offset < data.len) {
-        const end = @min(offset + max_count, data.len);
-        try appendByte(writer, version, data[offset..end]);
-        offset = end;
-    }
-}
-
-pub fn byteBitLength(version: u6, data_len: usize) usize {
-    if (!validVersion(version) or data_len == 0) return 0;
-
-    const max_count = maxCharacterCount(.byte, version);
-    var remaining = data_len;
-    var total: usize = 0;
-    while (remaining > 0) {
-        const count = @min(remaining, max_count);
-        total += 4 + spec.charCountBits(.byte, version) + count * 8;
-        remaining -= count;
-    }
-    return total;
 }
 
 pub fn finalize(writer: *bitstream.Writer) Error!void {
@@ -478,29 +457,4 @@ test "ECI supports all standard assignment widths" {
     }
 }
 
-test "byte bit length matches byte writer" {
-    const testing = std.testing;
-    const lengths = [_]usize{ 1, 32, 255, 256, 600 };
 
-    for (lengths) |len| {
-        var data: [600]u8 = undefined;
-        @memset(data[0..len], 0x80);
-
-        var buf: [1024]u8 = undefined;
-        var writer = bitstream.Writer.init(&buf);
-        try writeBytes(&writer, 1, data[0..len]);
-        try testing.expectEqual(writer.bitLength(), byteBitLength(1, len));
-    }
-}
-
-test "auto bit length matches auto writer" {
-    const testing = std.testing;
-    const samples = [_][]const u8{ "HELLO WORLD", "01234567890123", "Mixed123Text!", "" };
-
-    for (samples) |sample| {
-        var buf: [256]u8 = undefined;
-        var writer = bitstream.Writer.init(&buf);
-        try writeAuto(&writer, 10, sample);
-        try testing.expectEqual(writer.bitLength(), autoBitLength(10, sample));
-    }
-}
