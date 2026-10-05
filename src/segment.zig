@@ -184,6 +184,32 @@ pub fn writeAuto(writer: *bitstream.Writer, version: u6, text: []const u8) Error
     }
 }
 
+pub fn writeBytes(writer: *bitstream.Writer, version: u6, data: []const u8) Error!void {
+    if (!validVersion(version)) return Error.InvalidVersion;
+
+    const max_count = maxCharacterCount(.byte, version);
+    var offset: usize = 0;
+    while (offset < data.len) {
+        const end = @min(offset + max_count, data.len);
+        try appendByte(writer, version, data[offset..end]);
+        offset = end;
+    }
+}
+
+pub fn byteBitLength(version: u6, data_len: usize) usize {
+    if (!validVersion(version) or data_len == 0) return 0;
+
+    const max_count = maxCharacterCount(.byte, version);
+    var remaining = data_len;
+    var total: usize = 0;
+    while (remaining > 0) {
+        const count = @min(remaining, max_count);
+        total += 4 + spec.charCountBits(.byte, version) + count * 8;
+        remaining -= count;
+    }
+    return total;
+}
+
 fn payloadBits(class: Class, count: usize) usize {
     return switch (class) {
         .numeric => (count / 3) * 10 + ([_]usize{ 0, 4, 7 })[count % 3],
@@ -301,6 +327,21 @@ test "ECI supports all standard assignment widths" {
         var writer = bitstream.Writer.init(&buf);
         try appendEci(&writer, assignment);
         try testing.expect(writer.bitLength() == 12 or writer.bitLength() == 20 or writer.bitLength() == 28);
+    }
+}
+
+test "byte bit length matches byte writer" {
+    const testing = std.testing;
+    const lengths = [_]usize{ 1, 32, 255, 256, 600 };
+
+    for (lengths) |len| {
+        var data: [600]u8 = undefined;
+        @memset(data[0..len], 0x80);
+
+        var buf: [1024]u8 = undefined;
+        var writer = bitstream.Writer.init(&buf);
+        try writeBytes(&writer, 1, data[0..len]);
+        try testing.expectEqual(writer.bitLength(), byteBitLength(1, len));
     }
 }
 
