@@ -219,19 +219,28 @@ pub fn autoBitLength(version: u6, text: []const u8) usize {
     return total;
 }
 
-pub fn finalize(writer: *bitstream.Writer) void {
+pub fn finalize(writer: *bitstream.Writer) Error!void {
     const capacity_bits = writer.bytes.len * 8;
+    if (writer.bit_len > capacity_bits) return Error.BufferFull;
+
     const terminator_bits: u6 = @intCast(@min(4, capacity_bits - writer.bit_len));
-    writer.append(0, terminator_bits) catch unreachable;
+    try writer.append(0, terminator_bits);
 
     const pad_to_byte: u6 = @intCast((8 - writer.bit_len % 8) % 8);
-    writer.append(0, pad_to_byte) catch unreachable;
+    try writer.append(0, pad_to_byte);
 
     var pad_byte: u8 = 0xEC;
     while (writer.bit_len < capacity_bits) {
-        writer.append(pad_byte, 8) catch unreachable;
+        try writer.append(pad_byte, 8);
         pad_byte ^= 0xFD;
     }
+}
+
+test "finalize rejects invalid writer state" {
+    var buf: [1]u8 = .{0};
+    var writer = bitstream.Writer.init(&buf);
+    writer.bit_len = 9;
+    try std.testing.expectError(Error.BufferFull, finalize(&writer));
 }
 
 test "finalize fills the data codeword buffer" {
@@ -239,7 +248,7 @@ test "finalize fills the data codeword buffer" {
     var buf: [4]u8 = undefined;
     var writer = bitstream.Writer.init(&buf);
     try writer.append(0b0001, 4);
-    finalize(&writer);
+    try finalize(&writer);
 
     try testing.expectEqual(@as(usize, 32), writer.bitLength());
     try testing.expectEqual(@as(u8, 0x10), buf[0]);
