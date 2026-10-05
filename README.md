@@ -38,7 +38,7 @@ const symbol = try qrz.encodeText(
 );
 ```
 
-`encodeText` validates UTF-8 and emits ECI 26 for non-ASCII text. Version selection compares the normal mixed-mode path with a byte-mode fallback and uses the smaller representation. `boost_ec_level` can use otherwise spare capacity for stronger error correction without increasing the selected version.
+`encodeText` validates UTF-8 and emits ECI 26 for non-ASCII text. Numeric, alphanumeric, and byte segments are planned for the minimum encoded bit length without heap allocation. `boost_ec_level` can use otherwise spare capacity for stronger error correction without increasing the selected version.
 
 ## Encoding bytes
 
@@ -96,7 +96,7 @@ A finalized stream must contain exactly `qrz.dataCodewords(version, level)` byte
 
 ## Memory model
 
-QRz does not request an allocator. Module storage and interleaved codeword scratch are supplied by the caller. Temporary storage is bounded by QR Code limits.
+QRz does not request an allocator. Module storage and interleaved codeword scratch are supplied by the caller. The encoder temporarily reuses the caller's cell buffer while planning segments, then overwrites it with the symbol matrix. Temporary storage is bounded by QR Code limits.
 
 The decoder corrects one Reed-Solomon block at a time instead of materializing every block concurrently. Allocation policy stays with the application, including in freestanding environments.
 
