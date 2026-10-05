@@ -6,7 +6,7 @@ QRz operates on caller-owned buffers. The core library does not perform file I/O
 
 ## Status
 
-QRz is under v1 stabilization. The public API is not frozen yet.
+QRz 1.0 is stable. The public API exported by `src/root.zig` follows semantic versioning.
 
 The current implementation covers the Model 2 symbol mechanics used by QR versions 1 through 40:
 
@@ -111,7 +111,7 @@ zig build qualify
 
 The package currently supports Zig 0.16.0 as its minimum version. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall and compiles the core for `wasm32-freestanding` in ReleaseFast.
 
-The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
+The v1 compatibility contract is documented in `docs/v1-contract.md`.
 
 ## Source layout
 
