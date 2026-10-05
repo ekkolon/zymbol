@@ -110,8 +110,24 @@ fn needsUtf8Eci(text: []const u8) bool {
     return false;
 }
 
-fn encodedBitLength(version: u6, text: []const u8, utf8_eci: bool) usize {
-    return segment.autoBitLength(version, text) + if (utf8_eci) 12 else 0;
+const PayloadStrategy = enum {
+    auto,
+    byte,
+};
+
+fn payloadStrategy(version: u6, payload: []const u8) PayloadStrategy {
+    if (segment.byteBitLength(version, payload.len) < segment.autoBitLength(version, payload)) {
+        return .byte;
+    }
+    return .auto;
+}
+
+fn encodedBitLength(version: u6, payload: []const u8, utf8_eci: bool) usize {
+    const payload_bits = switch (payloadStrategy(version, payload)) {
+        .auto => segment.autoBitLength(version, payload),
+        .byte => segment.byteBitLength(version, payload.len),
+    };
+    return payload_bits + if (utf8_eci) 12 else 0;
 }
 
 pub fn encodeText(
@@ -171,7 +187,10 @@ fn encodePayload(
     var data_buf: [max_data_codewords]u8 = undefined;
     var writer = bitstream.Writer.init(data_buf[0..data_len]);
     if (utf8_eci) try segment.appendEci(&writer, 26);
-    try segment.writeAuto(&writer, version, payload);
+    switch (payloadStrategy(version, payload)) {
+        .auto => try segment.writeAuto(&writer, version, payload),
+        .byte => try segment.writeBytes(&writer, version, payload),
+    }
     try segment.finalize(&writer);
 
     return encodeRaw(
@@ -283,6 +302,14 @@ pub fn encodeRaw(
     matrix.applyMask(&symbol, chosen_mask);
     matrix.drawFormatInfo(&symbol);
     return symbol;
+}
+
+test "mixed-mode overhead falls back to one byte segment" {
+    const payload = "A1b2C3d4E5f6";
+    try std.testing.expectEqual(
+        PayloadStrategy.byte,
+        payloadStrategy(1, payload),
+    );
 }
 
 test "encodeBytes accepts arbitrary binary data" {
