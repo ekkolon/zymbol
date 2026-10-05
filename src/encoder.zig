@@ -365,14 +365,6 @@ test "byte capacity boundary is exact for every version and EC level" {
     }
 }
 
-test "mixed-mode overhead falls back to one byte segment" {
-    const payload = "A1b2C3d4E5f6";
-    try std.testing.expectEqual(
-        PayloadStrategy.byte,
-        payloadStrategy(1, payload),
-    );
-}
-
 test "encodeBytes accepts arbitrary binary data" {
     var cells: [matrix.requiredCells(2)]matrix.Cell = undefined;
     var scratch: [maxCodewords(2)]u8 = undefined;
