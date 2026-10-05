@@ -126,9 +126,10 @@ pub fn decode(block: []u8, ec_len: usize) DecodeError!DecodeResult {
     // stored highest-degree-first like every other Poly here.
     var syndrome_poly = Poly.init(ec_len);
     for (0..ec_len) |i| syndrome_poly.values[ec_len - 1 - i] = syndromes[i];
+    syndrome_poly = syndrome_poly.trimmed();
 
     const modulus = Poly.monomial(1, ec_len);
-    const eea = euclidean(modulus, syndrome_poly, ec_len);
+    const eea = try euclidean(modulus, syndrome_poly, ec_len);
     const sigma = eea.sigma;
     const omega = eea.omega;
     if (debug_trace) std.debug.print("sigma.len={} sigma.values={any} omega.len={} omega.values={any}\n", .{ sigma.len, sigma.values[0..sigma.len], omega.len, omega.values[0..omega.len] });
@@ -304,7 +305,7 @@ const EuclideanResult = struct { sigma: Poly, omega: Poly };
 /// error evaluator (`omega`) polynomials for Reed-Solomon decoding, in the
 /// same shape used by (among others) the ZXing-derived decoders that
 /// underpin most deployed QR readers.
-fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) EuclideanResult {
+fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) DecodeError!EuclideanResult {
     var r_last = a_in;
     var r = b_in;
     if (r_last.degree() < r.degree()) {
@@ -317,6 +318,8 @@ fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) EuclideanResult {
     var t = Poly.monomial(1, 0); // 1
 
     while (2 * r.degree() >= ec_len) {
+        if (r.isZero()) return DecodeError.UnrecoverableBlock;
+
         const r_last_last = r_last;
         const t_last_last = t_last;
         r_last = r;
@@ -328,7 +331,9 @@ fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) EuclideanResult {
     }
 
     const sigma_tilde_zero = t.coeffAt(0);
-    const inverse: u8 = if (sigma_tilde_zero == 0) 1 else gf.inv(sigma_tilde_zero);
+    if (sigma_tilde_zero == 0) return DecodeError.UnrecoverableBlock;
+
+    const inverse = gf.inv(sigma_tilde_zero);
     return .{ .sigma = t.scale(inverse), .omega = r.scale(inverse) };
 }
 

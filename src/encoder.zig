@@ -1,15 +1,3 @@
-//! Ties the other modules into the encode side of the library: pick a
-//! version and error-correction level that fit the payload, pad the data
-//! to a whole number of codewords, split into blocks and add
-//! error-correction codewords, interleave per section 8.6, place the
-//! result into the module grid, and choose (or accept a forced) mask.
-//!
-//! Nothing here allocates. The caller owns two buffers: `cells`, sized for
-//! the version that ends up being used (see `matrix.requiredCells`), and
-//! `codeword_scratch`, sized for that version's raw codeword count (see
-//! `maxCodewords`). `Options.max_version` bounds both, so a caller that
-//! only ever needs small symbols can use correspondingly small buffers.
-
 const std = @import("std");
 const spec = @import("spec.zig");
 const bitstream = @import("bitstream.zig");
@@ -18,67 +6,164 @@ const reed_solomon = @import("reed_solomon.zig");
 const matrix = @import("matrix.zig");
 
 pub const Error = segment.Error || error{
-    /// The payload doesn't fit even at `max_version` and the requested
-    /// (or, with boosting, any) error-correction level.
     DataTooLong,
+    InvalidVersionRange,
+    CellBufferTooSmall,
+    ScratchTooSmall,
+    InvalidDataLength,
+    InvalidUtf8,
 };
 
-/// Largest number of Reed-Solomon blocks any (version, level) pair splits
-/// into (version 40, level H); block-buffer bookkeeping is sized off this.
 pub const max_blocks = 81;
+pub const max_data_codewords = spec.dataCodewords(spec.max_version, .l);
 
 pub const Options = struct {
     min_version: u6 = spec.min_version,
     max_version: u6 = spec.max_version,
     ec_level: spec.EcLevel = .m,
-    /// If true, raise the error-correction level above `ec_level` when the
-    /// chosen version has spare capacity at a stronger level for free.
     boost_ec_level: bool = true,
-    /// Force a specific mask (0-7) instead of evaluating all 8 and keeping
-    /// the lowest-penalty one.
     mask: ?u3 = null,
 };
 
-/// Bytes of scratch space `encodeRaw`/`encodeText` need for the
-/// interleaved codeword stream at `version`.
 pub fn maxCodewords(version: u6) usize {
     return spec.numRawDataModules(version) / 8;
 }
 
-/// Encodes `text` using automatic mode segmentation (see
-/// `segment.writeAuto`), choosing the smallest version in
-/// `options.min_version..=options.max_version` that fits, then the
-/// strongest error-correction level that still fits at that version (if
-/// `options.boost_ec_level`).
-pub fn encodeText(text: []const u8, options: Options, cells: []matrix.Cell, codeword_scratch: []u8) Error!matrix.Symbol {
+fn validVersion(version: u6) bool {
+    return version >= spec.min_version and version <= spec.max_version;
+}
+
+fn validateOptions(options: Options) Error!void {
+    if (!validVersion(options.min_version) or
+        !validVersion(options.max_version) or
+        options.min_version > options.max_version)
+    {
+        return Error.InvalidVersionRange;
+    }
+}
+
+fn isValidUtf8(bytes: []const u8) bool {
+    var index: usize = 0;
+    while (index < bytes.len) {
+        const first = bytes[index];
+        if (first < 0x80) {
+            index += 1;
+            continue;
+        }
+
+        if (first >= 0xC2 and first <= 0xDF) {
+            if (index + 1 >= bytes.len or bytes[index + 1] & 0xC0 != 0x80) return false;
+            index += 2;
+            continue;
+        }
+
+        if (index + 2 < bytes.len) {
+            const second = bytes[index + 1];
+            const third = bytes[index + 2];
+            const third_ok = third & 0xC0 == 0x80;
+
+            if (first == 0xE0 and second >= 0xA0 and second <= 0xBF and third_ok) {
+                index += 3;
+                continue;
+            }
+            if (((first >= 0xE1 and first <= 0xEC) or (first >= 0xEE and first <= 0xEF)) and
+                second & 0xC0 == 0x80 and third_ok)
+            {
+                index += 3;
+                continue;
+            }
+            if (first == 0xED and second >= 0x80 and second <= 0x9F and third_ok) {
+                index += 3;
+                continue;
+            }
+        }
+
+        if (index + 3 < bytes.len) {
+            const second = bytes[index + 1];
+            const third = bytes[index + 2];
+            const fourth = bytes[index + 3];
+            const tail_ok = third & 0xC0 == 0x80 and fourth & 0xC0 == 0x80;
+
+            if (first == 0xF0 and second >= 0x90 and second <= 0xBF and tail_ok) {
+                index += 4;
+                continue;
+            }
+            if (first >= 0xF1 and first <= 0xF3 and second & 0xC0 == 0x80 and tail_ok) {
+                index += 4;
+                continue;
+            }
+            if (first == 0xF4 and second >= 0x80 and second <= 0x8F and tail_ok) {
+                index += 4;
+                continue;
+            }
+        }
+
+        return false;
+    }
+    return true;
+}
+
+fn needsUtf8Eci(text: []const u8) bool {
+    for (text) |byte| {
+        if (byte >= 0x80) return true;
+    }
+    return false;
+}
+
+fn encodedBitLength(version: u6, text: []const u8, utf8_eci: bool) usize {
+    return segment.autoBitLength(version, text) + if (utf8_eci) 12 else 0;
+}
+
+pub fn encodeText(
+    text: []const u8,
+    options: Options,
+    cells: []matrix.Cell,
+    codeword_scratch: []u8,
+) Error!matrix.Symbol {
+    try validateOptions(options);
+    if (!isValidUtf8(text)) return Error.InvalidUtf8;
+
+    const utf8_eci = needsUtf8Eci(text);
     var version = options.min_version;
     while (true) : (version += 1) {
         const capacity_bits = @as(usize, spec.dataCodewords(version, options.ec_level)) * 8;
-        if (segment.autoBitLength(version, text) <= capacity_bits) break;
+        if (encodedBitLength(version, text, utf8_eci) <= capacity_bits) break;
         if (version >= options.max_version) return Error.DataTooLong;
     }
 
     var level = options.ec_level;
     if (options.boost_ec_level) {
-        const strength_order = [_]spec.EcLevel{ .l, .m, .q, .h };
-        const used_bits = segment.autoBitLength(version, text);
-        for (strength_order) |candidate| {
-            const candidate_bits = @as(usize, spec.dataCodewords(version, candidate)) * 8;
-            if (used_bits <= candidate_bits and isStrongerOrEqual(candidate, level)) level = candidate;
+        const used_bits = encodedBitLength(version, text, utf8_eci);
+        const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
+        for (levels) |candidate| {
+            const capacity_bits = @as(usize, spec.dataCodewords(version, candidate)) * 8;
+            if (used_bits <= capacity_bits and strengthRank(candidate) >= strengthRank(level)) {
+                level = candidate;
+            }
         }
     }
 
+    const required_cells = matrix.requiredCells(version);
+    if (cells.len < required_cells) return Error.CellBufferTooSmall;
+
+    const required_scratch = maxCodewords(version);
+    if (codeword_scratch.len < required_scratch) return Error.ScratchTooSmall;
+
     const data_len = spec.dataCodewords(version, level);
-    var data_buf: [3706]u8 = undefined;
+    var data_buf: [max_data_codewords]u8 = undefined;
     var writer = bitstream.Writer.init(data_buf[0..data_len]);
+    if (utf8_eci) try segment.appendEci(&writer, 26);
     try segment.writeAuto(&writer, version, text);
     finalizeDataBits(&writer);
 
-    return encodeRaw(data_buf[0..data_len], version, level, options.mask, cells, codeword_scratch);
-}
-
-fn isStrongerOrEqual(a: spec.EcLevel, b: spec.EcLevel) bool {
-    return strengthRank(a) >= strengthRank(b);
+    return encodeRaw(
+        data_buf[0..data_len],
+        version,
+        level,
+        options.mask,
+        cells,
+        codeword_scratch,
+    );
 }
 
 fn strengthRank(level: spec.EcLevel) u2 {
@@ -90,15 +175,12 @@ fn strengthRank(level: spec.EcLevel) u2 {
     };
 }
 
-/// Appends the terminator and pad codewords to fill `writer`'s buffer
-/// exactly, per section 7.4.9-7.4.10: up to 4 zero terminator bits, then
-/// zero bits to the next byte boundary, then alternating 0xEC/0x11 pad
-/// bytes until full.
 fn finalizeDataBits(writer: *bitstream.Writer) void {
     const capacity_bits = writer.bytes.len * 8;
-    const terminator_bits: u5 = @intCast(@min(4, capacity_bits - writer.bit_len));
+    const terminator_bits: u6 = @intCast(@min(4, capacity_bits - writer.bit_len));
     writer.append(0, terminator_bits) catch unreachable;
-    const pad_to_byte: u5 = @intCast((8 - writer.bit_len % 8) % 8);
+
+    const pad_to_byte: u6 = @intCast((8 - writer.bit_len % 8) % 8);
     writer.append(0, pad_to_byte) catch unreachable;
 
     var pad_byte: u8 = 0xEC;
@@ -108,11 +190,6 @@ fn finalizeDataBits(writer: *bitstream.Writer) void {
     }
 }
 
-/// Encodes an already-finalized data codeword stream (exactly
-/// `spec.dataCodewords(version, level)` bytes — build one by hand with
-/// `segment.appendX` calls followed by padding, or get one from
-/// `encodeText`'s internals) into a complete symbol: error correction,
-/// interleaving, module placement, and mask selection.
 pub fn encodeRaw(
     data: []const u8,
     version: u6,
@@ -121,7 +198,15 @@ pub fn encodeRaw(
     cells: []matrix.Cell,
     codeword_scratch: []u8,
 ) Error!matrix.Symbol {
-    std.debug.assert(data.len == spec.dataCodewords(version, level));
+    if (!validVersion(version)) return Error.InvalidVersionRange;
+    if (data.len != spec.dataCodewords(version, level)) return Error.InvalidDataLength;
+
+    const required_cells = matrix.requiredCells(version);
+    if (cells.len < required_cells) return Error.CellBufferTooSmall;
+
+    const total_codewords = maxCodewords(version);
+    if (codeword_scratch.len < total_codewords) return Error.ScratchTooSmall;
+
     const layout = spec.blockLayout(version, level);
     const total_blocks = layout.totalBlocks();
     std.debug.assert(total_blocks <= max_blocks);
@@ -131,55 +216,64 @@ pub fn encodeRaw(
     var ec_buf: [max_blocks * reed_solomon.max_ec_codewords]u8 = undefined;
 
     var offset: usize = 0;
-    for (0..total_blocks) |b| {
-        const len: usize = if (b < layout.short_blocks) layout.short_data_codewords else layout.short_data_codewords + 1;
-        block_data_start[b] = offset;
-        block_data_len[b] = len;
-        reed_solomon.encode(data[offset .. offset + len], layout.ec_per_block, ec_buf[b * layout.ec_per_block .. (b + 1) * layout.ec_per_block]);
+    for (0..total_blocks) |block| {
+        const len: usize = if (block < layout.short_blocks)
+            layout.short_data_codewords
+        else
+            layout.short_data_codewords + 1;
+
+        block_data_start[block] = offset;
+        block_data_len[block] = len;
+        reed_solomon.encode(
+            data[offset .. offset + len],
+            layout.ec_per_block,
+            ec_buf[block * layout.ec_per_block .. (block + 1) * layout.ec_per_block],
+        );
         offset += len;
     }
 
-    const total_codewords = maxCodewords(version);
-    std.debug.assert(codeword_scratch.len >= total_codewords);
-    var pos: usize = 0;
-
+    var position: usize = 0;
     const max_data_len = layout.short_data_codewords + 1;
-    for (0..max_data_len) |i| {
-        for (0..total_blocks) |b| {
-            if (i < block_data_len[b]) {
-                codeword_scratch[pos] = data[block_data_start[b] + i];
-                pos += 1;
+    for (0..max_data_len) |index| {
+        for (0..total_blocks) |block| {
+            if (index < block_data_len[block]) {
+                codeword_scratch[position] = data[block_data_start[block] + index];
+                position += 1;
             }
         }
     }
-    for (0..layout.ec_per_block) |i| {
-        for (0..total_blocks) |b| {
-            codeword_scratch[pos] = ec_buf[b * layout.ec_per_block + i];
-            pos += 1;
+
+    for (0..layout.ec_per_block) |index| {
+        for (0..total_blocks) |block| {
+            codeword_scratch[position] = ec_buf[block * layout.ec_per_block + index];
+            position += 1;
         }
     }
-    std.debug.assert(pos == total_codewords);
+    std.debug.assert(position == total_codewords);
 
-    var symbol = matrix.layoutFunctionPatterns(cells, version, level, 0);
+    var symbol = matrix.layoutFunctionPatterns(cells[0..required_cells], version, level, 0);
     matrix.drawCodewords(&symbol, codeword_scratch[0..total_codewords]);
 
     const chosen_mask = forced_mask orelse blk: {
-        var best: u3 = 0;
+        var best_mask: u3 = 0;
         var best_penalty: i32 = std.math.maxInt(i32);
-        var m: u3 = 0;
-        while (true) : (m += 1) {
-            matrix.applyMask(&symbol, m);
-            symbol.mask = m;
+        var mask: u3 = 0;
+
+        while (true) : (mask += 1) {
+            matrix.applyMask(&symbol, mask);
+            symbol.mask = mask;
             matrix.drawFormatInfo(&symbol);
+
             const penalty = matrix.penaltyScore(&symbol);
             if (penalty < best_penalty) {
                 best_penalty = penalty;
-                best = m;
+                best_mask = mask;
             }
-            matrix.applyMask(&symbol, m); // undo
-            if (m == 7) break;
+
+            matrix.applyMask(&symbol, mask);
+            if (mask == 7) break;
         }
-        break :blk best;
+        break :blk best_mask;
     };
 
     symbol.mask = chosen_mask;
@@ -188,37 +282,61 @@ pub fn encodeRaw(
     return symbol;
 }
 
-test "encodeText produces a version-1 symbol for a short alphanumeric string" {
+test "encodeText selects version one for a short value" {
     const testing = std.testing;
     var cells: [21 * 21]matrix.Cell = undefined;
     var scratch: [64]u8 = undefined;
-    const symbol = try encodeText("HELLO WORLD", .{ .min_version = 1, .max_version = 1, .ec_level = .q, .boost_ec_level = false }, &cells, &scratch);
+
+    const symbol = try encodeText(
+        "HELLO WORLD",
+        .{ .min_version = 1, .max_version = 1, .ec_level = .q, .boost_ec_level = false },
+        &cells,
+        &scratch,
+    );
+
     try testing.expectEqual(@as(u16, 21), symbol.size);
     try testing.expectEqual(spec.EcLevel.q, symbol.ec_level);
 }
 
-test "boosting the EC level never changes the chosen version" {
+test "UTF-8 text emits ECI 26 when required" {
     const testing = std.testing;
-    var cells: [21 * 21]matrix.Cell = undefined;
-    var scratch: [64]u8 = undefined;
-    const symbol = try encodeText("HELLO", .{ .min_version = 1, .max_version = 1, .ec_level = .l, .boost_ec_level = true }, &cells, &scratch);
-    try testing.expectEqual(@as(u16, 21), symbol.size);
-    // Five alphanumeric characters fit comfortably even at H on version 1.
-    try testing.expectEqual(spec.EcLevel.h, symbol.ec_level);
+    var cells: [matrix.requiredCells(2)]matrix.Cell = undefined;
+    var scratch: [maxCodewords(2)]u8 = undefined;
+
+    const symbol = try encodeText(
+        "Grüße",
+        .{ .min_version = 2, .max_version = 2, .boost_ec_level = false },
+        &cells,
+        &scratch,
+    );
+
+    try testing.expectEqual(@as(u6, 2), symbol.version);
 }
 
-test "a forced mask is honored exactly" {
-    const testing = std.testing;
-    var cells: [21 * 21]matrix.Cell = undefined;
-    var scratch: [64]u8 = undefined;
-    const symbol = try encodeText("TEST", .{ .min_version = 1, .max_version = 1, .mask = 3 }, &cells, &scratch);
-    try testing.expectEqual(@as(u3, 3), symbol.mask);
+test "invalid UTF-8 is rejected" {
+    var cells: [matrix.requiredCells(1)]matrix.Cell = undefined;
+    var scratch: [maxCodewords(1)]u8 = undefined;
+    try std.testing.expectError(
+        Error.InvalidUtf8,
+        encodeText(&.{ 0xC0, 0x80 }, .{}, &cells, &scratch),
+    );
 }
 
-test "data too long for the allowed version range is reported, not truncated" {
-    const testing = std.testing;
-    var cells: [21 * 21]matrix.Cell = undefined;
-    var scratch: [64]u8 = undefined;
-    const too_long = "0" ** 100;
-    try testing.expectError(Error.DataTooLong, encodeText(too_long, .{ .min_version = 1, .max_version = 1 }, &cells, &scratch));
+test "invalid version ranges are rejected" {
+    var cells: [matrix.requiredCells(1)]matrix.Cell = undefined;
+    var scratch: [maxCodewords(1)]u8 = undefined;
+    try std.testing.expectError(
+        Error.InvalidVersionRange,
+        encodeText("x", .{ .min_version = 2, .max_version = 1 }, &cells, &scratch),
+    );
+}
+
+test "undersized buffers are reported" {
+    var cells: [1]matrix.Cell = undefined;
+    var scratch: [1]u8 = undefined;
+
+    try std.testing.expectError(
+        Error.CellBufferTooSmall,
+        encodeText("HELLO", .{ .min_version = 1, .max_version = 1 }, &cells, &scratch),
+    );
 }

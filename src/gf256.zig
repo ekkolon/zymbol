@@ -8,6 +8,8 @@
 //! is two table reads and an add; there is no field arithmetic loop left to
 //! execute.
 
+const std = @import("std");
+
 const primitive: u16 = 0x11D;
 
 /// exp[i] == 2^i. Sized to 512 so `mul` can add two logs in 0..254 and index
@@ -50,16 +52,19 @@ pub inline fn mul(a: u8, b: u8) u8 {
 
 /// Discrete log base 2 of `a`. `a` must be nonzero.
 pub inline fn log(a: u8) u8 {
+    std.debug.assert(a != 0);
     return log_table[a];
 }
 
 /// Multiplicative inverse of `a`. `a` must be nonzero.
 pub inline fn inv(a: u8) u8 {
+    std.debug.assert(a != 0);
     return exp_table[255 - @as(u16, log_table[a])];
 }
 
 /// `a / b` in GF(256). `b` must be nonzero.
 pub inline fn div(a: u8, b: u8) u8 {
+    std.debug.assert(b != 0);
     if (a == 0) return 0;
     const diff: i32 = @as(i32, log_table[a]) - @as(i32, log_table[b]);
     const idx: usize = @intCast(@mod(diff, 255));

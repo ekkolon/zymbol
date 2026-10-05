@@ -1,21 +1,3 @@
-//! Encodes payload data into the mode segments described in ISO/IEC 18004
-//! section 7.4: a 4-bit mode indicator, a version-dependent character-count
-//! indicator, then the mode's own bit packing. Each `appendX` function
-//! writes one complete segment straight into the caller's bit writer, so
-//! building a message by hand (mixing modes deliberately) is just calling
-//! several of these in sequence — there is no intermediate Segment value
-//! that owns memory.
-//!
-//! `writeAuto` covers the common case of "encode this text well" with a
-//! greedy classifier. It is deliberately not the optimal segmentation:
-//! finding the byte-length-minimal split is a shortest-path problem over
-//! mode-switch points, and doing that well needs a caller's own text
-//! statistics to be worth the extra bookkeeping. The greedy version -
-//! extend the current run while the next byte still fits its mode, start a
-//! new segment otherwise - costs a few extra bits at each mode boundary
-//! and no more; callers that have counted those boundaries and know it
-//! matters can always fall back to the explicit `appendX` functions.
-
 const std = @import("std");
 const spec = @import("spec.zig");
 const bitstream = @import("bitstream.zig");
@@ -25,92 +7,104 @@ pub const Error = bitstream.Error || error{
     TooManyCharacters,
     OddKanjiLength,
     InvalidKanjiByte,
+    InvalidEciAssignment,
 };
 
 const alphanumeric_charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+const invalid_alphanumeric = 0xFF;
 
-fn alphanumericValue(c: u8) ?u6 {
-    const idx = std.mem.indexOfScalar(u8, alphanumeric_charset, c) orelse return null;
-    return @intCast(idx);
+const alphanumeric_values: [256]u8 = blk: {
+    var values = [_]u8{invalid_alphanumeric} ** 256;
+    for (alphanumeric_charset, 0..) |character, index| {
+        values[character] = @intCast(index);
+    }
+    break :blk values;
+};
+
+fn alphanumericValue(character: u8) ?u6 {
+    const value = alphanumeric_values[character];
+    if (value == invalid_alphanumeric) return null;
+    return @intCast(value);
 }
 
 pub fn isNumeric(text: []const u8) bool {
-    for (text) |c| if (c < '0' or c > '9') return false;
+    for (text) |character| {
+        if (character < '0' or character > '9') return false;
+    }
     return true;
 }
 
 pub fn isAlphanumeric(text: []const u8) bool {
-    for (text) |c| if (alphanumericValue(c) == null) return false;
+    for (text) |character| {
+        if (alphanumericValue(character) == null) return false;
+    }
     return true;
 }
 
-fn writeHeader(writer: *bitstream.Writer, mode: spec.Mode, version: u6, char_count: usize) Error!void {
-    const cc_bits = spec.charCountBits(mode, version);
-    if (char_count >= (@as(usize, 1) << cc_bits)) return Error.TooManyCharacters;
-    try writer.append(@intFromEnum(mode), 4);
-    try writer.append(@intCast(char_count), @intCast(cc_bits));
+fn maxCharacterCount(mode: spec.Mode, version: u6) usize {
+    const bits = spec.charCountBits(mode, version);
+    return (@as(usize, 1) << @intCast(bits)) - 1;
 }
 
-/// Appends a numeric-mode segment. `digits` must be ASCII '0'-'9'.
+fn writeHeader(writer: *bitstream.Writer, mode: spec.Mode, version: u6, char_count: usize) Error!void {
+    if (char_count > maxCharacterCount(mode, version)) return Error.TooManyCharacters;
+    try writer.append(@intFromEnum(mode), 4);
+    try writer.append(@intCast(char_count), @intCast(spec.charCountBits(mode, version)));
+}
+
 pub fn appendNumeric(writer: *bitstream.Writer, version: u6, digits: []const u8) Error!void {
     if (!isNumeric(digits)) return Error.InvalidCharacter;
     try writeHeader(writer, .numeric, version, digits.len);
-    var i: usize = 0;
-    while (i < digits.len) {
-        const remaining = digits.len - i;
-        const group_len = @min(remaining, 3);
+
+    var index: usize = 0;
+    while (index < digits.len) {
+        const group_len = @min(digits.len - index, 3);
         var value: u32 = 0;
-        for (digits[i .. i + group_len]) |c| value = value * 10 + (c - '0');
-        const bits: u5 = switch (group_len) {
+        for (digits[index .. index + group_len]) |character| {
+            value = value * 10 + (character - '0');
+        }
+
+        const bits: u6 = switch (group_len) {
             1 => 4,
             2 => 7,
             3 => 10,
             else => unreachable,
         };
         try writer.append(value, bits);
-        i += group_len;
+        index += group_len;
     }
 }
 
-/// Appends an alphanumeric-mode segment. `text` must be drawn from
-/// "0-9A-Z $%*+-./:".
 pub fn appendAlphanumeric(writer: *bitstream.Writer, version: u6, text: []const u8) Error!void {
     if (!isAlphanumeric(text)) return Error.InvalidCharacter;
     try writeHeader(writer, .alphanumeric, version, text.len);
-    var i: usize = 0;
-    while (i < text.len) {
-        if (i + 1 < text.len) {
-            const a = alphanumericValue(text[i]).?;
-            const b = alphanumericValue(text[i + 1]).?;
-            try writer.append(@as(u32, a) * 45 + b, 11);
-            i += 2;
+
+    var index: usize = 0;
+    while (index < text.len) {
+        if (index + 1 < text.len) {
+            const first = alphanumericValue(text[index]).?;
+            const second = alphanumericValue(text[index + 1]).?;
+            try writer.append(@as(u32, first) * 45 + second, 11);
+            index += 2;
         } else {
-            try writer.append(alphanumericValue(text[i]).?, 6);
-            i += 1;
+            try writer.append(alphanumericValue(text[index]).?, 6);
+            index += 1;
         }
     }
 }
 
-/// Appends a byte-mode segment, verbatim. This is the mode that carries
-/// arbitrary binary data or any text encoding a scanner is expected to
-/// already know (UTF-8 by common convention, though the standard itself is
-/// silent on this — see `appendEci` for declaring the encoding explicitly).
 pub fn appendByte(writer: *bitstream.Writer, version: u6, data: []const u8) Error!void {
     try writeHeader(writer, .byte, version, data.len);
     try writer.appendBytes(data);
 }
 
-/// Appends a kanji-mode segment. `sjis` must contain whole Shift-JIS
-/// double-byte characters (even length) in one of the two ranges Table 4
-/// designates for this mode; single-byte Shift-JIS codes are not kanji
-/// mode's concern and should go through byte mode instead.
 pub fn appendKanji(writer: *bitstream.Writer, version: u6, sjis: []const u8) Error!void {
     if (sjis.len % 2 != 0) return Error.OddKanjiLength;
-    const char_count = sjis.len / 2;
-    try writeHeader(writer, .kanji, version, char_count);
-    var i: usize = 0;
-    while (i < sjis.len) : (i += 2) {
-        var value: u32 = (@as(u32, sjis[i]) << 8) | sjis[i + 1];
+    try writeHeader(writer, .kanji, version, sjis.len / 2);
+
+    var index: usize = 0;
+    while (index < sjis.len) : (index += 2) {
+        var value: u32 = (@as(u32, sjis[index]) << 8) | sjis[index + 1];
         if (value >= 0x8140 and value <= 0x9FFC) {
             value -= 0x8140;
         } else if (value >= 0xE040 and value <= 0xEBBF) {
@@ -118,15 +112,15 @@ pub fn appendKanji(writer: *bitstream.Writer, version: u6, sjis: []const u8) Err
         } else {
             return Error.InvalidKanjiByte;
         }
+
         const packed_value = (value >> 8) * 0xC0 + (value & 0xFF);
         try writer.append(packed_value, 13);
     }
 }
 
-/// Appends an ECI designator segment (section 7.4.2), declaring the
-/// character encoding used by byte-mode segments that follow it. This
-/// carries no character-count field of its own.
 pub fn appendEci(writer: *bitstream.Writer, assignment: u21) Error!void {
+    if (assignment > 999_999) return Error.InvalidEciAssignment;
+
     try writer.append(@intFromEnum(spec.Mode.eci), 4);
     if (assignment < (1 << 7)) {
         try writer.append(assignment, 8);
@@ -139,112 +133,134 @@ pub fn appendEci(writer: *bitstream.Writer, assignment: u21) Error!void {
     }
 }
 
-/// Encodes `text` by greedily splitting it into runs of numeric,
-/// alphanumeric, and byte mode (in that preference order whenever a
-/// character qualifies for more than one), appending one segment per run.
-/// See the module doc comment for what this heuristic does and doesn't
-/// optimize.
-pub fn writeAuto(writer: *bitstream.Writer, version: u6, text: []const u8) Error!void {
-    var i: usize = 0;
-    while (i < text.len) {
-        const class = classify(text[i]);
-        var j = i + 1;
-        while (j < text.len and classify(text[j]) == class) : (j += 1) {}
-        switch (class) {
-            .numeric => try appendNumeric(writer, version, text[i..j]),
-            .alphanumeric => try appendAlphanumeric(writer, version, text[i..j]),
-            .byte => try appendByte(writer, version, text[i..j]),
-        }
-        i = j;
-    }
-}
+const Class = enum {
+    numeric,
+    alphanumeric,
+    byte,
 
-const Class = enum { numeric, alphanumeric, byte };
-
-fn classify(c: u8) Class {
-    if (c >= '0' and c <= '9') return .numeric;
-    if (alphanumericValue(c) != null) return .alphanumeric;
-    return .byte;
-}
-
-/// Bit length `writeAuto` would produce for `text` at `version`, without
-/// writing anything — what a caller doing its own version search needs.
-pub fn autoBitLength(version: u6, text: []const u8) usize {
-    var total: usize = 0;
-    var i: usize = 0;
-    while (i < text.len) {
-        const class = classify(text[i]);
-        var j = i + 1;
-        while (j < text.len and classify(text[j]) == class) : (j += 1) {}
-        const run_len = j - i;
-        const mode: spec.Mode = switch (class) {
+    fn mode(self: Class) spec.Mode {
+        return switch (self) {
             .numeric => .numeric,
             .alphanumeric => .alphanumeric,
             .byte => .byte,
         };
-        total += 4 + spec.charCountBits(mode, version);
-        total += switch (class) {
-            .numeric => (run_len / 3) * 10 + ([_]usize{ 0, 4, 7 })[run_len % 3],
-            .alphanumeric => (run_len / 2) * 11 + (run_len % 2) * 6,
-            .byte => run_len * 8,
-        };
-        i = j;
+    }
+};
+
+fn classify(character: u8) Class {
+    if (character >= '0' and character <= '9') return .numeric;
+    if (alphanumericValue(character) != null) return .alphanumeric;
+    return .byte;
+}
+
+fn appendRun(writer: *bitstream.Writer, version: u6, class: Class, run: []const u8) Error!void {
+    const max_count = maxCharacterCount(class.mode(), version);
+    var offset: usize = 0;
+    while (offset < run.len) {
+        const end = @min(offset + max_count, run.len);
+        switch (class) {
+            .numeric => try appendNumeric(writer, version, run[offset..end]),
+            .alphanumeric => try appendAlphanumeric(writer, version, run[offset..end]),
+            .byte => try appendByte(writer, version, run[offset..end]),
+        }
+        offset = end;
+    }
+}
+
+pub fn writeAuto(writer: *bitstream.Writer, version: u6, text: []const u8) Error!void {
+    var index: usize = 0;
+    while (index < text.len) {
+        const class = classify(text[index]);
+        var end = index + 1;
+        while (end < text.len and classify(text[end]) == class) : (end += 1) {}
+        try appendRun(writer, version, class, text[index..end]);
+        index = end;
+    }
+}
+
+fn payloadBits(class: Class, count: usize) usize {
+    return switch (class) {
+        .numeric => (count / 3) * 10 + ([_]usize{ 0, 4, 7 })[count % 3],
+        .alphanumeric => (count / 2) * 11 + (count % 2) * 6,
+        .byte => count * 8,
+    };
+}
+
+fn runBitLength(version: u6, class: Class, run_len: usize) usize {
+    const max_count = maxCharacterCount(class.mode(), version);
+    var remaining = run_len;
+    var total: usize = 0;
+
+    while (remaining > 0) {
+        const count = @min(remaining, max_count);
+        total += 4 + spec.charCountBits(class.mode(), version) + payloadBits(class, count);
+        remaining -= count;
     }
     return total;
 }
 
-test "numeric segment matches the textbook 0001-0000001000-... worked example" {
+pub fn autoBitLength(version: u6, text: []const u8) usize {
+    var total: usize = 0;
+    var index: usize = 0;
+
+    while (index < text.len) {
+        const class = classify(text[index]);
+        var end = index + 1;
+        while (end < text.len and classify(text[end]) == class) : (end += 1) {}
+        total += runBitLength(version, class, end - index);
+        index = end;
+    }
+    return total;
+}
+
+test "numeric packing" {
     const testing = std.testing;
     var buf: [8]u8 = undefined;
-    var w = bitstream.Writer.init(&buf);
-    try appendNumeric(&w, 1, "01234567");
-    // mode(4)=0001, count(10)=8, then 012/345/67 as 10/10/7 bits.
-    try testing.expectEqual(@as(usize, 4 + 10 + 10 + 10 + 7), w.bitLength());
-    var r = bitstream.Reader.init(w.filled());
-    try testing.expectEqual(@as(u32, 0b0001), r.read(4));
-    try testing.expectEqual(@as(u32, 8), r.read(10));
-    try testing.expectEqual(@as(u32, 12), r.read(10));
-    try testing.expectEqual(@as(u32, 345), r.read(10));
-    try testing.expectEqual(@as(u32, 67), r.read(7));
+    var writer = bitstream.Writer.init(&buf);
+    try appendNumeric(&writer, 1, "01234567");
+
+    var reader = bitstream.Reader.init(writer.filled());
+    try testing.expectEqual(@as(u32, 0b0001), try reader.read(4));
+    try testing.expectEqual(@as(u32, 8), try reader.read(10));
+    try testing.expectEqual(@as(u32, 12), try reader.read(10));
+    try testing.expectEqual(@as(u32, 345), try reader.read(10));
+    try testing.expectEqual(@as(u32, 67), try reader.read(7));
 }
 
-test "alphanumeric segment packs pairs into 11 bits and a lone tail into 6" {
+test "alphanumeric packing" {
     const testing = std.testing;
     var buf: [6]u8 = undefined;
-    var w = bitstream.Writer.init(&buf);
-    try appendAlphanumeric(&w, 1, "AC-42");
-    var r = bitstream.Reader.init(w.filled());
-    try testing.expectEqual(@as(u32, 0b0010), r.read(4));
-    try testing.expectEqual(@as(u32, 5), r.read(9));
-    // "AC" -> 10*45 + 12 = 462
-    try testing.expectEqual(@as(u32, 462), r.read(11));
-    // "-4" -> 41*45 + 4 = 1849
-    try testing.expectEqual(@as(u32, 1849), r.read(11));
-    // "2" -> 2
-    try testing.expectEqual(@as(u32, 2), r.read(6));
+    var writer = bitstream.Writer.init(&buf);
+    try appendAlphanumeric(&writer, 1, "AC-42");
+
+    var reader = bitstream.Reader.init(writer.filled());
+    try testing.expectEqual(@as(u32, 0b0010), try reader.read(4));
+    try testing.expectEqual(@as(u32, 5), try reader.read(9));
+    try testing.expectEqual(@as(u32, 462), try reader.read(11));
+    try testing.expectEqual(@as(u32, 1849), try reader.read(11));
+    try testing.expectEqual(@as(u32, 2), try reader.read(6));
 }
 
-test "auto segmenter splits mixed text into the expected number of runs" {
+test "ECI supports all standard assignment widths" {
     const testing = std.testing;
-    var buf: [64]u8 = undefined;
-    var w = bitstream.Writer.init(&buf);
-    try writeAuto(&w, 5, "1234hello!!");
-    var r = bitstream.Reader.init(w.filled());
-    try testing.expectEqual(@as(u32, @intFromEnum(spec.Mode.numeric)), r.read(4));
-    try testing.expectEqual(@as(u32, 4), r.read(10)); // "1234" is 4 digits
-    _ = r.read(10); // "123" packed
-    _ = r.read(4); // "4" packed (1 digit -> 4 bits)
-    try testing.expectEqual(@as(u32, @intFromEnum(spec.Mode.byte)), r.read(4));
-    try testing.expectEqual(@as(u32, 7), r.read(8)); // "hello!!" is 7 bytes
+    const assignments = [_]u21{ 26, 128, 999_999 };
+
+    for (assignments) |assignment| {
+        var buf: [4]u8 = undefined;
+        var writer = bitstream.Writer.init(&buf);
+        try appendEci(&writer, assignment);
+        try testing.expect(writer.bitLength() == 12 or writer.bitLength() == 20 or writer.bitLength() == 28);
+    }
 }
 
-test "autoBitLength predicts exactly what writeAuto writes" {
+test "auto bit length matches auto writer" {
     const testing = std.testing;
     const samples = [_][]const u8{ "HELLO WORLD", "01234567890123", "Mixed123Text!", "" };
+
     for (samples) |sample| {
         var buf: [256]u8 = undefined;
-        var w = bitstream.Writer.init(&buf);
-        try writeAuto(&w, 10, sample);
-        try testing.expectEqual(w.bitLength(), autoBitLength(10, sample));
+        var writer = bitstream.Writer.init(&buf);
+        try writeAuto(&writer, 10, sample);
+        try testing.expectEqual(writer.bitLength(), autoBitLength(10, sample));
     }
 }

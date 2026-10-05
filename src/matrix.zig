@@ -225,34 +225,68 @@ fn drawVersionInfo(symbol: *Symbol) void {
     }
 }
 
-/// Draws `codewords` (a fully assembled, interleaved, MSB-first bitstream)
-/// into every `data` cell in the standard's zigzag column-pair scan
-/// (section 8.7.3), skipping the vertical timing column entirely. Any bits
-/// left over after the codewords are exhausted are the version's remainder
-/// bits and are simply left light, matching a real encoder.
-pub fn drawCodewords(symbol: *Symbol, codewords: []const u8) void {
-    var bit_index: usize = 0;
-    const total_bits = codewords.len * 8;
-    const size: i32 = symbol.size;
+pub const DataPosition = struct {
+    x: usize,
+    y: usize,
+};
 
-    var right: i32 = size - 1;
-    while (right >= 1) : (right -= 2) {
-        if (right == 6) right = 5;
-        var vert: i32 = 0;
-        while (vert < size) : (vert += 1) {
-            var j: i32 = 0;
-            while (j < 2) : (j += 1) {
-                const x = right - j;
-                const upward = (right + 1) & 2 == 0;
-                const y = if (upward) size - 1 - vert else vert;
-                if (symbol.kindAt(@intCast(x), @intCast(y)) == .data and bit_index < total_bits) {
-                    const byte = codewords[bit_index >> 3];
-                    const bit = (byte >> @intCast(7 - (bit_index & 7))) & 1;
-                    symbol.setUnchecked(@intCast(x), @intCast(y), bit != 0);
-                    bit_index += 1;
+pub const DataIterator = struct {
+    size: i32,
+    right: i32,
+    vertical: i32 = 0,
+    lane: u2 = 0,
+
+    pub fn init(size: u16) DataIterator {
+        return .{
+            .size = size,
+            .right = @as(i32, size) - 1,
+        };
+    }
+
+    pub fn next(self: *DataIterator, symbol: *const Symbol) ?DataPosition {
+        while (self.right >= 1) {
+            if (self.right == 6) self.right = 5;
+
+            while (self.vertical < self.size) {
+                while (self.lane < 2) {
+                    const lane = self.lane;
+                    self.lane += 1;
+
+                    const x = self.right - @as(i32, lane);
+                    const upward = ((self.right + 1) & 2) == 0;
+                    const y = if (upward)
+                        self.size - 1 - self.vertical
+                    else
+                        self.vertical;
+
+                    if (symbol.kindAt(@intCast(x), @intCast(y)) == .data) {
+                        return .{ .x = @intCast(x), .y = @intCast(y) };
+                    }
                 }
+
+                self.lane = 0;
+                self.vertical += 1;
             }
+
+            self.vertical = 0;
+            self.lane = 0;
+            self.right -= 2;
         }
+
+        return null;
+    }
+};
+
+pub fn drawCodewords(symbol: *Symbol, codewords: []const u8) void {
+    const total_bits = codewords.len * 8;
+    var bit_index: usize = 0;
+    var iterator = DataIterator.init(symbol.size);
+
+    while (bit_index < total_bits) : (bit_index += 1) {
+        const position = iterator.next(symbol) orelse unreachable;
+        const byte = codewords[bit_index >> 3];
+        const bit = (byte >> @intCast(7 - (bit_index & 7))) & 1;
+        symbol.setUnchecked(position.x, position.y, bit != 0);
     }
 }
 
@@ -453,4 +487,27 @@ test "setData refuses to touch a function module but allows a data module" {
     try testing.expectError(Symbol.ProtectedModuleError.ProtectedModule, symbol.setData(0, 0, false));
     try symbol.setData(12, 12, true);
     try testing.expect(symbol.isDark(12, 12));
+}
+
+
+test "data iterator matches codeword placement order" {
+    const testing = std.testing;
+    var buf: [21 * 21]Cell = undefined;
+    var symbol = layoutFunctionPatterns(&buf, 1, .m, 0);
+    var codewords: [26]u8 = undefined;
+    for (&codewords, 0..) |*byte, index| byte.* = @intCast(index);
+
+    drawCodewords(&symbol, &codewords);
+
+    var recovered: [26]u8 = [_]u8{0} ** 26;
+    var iterator = DataIterator.init(symbol.size);
+    var bit_index: usize = 0;
+    while (bit_index < recovered.len * 8) : (bit_index += 1) {
+        const position = iterator.next(&symbol) orelse unreachable;
+        if (symbol.isDark(position.x, position.y)) {
+            recovered[bit_index >> 3] |= @as(u8, 1) << @intCast(7 - (bit_index & 7));
+        }
+    }
+
+    try testing.expectEqualSlices(u8, &codewords, &recovered);
 }
