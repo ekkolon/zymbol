@@ -1,14 +1,4 @@
-//! Numeric constants and small derivations from ISO/IEC 18004. Nothing in
-//! this file depends on the rest of the library, and nothing here allocates:
-//! every table is comptime data and every function is a closed-form or
-//! bounded-loop computation over it.
-//!
-//! The two block-layout tables (`ecc_codewords_per_block` and
-//! `num_ec_blocks`) are the minimal sufficient statistics for Table 9 of the
-//! standard: given a version and level, the split into a "group 1" of
-//! shorter blocks and a "group 2" of one-codeword-longer blocks falls out of
-//! `blockLayout` below by arithmetic, so the group sizes themselves don't
-//! need to be tabulated.
+//! QR Code Model 2 constants, capacity tables, and derived geometry.
 
 const std = @import("std");
 
@@ -84,10 +74,6 @@ pub fn blockLayout(version: u6, level: EcLevel) BlockLayout {
     const ec_per_block: u16 = ecc_codewords_per_block[row][version];
     const total_blocks: u16 = num_ec_blocks[row][version];
     const raw: u32 = numRawDataModules(version) / 8;
-    // Blocks divide the raw codeword count as evenly as possible: some get
-    // one fewer data codeword than others. `long_blocks` is the remainder
-    // of that division, matching how the interleaving in section 8.6 packs
-    // the tail end of the message.
     const long_blocks: u16 = @intCast(raw % total_blocks);
     const short_blocks: u16 = total_blocks - long_blocks;
     const short_data: u16 = @intCast(raw / total_blocks - ec_per_block);
@@ -210,15 +196,12 @@ pub fn hammingDistance(a: anytype, b: @TypeOf(a)) u32 {
 
 test "raw data modules matches published capacities at a few versions" {
     const testing = std.testing;
-    // Version 1: 208 usable bits (26 codewords) is the textbook figure.
     try testing.expectEqual(@as(u32, 208), numRawDataModules(1));
-    // Version 40 tops out at 29648 bits (3706 codewords), the largest symbol.
     try testing.expectEqual(@as(u32, 29648), numRawDataModules(40));
 }
 
 test "data codewords match the standard's per-level totals at every version" {
     const testing = std.testing;
-    // Spot-checked against ISO/IEC 18004 Table 9 across the version range.
     try testing.expectEqual(@as(u16, 19), dataCodewords(1, .l));
     try testing.expectEqual(@as(u16, 9), dataCodewords(1, .h));
     try testing.expectEqual(@as(u16, 108), dataCodewords(5, .l));
@@ -229,7 +212,6 @@ test "data codewords match the standard's per-level totals at every version" {
 
 test "block layout group sizes match the standard at a two-group version" {
     const testing = std.testing;
-    // Version 5-Q splits into two groups of two blocks each: 2x15 + 2x16.
     const layout = blockLayout(5, .q);
     try testing.expectEqual(@as(u16, 18), layout.ec_per_block);
     try testing.expectEqual(@as(u16, 2), layout.short_blocks);
