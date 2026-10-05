@@ -1,16 +1,16 @@
 const std = @import("std");
 const qrz = @import("qrz");
 
-pub fn main() void {
+pub fn main() !void {
     const version = 6;
     var cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
     var scratch: [qrz.requiredEncodeScratch(version)]u8 = undefined;
-    const symbol = qrz.encodeText(
+    const symbol = try qrz.encodeText(
         "https://example.com/qrz",
         .{ .min_version = version, .max_version = version, .ec_level = .q },
         &cells,
         &scratch,
-    ) catch unreachable;
+    );
 
     const quiet = 4;
     var y: i32 = -quiet;
