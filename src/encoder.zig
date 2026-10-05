@@ -307,6 +307,53 @@ pub fn encodeRaw(
     return symbol;
 }
 
+test "byte capacity boundary is exact for every version and EC level" {
+    const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
+    var payload: [max_data_codewords]u8 = undefined;
+    @memset(&payload, 0x80);
+
+    var cells: [matrix.requiredCells(spec.max_version)]matrix.Cell = undefined;
+    var scratch: [maxCodewords(spec.max_version)]u8 = undefined;
+
+    var version: u6 = spec.min_version;
+    while (version <= spec.max_version) : (version += 1) {
+        for (levels) |level| {
+            const capacity_bits = @as(usize, spec.dataCodewords(version, level)) * 8;
+            const header_bits = 4 + @as(usize, spec.charCountBits(.byte, version));
+            const max_payload = (capacity_bits - header_bits) / 8;
+
+            _ = try encodeBytes(
+                payload[0..max_payload],
+                .{
+                    .min_version = version,
+                    .max_version = version,
+                    .ec_level = level,
+                    .boost_ec_level = false,
+                    .mask = 0,
+                },
+                &cells,
+                &scratch,
+            );
+
+            try std.testing.expectError(
+                Error.DataTooLong,
+                encodeBytes(
+                    payload[0 .. max_payload + 1],
+                    .{
+                        .min_version = version,
+                        .max_version = version,
+                        .ec_level = level,
+                        .boost_ec_level = false,
+                        .mask = 0,
+                    },
+                    &cells,
+                    &scratch,
+                ),
+            );
+        }
+    }
+}
+
 test "mixed-mode overhead falls back to one byte segment" {
     const payload = "A1b2C3d4E5f6";
     try std.testing.expectEqual(
