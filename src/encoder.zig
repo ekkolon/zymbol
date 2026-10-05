@@ -318,6 +318,26 @@ pub fn encodeRaw(
     return symbol;
 }
 
+test "segment planner fits in the symbol cell buffer" {
+    var version: u6 = spec.min_version;
+    while (version <= spec.max_version) : (version += 1) {
+        const capacity_bits = @as(usize, spec.dataCodewords(version, .l)) * 8;
+        const header_bits = 4 + @as(usize, spec.charCountBits(.numeric, version));
+
+        var count: usize = 0;
+        while (header_bits +
+            (count / 3) * 10 +
+            ([_]usize{ 0, 4, 7 })[count % 3] <= capacity_bits)
+        {
+            count += 1;
+        }
+        count -= 1;
+
+        const planner_bytes = segment.optimalScratchBytes(count) * 2;
+        try std.testing.expect(planner_bytes <= matrix.requiredCells(version));
+    }
+}
+
 test "byte capacity boundary is exact for every version and EC level" {
     const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
     var payload: [max_data_codewords]u8 = undefined;
