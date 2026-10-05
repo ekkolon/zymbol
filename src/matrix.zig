@@ -324,113 +324,90 @@ const penalty_n4: i32 = 10;
 pub fn penaltyScore(symbol: *const Symbol) i32 {
     var result: i32 = 0;
     const size = symbol.size;
+    const finder_left: u11 = 0b10111010000;
+    const finder_right: u11 = 0b00001011101;
+    const finder_mask: u11 = 0x7FF;
 
     var y: usize = 0;
     while (y < size) : (y += 1) {
-        var history = RunHistory{};
         var run_color = false;
         var run_len: i32 = 0;
+        var window: u11 = 0;
+
         var x: usize = 0;
         while (x < size) : (x += 1) {
-            if (isDarkUnchecked(symbol, x, y) == run_color) {
+            const dark = isDarkUnchecked(symbol, x, y);
+
+            if (dark == run_color) {
                 run_len += 1;
                 if (run_len == 5) result += penalty_n1 else if (run_len > 5) result += 1;
             } else {
-                history.push(run_len, size);
-                if (!run_color) result += history.countPatterns(size) * penalty_n3;
-                run_color = isDarkUnchecked(symbol, x, y);
+                run_color = dark;
                 run_len = 1;
             }
+
+            window = ((window << 1) & finder_mask) | @as(u11, @intFromBool(dark));
+            if (x >= 10 and (window == finder_left or window == finder_right)) {
+                result += penalty_n3;
+            }
         }
-        result += history.terminate(run_color, run_len, size) * penalty_n3;
     }
 
     var x: usize = 0;
     while (x < size) : (x += 1) {
-        var history = RunHistory{};
         var run_color = false;
         var run_len: i32 = 0;
+        var window: u11 = 0;
+
         y = 0;
         while (y < size) : (y += 1) {
-            if (isDarkUnchecked(symbol, x, y) == run_color) {
+            const dark = isDarkUnchecked(symbol, x, y);
+
+            if (dark == run_color) {
                 run_len += 1;
                 if (run_len == 5) result += penalty_n1 else if (run_len > 5) result += 1;
             } else {
-                history.push(run_len, size);
-                if (!run_color) result += history.countPatterns(size) * penalty_n3;
-                run_color = isDarkUnchecked(symbol, x, y);
+                run_color = dark;
                 run_len = 1;
             }
+
+            window = ((window << 1) & finder_mask) | @as(u11, @intFromBool(dark));
+            if (y >= 10 and (window == finder_left or window == finder_right)) {
+                result += penalty_n3;
+            }
         }
-        result += history.terminate(run_color, run_len, size) * penalty_n3;
     }
 
     y = 0;
     while (y + 1 < size) : (y += 1) {
         x = 0;
         while (x + 1 < size) : (x += 1) {
-            const c = isDarkUnchecked(symbol, x, y);
-            if (c == isDarkUnchecked(symbol, x + 1, y) and c == isDarkUnchecked(symbol, x, y + 1) and c == isDarkUnchecked(symbol, x + 1, y + 1)) {
+            const dark = isDarkUnchecked(symbol, x, y);
+            if (dark == isDarkUnchecked(symbol, x + 1, y) and
+                dark == isDarkUnchecked(symbol, x, y + 1) and
+                dark == isDarkUnchecked(symbol, x + 1, y + 1))
+            {
                 result += penalty_n2;
             }
         }
     }
 
-    var dark: i32 = 0;
+    var dark_count: i32 = 0;
     y = 0;
     while (y < size) : (y += 1) {
         x = 0;
         while (x < size) : (x += 1) {
-            if (isDarkUnchecked(symbol, x, y)) dark += 1;
+            if (isDarkUnchecked(symbol, x, y)) dark_count += 1;
         }
     }
+
     const total: i32 = @as(i32, size) * @as(i32, size);
-    const k: i32 = @divTrunc(@as(i32, @intCast(@abs(dark * 20 - total * 10))) + total - 1, total) - 1;
+    const deviation = @as(i32, @intCast(@abs(dark_count * 20 - total * 10)));
+    const k = @divTrunc(deviation + total - 1, total) - 1;
     result += k * penalty_n4;
+
     return result;
 }
-
-/// Tracks the last 7 run lengths (in the order the standard's finder-like
-/// pattern test needs) to detect a 1:1:3:1:1 ratio pattern that would
-/// confuse a scanner into misreading a false finder pattern.
-const RunHistory = struct {
-    runs: [7]i32 = [_]i32{0} ** 7,
-    started: bool = false,
-
-    fn push(self: *RunHistory, run_len_in: i32, size: u16) void {
-        var run_len = run_len_in;
-        if (!self.started) {
-            run_len += size;
-            self.started = true;
-        }
-        var i: usize = 6;
-        while (i > 0) : (i -= 1) self.runs[i] = self.runs[i - 1];
-        self.runs[0] = run_len;
-    }
-
-    fn countPatterns(self: RunHistory, size: u16) i32 {
-        _ = size;
-        const n = self.runs[1];
-        if (n <= 0) return 0;
-        const core = self.runs[2] == n and self.runs[3] == n * 3 and self.runs[4] == n and self.runs[5] == n;
-        if (!core) return 0;
-        var count: i32 = 0;
-        if (self.runs[0] >= n * 4 and self.runs[6] >= n) count += 1;
-        if (self.runs[6] >= n * 4 and self.runs[0] >= n) count += 1;
-        return count;
-    }
-
-    fn terminate(self: *RunHistory, run_color: bool, run_len_in: i32, size: u16) i32 {
-        var run_len = run_len_in;
-        if (run_color) {
-            self.push(run_len, size);
-            run_len = 0;
-        }
-        run_len += size;
-        self.push(run_len, size);
-        return self.countPatterns(size);
-    }
-};
 
 test "checked symbol access rejects inconsistent public state" {
     var cell: [1]Cell = .{.{}};
