@@ -5,8 +5,7 @@ const std = @import("std");
 pub const min_version: u6 = 1;
 pub const max_version: u6 = 40;
 
-/// Side length of a version's symbol, in modules: 21 at version 1, growing
-/// by 4 per version up to 177 at version 40.
+/// Symbol side length in modules.
 pub fn size(version: u6) u16 {
     return @as(u16, version) * 4 + 17;
 }
@@ -20,8 +19,6 @@ pub const EcLevel = enum(u2) {
     h = 0b10,
     q = 0b11,
 
-    /// Row index into the two block-layout tables below, in the order the
-    /// standard lists levels (L, M, Q, H).
     fn tableRow(self: EcLevel) usize {
         return switch (self) {
             .l => 0,
@@ -32,8 +29,6 @@ pub const EcLevel = enum(u2) {
     }
 };
 
-/// EC codewords contributed by each block, indexed [level.tableRow()][version].
-/// Index 0 is unused padding so the version number can index directly.
 pub const ecc_codewords_per_block = [4][41]u8{
     .{ 0, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30 },
     .{ 0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28 },
@@ -41,8 +36,6 @@ pub const ecc_codewords_per_block = [4][41]u8{
     .{ 0, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30 },
 };
 
-/// Total number of Reed-Solomon blocks the data splits into, indexed the
-/// same way as `ecc_codewords_per_block`.
 pub const num_ec_blocks = [4][41]u8{
     .{ 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25 },
     .{ 0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49 },
@@ -50,9 +43,6 @@ pub const num_ec_blocks = [4][41]u8{
     .{ 0, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81 },
 };
 
-/// The block layout for one (version, level): a number of "short" blocks
-/// holding `short_data_codewords` data codewords each, and a number of
-/// "long" blocks holding one more each. Either count may be zero.
 pub const BlockLayout = struct {
     ec_per_block: u16,
     short_blocks: u16,
@@ -85,17 +75,12 @@ pub fn blockLayout(version: u6, level: EcLevel) BlockLayout {
     };
 }
 
-/// Number of 8-bit data codewords a (version, level) symbol carries, net of
-/// error-correction codewords and any trailing remainder bits that don't
-/// reach a full codeword.
+/// Data codewords for one version/error-correction pair.
 pub fn dataCodewords(version: u6, level: EcLevel) u16 {
     return blockLayout(version, level).totalDataCodewords();
 }
 
-/// Number of bits available for codewords (data + EC) once every function
-/// pattern is excluded: finder/separator/timing/alignment patterns, the
-/// format and version info areas, and the one fixed dark module. This is
-/// ISO/IEC 18004's Table 1 capacity, derived rather than tabulated.
+/// Raw data-module count, derived from Model 2 geometry.
 pub fn numRawDataModules(version: u6) u32 {
     var result: u32 = (@as(u32, 16) * version + 128) * version + 64;
     if (version >= 2) {
@@ -106,9 +91,7 @@ pub fn numRawDataModules(version: u6) u32 {
     return result;
 }
 
-/// Center coordinates of alignment patterns along one axis, ascending, for
-/// both x and y (the full set is every pair from this list except the three
-/// corners already covered by finder patterns). Version 1 has none.
+/// Alignment-pattern centers along one axis.
 pub const AlignmentPositions = struct {
     values: [7]u8 = undefined,
     len: u3 = 0,
@@ -148,9 +131,7 @@ pub const Mode = enum(u4) {
     eci = 0b0111,
 };
 
-/// Bit width of the character-count indicator that follows a mode
-/// indicator, per Table 3. Depends on the mode and which of the three
-/// version bands (1-9, 10-26, 27-40) the symbol falls in.
+/// Character-count field width for the mode/version band.
 pub fn charCountBits(mode: Mode, version: u6) u5 {
     const band: usize = (@as(usize, version) + 7) / 17; // 0, 1, or 2
     return switch (mode) {
@@ -162,10 +143,7 @@ pub fn charCountBits(mode: Mode, version: u6) u5 {
     };
 }
 
-/// Encodes the 5 data bits (2-bit level, 3-bit mask) of a format-info
-/// codeword with the (15,5) BCH code from Annex C, XORed with the fixed
-/// mask pattern 0b101010000010010 so an all-zero symbol never produces an
-/// all-zero format codeword (which would be indistinguishable from noise).
+/// BCH-encodes the 5-bit format payload and applies the fixed format mask.
 pub fn formatInfoBits(level: EcLevel, mask: u3) u15 {
     const data: u15 = (@as(u15, @intFromEnum(level)) << 3) | mask;
     var rem: u15 = data;
@@ -176,9 +154,7 @@ pub fn formatInfoBits(level: EcLevel, mask: u3) u15 {
     return (data << 10 | rem) ^ 0x5412;
 }
 
-/// Encodes the 6-bit version number with the (18,6) BCH code from Annex D.
-/// Only meaningful for versions 7-40, which are the ones large enough to
-/// carry a dedicated version-info area.
+/// BCH-encodes version information for versions 7-40.
 pub fn versionInfoBits(version: u6) u18 {
     var rem: u18 = version;
     var i: usize = 0;
@@ -188,8 +164,6 @@ pub fn versionInfoBits(version: u6) u18 {
     return (@as(u18, version) << 12) | rem;
 }
 
-/// Hamming distance between two same-width bit patterns, used to recover a
-/// format/version codeword that a scan read with a handful of flipped bits.
 pub fn hammingDistance(a: anytype, b: @TypeOf(a)) u32 {
     return @popCount(a ^ b);
 }
