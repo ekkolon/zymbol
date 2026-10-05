@@ -110,25 +110,14 @@ fn needsUtf8Eci(text: []const u8) bool {
     return false;
 }
 
-const PayloadStrategy = enum {
-    auto,
-    byte,
-};
-
-fn payloadStrategy(version: u6, payload: []const u8) PayloadStrategy {
-    if (segment.byteBitLength(version, payload.len) < segment.autoBitLength(version, payload)) {
-        return .byte;
-    }
-    return .auto;
+fn versionBand(version: u6) usize {
+    if (version <= 9) return 0;
+    if (version <= 26) return 1;
+    return 2;
 }
 
-fn encodedBitLength(version: u6, payload: []const u8, utf8_eci: bool) usize {
-    const payload_bits = switch (payloadStrategy(version, payload)) {
-        .auto => segment.autoBitLength(version, payload),
-        .byte => segment.byteBitLength(version, payload.len),
-    };
-    const eci_bits: usize = if (utf8_eci) 12 else 0;
-    return payload_bits + eci_bits;
+fn eciBitLength(utf8_eci: bool) usize {
+    return if (utf8_eci) 12 else 0;
 }
 
 pub fn encodeText(
@@ -158,17 +147,40 @@ fn encodePayload(
     utf8_eci: bool,
 ) Error!matrix.Symbol {
     try validateOptions(options);
+    if (payload.len > segment.max_auto_input_len) return Error.DataTooLong;
 
+    const planner_bytes = segment.optimalScratchBytes(payload.len);
+    const total_planner_bytes = planner_bytes * 2;
+    const cell_bytes = std.mem.sliceAsBytes(cells);
+    if (cell_bytes.len < total_planner_bytes) return Error.CellBufferTooSmall;
+
+    const costs = cell_bytes[0..planner_bytes];
+    const trace = cell_bytes[planner_bytes..total_planner_bytes];
+    const eci_bits = eciBitLength(utf8_eci);
+
+    var cached_payload_bits: [3]?usize = .{ null, null, null };
+    var selected_payload_bits: usize = 0;
     var version = options.min_version;
+
     while (true) : (version += 1) {
+        const band = versionBand(version);
+        const payload_bits = cached_payload_bits[band] orelse blk: {
+            const bits = try segment.optimalBitLength(version, payload, costs);
+            cached_payload_bits[band] = bits;
+            break :blk bits;
+        };
+
         const capacity_bits = @as(usize, spec.dataCodewords(version, options.ec_level)) * 8;
-        if (encodedBitLength(version, payload, utf8_eci) <= capacity_bits) break;
+        if (payload_bits + eci_bits <= capacity_bits) {
+            selected_payload_bits = payload_bits;
+            break;
+        }
         if (version >= options.max_version) return Error.DataTooLong;
     }
 
     var level = options.ec_level;
     if (options.boost_ec_level) {
-        const used_bits = encodedBitLength(version, payload, utf8_eci);
+        const used_bits = selected_payload_bits + eci_bits;
         const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
         for (levels) |candidate| {
             const capacity_bits = @as(usize, spec.dataCodewords(version, candidate)) * 8;
@@ -188,10 +200,7 @@ fn encodePayload(
     var data_buf: [max_data_codewords]u8 = undefined;
     var writer = bitstream.Writer.init(data_buf[0..data_len]);
     if (utf8_eci) try segment.appendEci(&writer, 26);
-    switch (payloadStrategy(version, payload)) {
-        .auto => try segment.writeAuto(&writer, version, payload),
-        .byte => try segment.writeBytes(&writer, version, payload),
-    }
+    try segment.writeOptimal(&writer, version, payload, costs, trace);
     try segment.finalize(&writer);
 
     return encodeRaw(
