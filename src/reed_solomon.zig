@@ -1,45 +1,18 @@
-//! Reed-Solomon coding over the same GF(256) field QR Code error correction
-//! uses (ISO/IEC 18004 section 6.5.2, generator element 2). A codeword
-//! polynomial is a byte sequence read highest-degree coefficient first,
-//! which is the order codewords already appear in a data block, so the
-//! functions below operate on plain `[]u8` wherever the degree convention
-//! doesn't need to be explicit.
-//!
-//! Encoding follows the standard's own construction directly: divide the
-//! shifted message by a generator with roots 2^0..2^(degree-1) and the
-//! remainder is the EC codewords.
-//!
-//! Decoding is the classical syndrome / Euclidean-algorithm / Forney
-//! pipeline, the same shape used by most deployed QR decoders. It is
-//! entirely a general Reed-Solomon technique with nothing QR-specific in
-//! it beyond the choice of field, so it is verified here by property tests
-//! (encode, corrupt up to the guaranteed correction capacity, decode,
-//! compare) rather than by known-answer vectors, which don't meaningfully
-//! exist for arbitrary corruption patterns.
+//! Reed-Solomon encoding and correction over GF(256)/0x11D.
 
 const std = @import("std");
 const gf = @import("gf256.zig");
 
 const debug_trace = false;
 
-/// Largest EC-codewords-per-block value used anywhere in the standard's
-/// tables (see spec.ecc_codewords_per_block); every fixed-size buffer here
-/// is sized off this bound so nothing allocates.
 pub const max_ec_codewords = 30;
 const poly_capacity = 2 * max_ec_codewords + 2;
 
-/// Writes `degree` error-correction codewords for `data` into `ec_out`.
-/// `ec_out.len` must equal `degree`, and `degree` must be within
-/// `1..=max_ec_codewords`.
 pub fn encode(data: []const u8, degree: usize, ec_out: []u8) void {
     std.debug.assert(ec_out.len == degree);
     std.debug.assert(degree >= 1 and degree <= max_ec_codewords);
     const generator = generatorPolynomial(degree);
 
-    // Polynomial long division of (data padded with `degree` zero low-order
-    // coefficients) by `generator`, keeping only the running remainder: the
-    // classic linear-feedback-shift-register form of the division, so nothing
-    // beyond a `degree`-sized register is ever materialized.
     @memset(ec_out, 0);
     for (data) |coefficient| {
         const factor = coefficient ^ ec_out[0];
@@ -53,10 +26,7 @@ pub fn encode(data: []const u8, degree: usize, ec_out: []u8) void {
     }
 }
 
-/// generator polynomials for every degree in 1..=max_ec_codewords, computed
-/// once at comptime. `generatorPolynomial(d)` returns the `d` coefficients
-/// (highest to lowest, excluding the implicit leading 1) of
-/// (x - 2^0)(x - 2^1)...(x - 2^(d-1)).
+/// Generator polynomials for degrees 1..30, excluding the leading coefficient.
 const generators: [max_ec_codewords + 1][max_ec_codewords]u8 = blk: {
     @setEvalBranchQuota(200_000);
     var table: [max_ec_codewords + 1][max_ec_codewords]u8 = undefined;
@@ -80,9 +50,6 @@ const generators: [max_ec_codewords + 1][max_ec_codewords]u8 = blk: {
     break :blk table;
 };
 
-/// `gf.mul` is already comptime-callable (it only reads comptime tables and
-/// branches), but spelling that out here documents why the generator table
-/// above is allowed to call it inside a `comptime` block.
 inline fn gfMulComptime(a: u8, b: u8) u8 {
     return gf.mul(a, b);
 }
@@ -92,23 +59,14 @@ fn generatorPolynomial(degree: usize) []const u8 {
 }
 
 pub const DecodeError = error{
-    /// More codewords are wrong than this block's error-correction budget
-    /// can account for; the correction found does not check out.
     UnrecoverableBlock,
 };
 
-/// Result of decoding one block: `errors` is how many codeword positions
-/// were corrected, useful for a caller that wants to report symbol
-/// condition (0 always means the block was read back clean).
 pub const DecodeResult = struct {
     errors: u16,
 };
 
-/// Corrects `block` (data codewords followed by `ec_len` EC codewords, the
-/// same layout `encode` consumes) in place using up to `ec_len / 2` byte
-/// errors at unknown positions. Returns the number of corrections made, or
-/// `UnrecoverableBlock` if the syndromes are inconsistent with any error
-/// pattern this block's EC budget could actually correct.
+/// Corrects one data+EC block in place.
 pub fn decode(block: []u8, ec_len: usize) DecodeError!DecodeResult {
     std.debug.assert(ec_len >= 1 and ec_len <= max_ec_codewords);
 
@@ -126,9 +84,10 @@ pub fn decode(block: []u8, ec_len: usize) DecodeError!DecodeResult {
     // stored highest-degree-first like every other Poly here.
     var syndrome_poly = Poly.init(ec_len);
     for (0..ec_len) |i| syndrome_poly.values[ec_len - 1 - i] = syndromes[i];
+    syndrome_poly = syndrome_poly.trimmed();
 
     const modulus = Poly.monomial(1, ec_len);
-    const eea = euclidean(modulus, syndrome_poly, ec_len);
+    const eea = try euclidean(modulus, syndrome_poly, ec_len);
     const sigma = eea.sigma;
     const omega = eea.omega;
     if (debug_trace) std.debug.print("sigma.len={} sigma.values={any} omega.len={} omega.values={any}\n", .{ sigma.len, sigma.values[0..sigma.len], omega.len, omega.values[0..omega.len] });
@@ -169,28 +128,19 @@ pub fn decode(block: []u8, ec_len: usize) DecodeError!DecodeResult {
         block[positions[i]] ^= magnitude;
     }
 
-    // A correction that doesn't bring every syndrome back to zero means the
-    // error pattern found is not actually consistent with the received
-    // block; treat that as uncorrectable rather than returning silently
-    // wrong data.
     for (0..ec_len) |i| {
         if (evaluate(block, gf.pow2(@intCast(i))) != 0) return DecodeError.UnrecoverableBlock;
     }
     return .{ .errors = @intCast(num_errors) };
 }
 
-/// Evaluates the polynomial formed by `codewords` (highest degree first) at
-/// `x`, i.e. treats codewords as coefficients and runs Horner's method.
 fn evaluate(codewords: []const u8, x: u8) u8 {
     var result: u8 = 0;
     for (codewords) |c| result = gf.mul(result, x) ^ c;
     return result;
 }
 
-/// A polynomial over GF(256), coefficients highest-degree-first in
-/// `values[0..len]`; `values[len-1]` is always the constant term. Capacity
-/// is fixed at `poly_capacity`, comfortably above any degree the Euclidean
-/// algorithm below produces for QR's error-correction budgets.
+/// Fixed-capacity GF(256) polynomial, highest-degree coefficient first.
 const Poly = struct {
     values: [poly_capacity]u8 = [_]u8{0} ** poly_capacity,
     len: usize = 1,
@@ -214,7 +164,6 @@ const Poly = struct {
         return self.len == 1 and self.values[0] == 0;
     }
 
-    /// Coefficient of x^power, or 0 if power exceeds this polynomial's degree.
     fn coeffAt(self: Poly, power: usize) u8 {
         if (power > self.degree()) return 0;
         return self.values[self.len - 1 - power];
@@ -252,7 +201,6 @@ const Poly = struct {
         return result;
     }
 
-    /// Multiplies by x^shift (appends `shift` low-order zero coefficients).
     fn shifted(self: Poly, shift: usize) Poly {
         if (self.isZero()) return self;
         var result = Poly.init(self.len + shift);
@@ -272,8 +220,6 @@ const Poly = struct {
         return acc;
     }
 
-    /// Long division: returns (quotient, remainder) such that
-    /// self == quotient*divisor + remainder and deg(remainder) < deg(divisor).
     fn divide(self: Poly, divisor: Poly) struct { quotient: Poly, remainder: Poly } {
         std.debug.assert(!divisor.isZero());
         var quotient = Poly.init(1);
@@ -298,13 +244,7 @@ fn evaluate2(coeffs: []const u8, x: u8) u8 {
 
 const EuclideanResult = struct { sigma: Poly, omega: Poly };
 
-/// Extended Euclidean algorithm run between the modulus `x^ec_len` and the
-/// syndrome polynomial, stopped once the remainder's degree drops below
-/// `ec_len/2`: a standard construction of the error locator (`sigma`) and
-/// error evaluator (`omega`) polynomials for Reed-Solomon decoding, in the
-/// same shape used by (among others) the ZXing-derived decoders that
-/// underpin most deployed QR readers.
-fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) EuclideanResult {
+fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) DecodeError!EuclideanResult {
     var r_last = a_in;
     var r = b_in;
     if (r_last.degree() < r.degree()) {
@@ -317,6 +257,8 @@ fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) EuclideanResult {
     var t = Poly.monomial(1, 0); // 1
 
     while (2 * r.degree() >= ec_len) {
+        if (r.isZero()) return DecodeError.UnrecoverableBlock;
+
         const r_last_last = r_last;
         const t_last_last = t_last;
         r_last = r;
@@ -328,15 +270,74 @@ fn euclidean(a_in: Poly, b_in: Poly, ec_len: usize) EuclideanResult {
     }
 
     const sigma_tilde_zero = t.coeffAt(0);
-    const inverse: u8 = if (sigma_tilde_zero == 0) 1 else gf.inv(sigma_tilde_zero);
+    if (sigma_tilde_zero == 0) return DecodeError.UnrecoverableBlock;
+
+    const inverse = gf.inv(sigma_tilde_zero);
     return .{ .sigma = t.scale(inverse), .omega = r.scale(inverse) };
+}
+
+test "HELLO WORLD matches version 1-Q error correction codewords" {
+    const data = [_]u8{
+        0x20, 0x5B, 0x0B, 0x78, 0xD1, 0x72, 0xDC,
+        0x4D, 0x43, 0x40, 0xEC, 0x11, 0xEC,
+    };
+    const expected = [_]u8{
+        0xA8, 0x48, 0x16, 0x52, 0xD9, 0x36, 0x9C,
+        0x00, 0x2E, 0x0F, 0xB4, 0x7A, 0x10,
+    };
+
+    var ec: [expected.len]u8 = undefined;
+    encode(&data, ec.len, &ec);
+    try std.testing.expectEqualSlices(u8, &expected, &ec);
+}
+
+test "decode corrects every QR block layout at its guaranteed limit" {
+    const spec = @import("spec.zig");
+    const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
+
+    var version: u6 = spec.min_version;
+    while (version <= spec.max_version) : (version += 1) {
+        for (levels) |level| {
+            const layout = spec.blockLayout(version, level);
+            const ec_len: usize = layout.ec_per_block;
+            const short_len: usize = layout.short_data_codewords;
+            const lengths = [_]usize{ short_len, short_len + @intFromBool(layout.long_blocks > 0) };
+
+            for (lengths, 0..) |data_len, layout_index| {
+                if (layout_index == 1 and layout.long_blocks == 0) continue;
+
+                var data: [255]u8 = undefined;
+                for (data[0..data_len], 0..) |*byte, index| {
+                    byte.* = @truncate(index * 37 + @as(usize, version));
+                }
+
+                var ec: [max_ec_codewords]u8 = undefined;
+                encode(data[0..data_len], ec_len, ec[0..ec_len]);
+
+                var block: [255]u8 = undefined;
+                @memcpy(block[0..data_len], data[0..data_len]);
+                @memcpy(block[data_len .. data_len + ec_len], ec[0..ec_len]);
+                const block_len = data_len + ec_len;
+
+                var used = [_]bool{false} ** 255;
+                var injected: usize = 0;
+                while (injected < ec_len / 2) : (injected += 1) {
+                    var position = (injected * 17 + @as(usize, version)) % block_len;
+                    while (used[position]) position = (position + 1) % block_len;
+                    used[position] = true;
+                    block[position] ^= @intCast(injected + 1);
+                }
+
+                const result = try decode(block[0..block_len], ec_len);
+                try std.testing.expectEqual(@as(u16, @intCast(ec_len / 2)), result.errors);
+                try std.testing.expectEqualSlices(u8, data[0..data_len], block[0..data_len]);
+            }
+        }
+    }
 }
 
 test "generator polynomials are monic products of the right roots" {
     const testing = std.testing;
-    // Degree 2: (x - 1)(x - 2) = x^2 - 3x + 2 = x^2 + x + 2 over GF(2) coeffs... but
-    // arithmetic is in GF(256), so check by evaluating the generator (with implicit
-    // leading 1) at its two roots and expecting zero both times.
     const g = generatorPolynomial(2);
     var full: [3]u8 = .{ 1, g[0], g[1] };
     try testing.expectEqual(@as(u8, 0), evaluate2(&full, gf.pow2(0)));

@@ -1,13 +1,4 @@
-//! The module grid itself: laying out finder/timing/alignment patterns,
-//! placing codeword bits in the standard's zigzag order, applying a mask,
-//! and scoring mask candidates by the four penalty rules of section 8.8.2.
-//!
-//! Every function here operates on a caller-supplied `[]Cell` slice sized
-//! for the symbol's version (see `requiredCells`); nothing is allocated.
-//! Each cell carries both its color and its `ModuleKind`, which is what
-//! lets a caller safely recolor a symbol for artistic purposes: `data`
-//! cells can be touched freely within the error-correction budget, and
-//! every other kind is load-bearing for scanning.
+//! QR Code Model 2 module layout, masking, and penalty scoring.
 
 const std = @import("std");
 const spec = @import("spec.zig");
@@ -29,7 +20,6 @@ pub const Cell = packed struct(u8) {
     _reserved: u4 = 0,
 };
 
-/// Number of cells the caller's backing slice must have for `version`.
 pub fn requiredCells(version: u6) usize {
     const s: usize = spec.size(version);
     return s * s;
@@ -42,40 +32,55 @@ pub const Symbol = struct {
     ec_level: spec.EcLevel,
     mask: u3,
 
+    pub const SetError = error{
+        OutOfBounds,
+        ProtectedModule,
+    };
+
     fn index(self: Symbol, x: usize, y: usize) usize {
         return y * self.size + x;
     }
 
+    pub fn contains(self: Symbol, x: usize, y: usize) bool {
+        if (x >= self.size or y >= self.size) return false;
+        return self.index(x, y) < self.cells.len;
+    }
+
     pub fn isDark(self: Symbol, x: usize, y: usize) bool {
+        if (!self.contains(x, y)) return false;
         return self.cells[self.index(x, y)].dark;
     }
 
-    pub fn kindAt(self: Symbol, x: usize, y: usize) ModuleKind {
+    pub fn kindAt(self: Symbol, x: usize, y: usize) ?ModuleKind {
+        if (!self.contains(x, y)) return null;
         return self.cells[self.index(x, y)].kind;
     }
 
-    pub const ProtectedModuleError = error{ProtectedModule};
+    pub fn setData(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
+        if (!self.contains(x, y)) return SetError.OutOfBounds;
 
-    /// Sets a module the caller intends to recolor. Refuses to touch
-    /// anything but a `data` module, since finder/timing/alignment/format/
-    /// version modules and the fixed dark module are what a scanner relies
-    /// on to locate and calibrate the symbol at all.
-    pub fn setData(self: *Symbol, x: usize, y: usize, dark: bool) ProtectedModuleError!void {
-        const i = self.index(x, y);
-        if (self.cells[i].kind != .data) return ProtectedModuleError.ProtectedModule;
-        self.cells[i].dark = dark;
+        const cell_index = self.index(x, y);
+        if (self.cells[cell_index].kind != .data) return SetError.ProtectedModule;
+        self.cells[cell_index].dark = dark;
     }
 
-    /// Sets any module regardless of kind. Overriding a function module
-    /// will very likely make the symbol unscannable; overriding a data
-    /// module beyond what the chosen EC level can recover will corrupt the
-    /// payload. This exists for callers who have already accounted for
-    /// that (for example, punching a small logo well within the EC budget)
-    /// and accept the risk explicitly, by name, at the call site.
-    pub fn setUnchecked(self: *Symbol, x: usize, y: usize, dark: bool) void {
+    pub fn set(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
+        if (!self.contains(x, y)) return SetError.OutOfBounds;
         self.cells[self.index(x, y)].dark = dark;
     }
 };
+
+pub inline fn isDarkUnchecked(symbol: *const Symbol, x: usize, y: usize) bool {
+    return symbol.cells[y * symbol.size + x].dark;
+}
+
+pub inline fn kindAtUnchecked(symbol: *const Symbol, x: usize, y: usize) ModuleKind {
+    return symbol.cells[y * symbol.size + x].kind;
+}
+
+pub inline fn setUnchecked(symbol: *Symbol, x: usize, y: usize, dark: bool) void {
+    symbol.cells[y * symbol.size + x].dark = dark;
+}
 
 fn set(cells: []Cell, size: u16, x: i32, y: i32, dark: bool, kind: ModuleKind) void {
     if (x < 0 or y < 0 or x >= size or y >= size) return;
@@ -84,10 +89,6 @@ fn set(cells: []Cell, size: u16, x: i32, y: i32, dark: bool, kind: ModuleKind) v
 }
 
 fn fillFinder(cells: []Cell, size: u16, cx: i32, cy: i32) void {
-    // A 9x9 block centered on the finder's own center, covering the finder
-    // pattern proper (the ring structure out to radius 3) and the light
-    // separator ring at radius 4. Cells outside the symbol are dropped by
-    // `set`, which is what lets one shared routine handle all 3 corners.
     var dy: i32 = -4;
     while (dy <= 4) : (dy += 1) {
         var dx: i32 = -4;
@@ -111,19 +112,11 @@ fn fillAlignment(cells: []Cell, size: u16, cx: i32, cy: i32) void {
     }
 }
 
-/// Lays out every function pattern for `version`: finder patterns and
-/// their separators, timing patterns, alignment patterns, the reserved
-/// format-info area (dark placeholder, overwritten with real bits later),
-/// the reserved version-info area for version >= 7, and the single fixed
-/// dark module. Every other cell is left as `data`/light, ready for
-/// codewords to be drawn into it.
+/// Initializes all function modules; remaining cells are data modules.
 pub fn layoutFunctionPatterns(cells: []Cell, version: u6, ec_level: spec.EcLevel, mask: u3) Symbol {
     const size = spec.size(version);
     @memset(cells[0 .. @as(usize, size) * size], Cell{});
 
-    // Timing patterns: alternating dark/light along row 6 and column 6,
-    // spanning the full symbol; the finder corners will overwrite their
-    // ends momentarily, same as the reference construction does.
     var i: i32 = 0;
     while (i < size) : (i += 1) {
         const dark = @rem(i, 2) == 0;
@@ -211,13 +204,6 @@ fn drawVersionInfo(symbol: *Symbol) void {
     var i: i32 = 0;
     while (i < 18) : (i += 1) {
         const dark = (bits >> @intCast(i)) & 1 != 0;
-        // i%3 is the fine-grained position within the 3-wide dimension
-        // (combined with the size-11 offset); i/3 is the coarse position
-        // along the 6-long dimension. Getting these two swapped produces a
-        // symbol that looks fine and round-trips against this library's
-        // own decoder, but is wrong per the standard and unreadable by any
-        // other implementation — exactly what independent cross-checking
-        // against a second decoder (not just this library's own) caught.
         const fine = @rem(i, 3);
         const coarse = @divTrunc(i, 3);
         set(symbol.cells, symbol.size, size - 11 + fine, coarse, dark, .version);
@@ -225,46 +211,77 @@ fn drawVersionInfo(symbol: *Symbol) void {
     }
 }
 
-/// Draws `codewords` (a fully assembled, interleaved, MSB-first bitstream)
-/// into every `data` cell in the standard's zigzag column-pair scan
-/// (section 8.7.3), skipping the vertical timing column entirely. Any bits
-/// left over after the codewords are exhausted are the version's remainder
-/// bits and are simply left light, matching a real encoder.
-pub fn drawCodewords(symbol: *Symbol, codewords: []const u8) void {
-    var bit_index: usize = 0;
-    const total_bits = codewords.len * 8;
-    const size: i32 = symbol.size;
+pub const DataPosition = struct {
+    x: usize,
+    y: usize,
+};
 
-    var right: i32 = size - 1;
-    while (right >= 1) : (right -= 2) {
-        if (right == 6) right = 5;
-        var vert: i32 = 0;
-        while (vert < size) : (vert += 1) {
-            var j: i32 = 0;
-            while (j < 2) : (j += 1) {
-                const x = right - j;
-                const upward = (right + 1) & 2 == 0;
-                const y = if (upward) size - 1 - vert else vert;
-                if (symbol.kindAt(@intCast(x), @intCast(y)) == .data and bit_index < total_bits) {
-                    const byte = codewords[bit_index >> 3];
-                    const bit = (byte >> @intCast(7 - (bit_index & 7))) & 1;
-                    symbol.setUnchecked(@intCast(x), @intCast(y), bit != 0);
-                    bit_index += 1;
+pub const DataIterator = struct {
+    size: i32,
+    right: i32,
+    vertical: i32 = 0,
+    lane: u2 = 0,
+
+    pub fn init(size: u16) DataIterator {
+        return .{
+            .size = size,
+            .right = @as(i32, size) - 1,
+        };
+    }
+
+    pub fn next(self: *DataIterator, symbol: *const Symbol) ?DataPosition {
+        while (self.right >= 1) {
+            if (self.right == 6) self.right = 5;
+
+            while (self.vertical < self.size) {
+                while (self.lane < 2) {
+                    const lane = self.lane;
+                    self.lane += 1;
+
+                    const x = self.right - @as(i32, lane);
+                    const upward = ((self.right + 1) & 2) == 0;
+                    const y = if (upward)
+                        self.size - 1 - self.vertical
+                    else
+                        self.vertical;
+
+                    if (kindAtUnchecked(symbol, @intCast(x), @intCast(y)) == .data) {
+                        return .{ .x = @intCast(x), .y = @intCast(y) };
+                    }
                 }
+
+                self.lane = 0;
+                self.vertical += 1;
             }
+
+            self.vertical = 0;
+            self.lane = 0;
+            self.right -= 2;
         }
+
+        return null;
+    }
+};
+
+pub fn drawCodewords(symbol: *Symbol, codewords: []const u8) void {
+    const total_bits = codewords.len * 8;
+    var bit_index: usize = 0;
+    var iterator = DataIterator.init(symbol.size);
+
+    while (bit_index < total_bits) : (bit_index += 1) {
+        const position = iterator.next(symbol) orelse unreachable;
+        const byte = codewords[bit_index >> 3];
+        const bit = (byte >> @intCast(7 - (bit_index & 7))) & 1;
+        setUnchecked(symbol, position.x, position.y, bit != 0);
     }
 }
 
-/// XORs every `data` cell with the given mask pattern's predicate (section
-/// 8.8.1's six formulas plus the two that split evenly, numbered 0-7).
-/// Applying the same mask twice undoes it, since XOR is its own inverse.
 pub fn applyMask(symbol: *Symbol, mask: u3) void {
     var y: usize = 0;
     while (y < symbol.size) : (y += 1) {
         var x: usize = 0;
         while (x < symbol.size) : (x += 1) {
-            if (symbol.kindAt(x, y) != .data) continue;
+            if (kindAtUnchecked(symbol, x, y) != .data) continue;
             if (maskInvert(mask, x, y)) {
                 const i = symbol.index(x, y);
                 symbol.cells[i].dark = !symbol.cells[i].dark;
@@ -291,136 +308,120 @@ const penalty_n2: i32 = 3;
 const penalty_n3: i32 = 40;
 const penalty_n4: i32 = 10;
 
-/// Lower is better. Used to pick the least-penalized of the 8 masks when
-/// the caller doesn't force one; see section 8.8.2 for the four rules
-/// summed here (same-color runs, 2x2 blocks, finder-like run patterns, and
-/// the overall dark/light balance).
 pub fn penaltyScore(symbol: *const Symbol) i32 {
     var result: i32 = 0;
     const size = symbol.size;
+    const finder_left: u11 = 0b10111010000;
+    const finder_right: u11 = 0b00001011101;
+    const finder_mask: u11 = 0x7FF;
 
     var y: usize = 0;
     while (y < size) : (y += 1) {
-        var history = RunHistory{};
         var run_color = false;
         var run_len: i32 = 0;
+        var window: u11 = 0;
+
         var x: usize = 0;
         while (x < size) : (x += 1) {
-            if (symbol.isDark(x, y) == run_color) {
+            const dark = isDarkUnchecked(symbol, x, y);
+
+            if (dark == run_color) {
                 run_len += 1;
                 if (run_len == 5) result += penalty_n1 else if (run_len > 5) result += 1;
             } else {
-                history.push(run_len, size);
-                if (!run_color) result += history.countPatterns(size) * penalty_n3;
-                run_color = symbol.isDark(x, y);
+                run_color = dark;
                 run_len = 1;
             }
+
+            window = ((window << 1) & finder_mask) | @as(u11, @intFromBool(dark));
+            if (x >= 10 and (window == finder_left or window == finder_right)) {
+                result += penalty_n3;
+            }
         }
-        result += history.terminate(run_color, run_len, size) * penalty_n3;
     }
 
     var x: usize = 0;
     while (x < size) : (x += 1) {
-        var history = RunHistory{};
         var run_color = false;
         var run_len: i32 = 0;
+        var window: u11 = 0;
+
         y = 0;
         while (y < size) : (y += 1) {
-            if (symbol.isDark(x, y) == run_color) {
+            const dark = isDarkUnchecked(symbol, x, y);
+
+            if (dark == run_color) {
                 run_len += 1;
                 if (run_len == 5) result += penalty_n1 else if (run_len > 5) result += 1;
             } else {
-                history.push(run_len, size);
-                if (!run_color) result += history.countPatterns(size) * penalty_n3;
-                run_color = symbol.isDark(x, y);
+                run_color = dark;
                 run_len = 1;
             }
+
+            window = ((window << 1) & finder_mask) | @as(u11, @intFromBool(dark));
+            if (y >= 10 and (window == finder_left or window == finder_right)) {
+                result += penalty_n3;
+            }
         }
-        result += history.terminate(run_color, run_len, size) * penalty_n3;
     }
 
     y = 0;
     while (y + 1 < size) : (y += 1) {
         x = 0;
         while (x + 1 < size) : (x += 1) {
-            const c = symbol.isDark(x, y);
-            if (c == symbol.isDark(x + 1, y) and c == symbol.isDark(x, y + 1) and c == symbol.isDark(x + 1, y + 1)) {
+            const dark = isDarkUnchecked(symbol, x, y);
+            if (dark == isDarkUnchecked(symbol, x + 1, y) and
+                dark == isDarkUnchecked(symbol, x, y + 1) and
+                dark == isDarkUnchecked(symbol, x + 1, y + 1))
+            {
                 result += penalty_n2;
             }
         }
     }
 
-    var dark: i32 = 0;
+    var dark_count: i32 = 0;
     y = 0;
     while (y < size) : (y += 1) {
         x = 0;
         while (x < size) : (x += 1) {
-            if (symbol.isDark(x, y)) dark += 1;
+            if (isDarkUnchecked(symbol, x, y)) dark_count += 1;
         }
     }
+
     const total: i32 = @as(i32, size) * @as(i32, size);
-    const k: i32 = @divTrunc(@as(i32, @intCast(@abs(dark * 20 - total * 10))) + total - 1, total) - 1;
+    const deviation = @as(i32, @intCast(@abs(dark_count * 20 - total * 10)));
+    const k = @divTrunc(deviation + total - 1, total) - 1;
     result += k * penalty_n4;
+
     return result;
 }
 
-/// Tracks the last 7 run lengths (in the order the standard's finder-like
-/// pattern test needs) to detect a 1:1:3:1:1 ratio pattern that would
-/// confuse a scanner into misreading a false finder pattern.
-const RunHistory = struct {
-    runs: [7]i32 = [_]i32{0} ** 7,
-    started: bool = false,
+test "checked symbol access rejects inconsistent public state" {
+    var cell: [1]Cell = .{.{}};
+    var symbol = Symbol{
+        .cells = &cell,
+        .size = 21,
+        .version = 1,
+        .ec_level = .m,
+        .mask = 0,
+    };
 
-    fn push(self: *RunHistory, run_len_in: i32, size: u16) void {
-        var run_len = run_len_in;
-        if (!self.started) {
-            run_len += size;
-            self.started = true;
-        }
-        var i: usize = 6;
-        while (i > 0) : (i -= 1) self.runs[i] = self.runs[i - 1];
-        self.runs[0] = run_len;
-    }
-
-    fn countPatterns(self: RunHistory, size: u16) i32 {
-        _ = size;
-        const n = self.runs[1];
-        if (n <= 0) return 0;
-        const core = self.runs[2] == n and self.runs[3] == n * 3 and self.runs[4] == n and self.runs[5] == n;
-        if (!core) return 0;
-        var count: i32 = 0;
-        if (self.runs[0] >= n * 4 and self.runs[6] >= n) count += 1;
-        if (self.runs[6] >= n * 4 and self.runs[0] >= n) count += 1;
-        return count;
-    }
-
-    fn terminate(self: *RunHistory, run_color: bool, run_len_in: i32, size: u16) i32 {
-        var run_len = run_len_in;
-        if (run_color) {
-            self.push(run_len, size);
-            run_len = 0;
-        }
-        run_len += size;
-        self.push(run_len, size);
-        return self.countPatterns(size);
-    }
-};
+    try std.testing.expect(!symbol.isDark(20, 20));
+    try std.testing.expectEqual(@as(?ModuleKind, null), symbol.kindAt(20, 20));
+    try std.testing.expectError(Symbol.SetError.OutOfBounds, symbol.set(20, 20, true));
+}
 
 test "function pattern layout marks exactly the modules the standard reserves" {
     const testing = std.testing;
     var buf: [21 * 21]Cell = undefined;
     const symbol = layoutFunctionPatterns(&buf, 1, .m, 0);
     try testing.expectEqual(@as(u16, 21), symbol.size);
-    // Top-left finder core is dark; the module just outside it (start of
-    // the separator ring) must be light.
     try testing.expect(symbol.isDark(0, 0));
     try testing.expect(!symbol.isDark(7, 7));
-    try testing.expectEqual(ModuleKind.finder, symbol.kindAt(0, 0));
-    try testing.expectEqual(ModuleKind.separator, symbol.kindAt(7, 0));
-    // The fixed dark module at (8, size-8) is always dark.
+    try testing.expectEqual(ModuleKind.finder, symbol.kindAt(0, 0).?);
+    try testing.expectEqual(ModuleKind.separator, symbol.kindAt(7, 0).?);
     try testing.expect(symbol.isDark(8, 21 - 8));
-    // A cell in the interior with nothing special going on is untouched data.
-    try testing.expectEqual(ModuleKind.data, symbol.kindAt(12, 12));
+    try testing.expectEqual(ModuleKind.data, symbol.kindAt(12, 12).?);
 }
 
 test "format info is written as two matching, position-consistent copies" {
@@ -450,7 +451,31 @@ test "setData refuses to touch a function module but allows a data module" {
     const testing = std.testing;
     var buf: [21 * 21]Cell = undefined;
     var symbol = layoutFunctionPatterns(&buf, 1, .m, 0);
-    try testing.expectError(Symbol.ProtectedModuleError.ProtectedModule, symbol.setData(0, 0, false));
+    try testing.expectError(Symbol.SetError.ProtectedModule, symbol.setData(0, 0, false));
     try symbol.setData(12, 12, true);
     try testing.expect(symbol.isDark(12, 12));
+    try testing.expectError(Symbol.SetError.OutOfBounds, symbol.setData(21, 0, true));
+}
+
+
+test "data iterator matches codeword placement order" {
+    const testing = std.testing;
+    var buf: [21 * 21]Cell = undefined;
+    var symbol = layoutFunctionPatterns(&buf, 1, .m, 0);
+    var codewords: [26]u8 = undefined;
+    for (&codewords, 0..) |*byte, index| byte.* = @intCast(index);
+
+    drawCodewords(&symbol, &codewords);
+
+    var recovered: [26]u8 = [_]u8{0} ** 26;
+    var iterator = DataIterator.init(symbol.size);
+    var bit_index: usize = 0;
+    while (bit_index < recovered.len * 8) : (bit_index += 1) {
+        const position = iterator.next(&symbol) orelse unreachable;
+        if (symbol.isDark(position.x, position.y)) {
+            recovered[bit_index >> 3] |= @as(u8, 1) << @intCast(7 - (bit_index & 7));
+        }
+    }
+
+    try testing.expectEqualSlices(u8, &codewords, &recovered);
 }
