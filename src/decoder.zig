@@ -72,6 +72,7 @@ pub fn decode(
 
     const layout = spec.blockLayout(version, format.level);
     const total_blocks: usize = layout.totalBlocks();
+    const short_blocks: usize = layout.short_blocks;
     const short_data_len: usize = layout.short_data_codewords;
     const ec_len: usize = layout.ec_per_block;
     const data_codewords: usize = layout.totalDataCodewords();
@@ -82,7 +83,7 @@ pub fn decode(
     var errors_corrected: u32 = 0;
 
     for (0..total_blocks) |block| {
-        const is_long = block >= layout.short_blocks;
+        const is_long = block >= short_blocks;
         const block_data_len = short_data_len + @intFromBool(is_long);
         const block_len = block_data_len + ec_len;
         std.debug.assert(block_len <= block_buf.len);
@@ -91,7 +92,7 @@ pub fn decode(
             const source = if (index < short_data_len)
                 index * total_blocks + block
             else
-                short_data_len * total_blocks + (block - layout.short_blocks);
+                short_data_len * total_blocks + (block - short_blocks);
             block_buf[index] = codeword_scratch[source];
         }
 
@@ -103,7 +104,7 @@ pub fn decode(
         const corrected = reed_solomon.decode(block_buf[0..block_len], ec_len) catch {
             return Error.UnrecoverableBlock;
         };
-        errors_corrected += corrected.errors;
+        errors_corrected += @as(u32, corrected.errors);
 
         @memcpy(
             data_buf[data_position .. data_position + block_data_len],
