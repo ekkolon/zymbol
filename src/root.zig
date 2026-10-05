@@ -702,7 +702,7 @@ test "decoder handles random structurally valid symbols without trapping" {
 
             for (0..cell_count) |cell_index| {
                 if (symbol.cells[cell_index].kind == .data) {
-                    symbol.cells[cell_index].dark = random.boolean();
+                    symbol.cells[cell_index].dark = random.int(u1) != 0;
                 }
                 bits[cell_index] = symbol.cells[cell_index].dark;
             }
