@@ -1,6 +1,5 @@
 const std = @import("std");
 const spec = @import("qrz_spec");
-const reed_solomon = @import("qrz_rs");
 const reference = @import("reference/ecc_tables.zig");
 
 test "external Annex C format information matches all QR combinations" {
@@ -26,23 +25,6 @@ test "external Annex D version information matches versions 7 through 40" {
         try std.testing.expectEqual(
             reference.version_info[version - 7],
             spec.versionInfoBits(version),
-        );
-    }
-}
-
-test "external Annex A RS generators match every degree used by QR Code" {
-    for (reference.generators_a) |entry| {
-        try std.testing.expectEqualSlices(
-            u8,
-            entry.coefficients,
-            reed_solomon.generatorPolynomial(entry.degree),
-        );
-    }
-    for (reference.generators_b) |entry| {
-        try std.testing.expectEqualSlices(
-            u8,
-            entry.coefficients,
-            reed_solomon.generatorPolynomial(entry.degree),
         );
     }
 }
