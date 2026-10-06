@@ -31,7 +31,13 @@ pub fn build(b: *std.Build) void {
             .{ .name = "qrz_render", .module = qrz_render },
         },
     });
-    const fuzz_tests = b.addTest(.{ .root_module = fuzz_module });
+    const fuzz_tests = b.addTest(.{
+        .root_module = fuzz_module,
+        // Zig's coverage-guided fuzz runner requires LLVM-backed coverage
+        // metadata on affected toolchains; the self-hosted backend can yield
+        // empty entry-point PC lists and crash std.Build.Fuzz.
+        .use_llvm = true,
+    });
     const run_fuzz_tests = b.addRunArtifact(fuzz_tests);
     test_step.dependOn(&run_fuzz_tests.step);
 
