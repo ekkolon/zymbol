@@ -115,38 +115,12 @@ def parse_png(data):
     return chunks
 
 
-def defilter(raw, width, height):
+def indexed_pixel(raw, width, x, y):
     row_bytes = (width + 7) // 8
-    stride = row_bytes + 1
-    rows = []
-    previous = bytes(row_bytes)
-
-    for y in range(height):
-        offset = y * stride
-        filter_type = raw[offset]
-        encoded = raw[offset + 1 : offset + stride]
-
-        if filter_type == 0:
-            row = bytes(encoded)
-        elif filter_type == 2:
-            row = bytes(
-                (encoded[i] + previous[i]) & 0xFF
-                for i in range(row_bytes)
-            )
-        else:
-            raise AssertionError(
-                f"unsupported PNG filter type {filter_type} at row {y}"
-            )
-
-        rows.append(row)
-        previous = row
-
-    return rows
-
-
-def indexed_pixel(rows, x, y):
-    byte = rows[y][x // 8]
+    row_start = y * (row_bytes + 1)
+    byte = raw[row_start + 1 + x // 8]
     return (byte >> (7 - (x % 8))) & 1
+
 
 def validate_case(driver, case_name, expected):
     png = run_case(driver, case_name)
@@ -211,20 +185,13 @@ def validate_case(driver, case_name, expected):
         raise AssertionError(
             f"{case_name}: raw length {len(raw)} != {expected_raw_len}"
         )
-    expected_scaled = expected["scale"] > 1
     for y in range(height):
-        filter_type = raw[y * (row_bytes + 1)]
-        expected_filter = 0 if (y == 0 or not expected_scaled) else 2
-        if filter_type != expected_filter:
-            raise AssertionError(
-                f"{case_name}: filter {filter_type} at row {y}, "
-                f"expected {expected_filter}"
-            )
+        if raw[y * (row_bytes + 1)] != 0:
+            raise AssertionError(f"{case_name}: non-zero PNG filter at row {y}")
 
-    rows = defilter(raw, width, height)
-    quiet_index = indexed_pixel(rows, 0, 0)
+    quiet_index = indexed_pixel(raw, width, 0, 0)
     q = expected["quiet"] * expected["scale"]
-    finder_index = indexed_pixel(rows, q, q)
+    finder_index = indexed_pixel(raw, width, q, q)
     if expected["reversed"]:
         if (quiet_index, finder_index) != (0, 1):
             raise AssertionError(
