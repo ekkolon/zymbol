@@ -530,7 +530,7 @@ fn requiredBytesForModules(
     return pngLength(try maxZlibLength(raw_len), options.background == null);
 }
 
-pub fn requiredBytesForVersion(version: qrz.Version, options: Options) Error!usize {
+pub fn maxBytesForVersion(version: qrz.Version, options: Options) Error!usize {
     if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
     return requiredBytesForModules(
         qrz.size(version),
@@ -539,7 +539,7 @@ pub fn requiredBytesForVersion(version: qrz.Version, options: Options) Error!usi
     );
 }
 
-pub fn requiredBytesForMicroVersion(
+pub fn maxBytesForMicroVersion(
     version: qrz.MicroVersion,
     options: Options,
 ) Error!usize {
@@ -643,7 +643,7 @@ test "PNG version requirement bounds exact compressed size" {
     );
 
     const options = Options{ .scale = 4 };
-    const bound = try requiredBytesForVersion(4, options);
+    const bound = try maxBytesForVersion(4, options);
     const exact = try requiredBytes(&symbol, options);
     try std.testing.expect(bound >= exact);
 }
