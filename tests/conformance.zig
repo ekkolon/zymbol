@@ -1,5 +1,5 @@
 const std = @import("std");
-const qrz = @import("qrz");
+const zymbol = @import("zymbol");
 const qr_tables = @import("reference/qr_tables.zig");
 
 fn fillBits(rows: []const []const u8, out: []bool) !void {
@@ -15,7 +15,7 @@ fn fillBits(rows: []const []const u8, out: []bool) !void {
     }
 }
 
-fn expectSymbolRows(symbol: qrz.Symbol, rows: []const []const u8) !void {
+fn expectSymbolRows(symbol: zymbol.Symbol, rows: []const []const u8) !void {
     const side: usize = @intCast(symbol.size);
     try std.testing.expectEqual(side, rows.len);
 
@@ -29,17 +29,17 @@ fn expectSymbolRows(symbol: qrz.Symbol, rows: []const []const u8) !void {
 
 fn verifyQrReference(
     payload: []const u8,
-    version: qrz.Version,
-    level: qrz.EcLevel,
+    version: zymbol.Version,
+    level: zymbol.EcLevel,
     forced_mask: ?u3,
     expected_mask: u3,
     rows: []const []const u8,
 ) !void {
-    const cell_count = qrz.requiredCells(version);
+    const cell_count = zymbol.requiredCells(version);
 
-    var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
-    var encode_scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [zymbol.requiredCells(zymbol.max_version)]zymbol.Cell = undefined;
+    var encode_scratch: [zymbol.requiredEncodeScratch(zymbol.max_version)]u8 = undefined;
+    const symbol = try zymbol.encodeText(
         payload,
         .{
             .min_version = version,
@@ -49,24 +49,24 @@ fn verifyQrReference(
             .mask = forced_mask,
         },
         cells[0..cell_count],
-        encode_scratch[0..qrz.requiredEncodeScratch(version)],
+        encode_scratch[0..zymbol.requiredEncodeScratch(version)],
     );
 
     try std.testing.expectEqual(version, symbol.version);
     try std.testing.expectEqual(expected_mask, symbol.mask);
     try expectSymbolRows(symbol, rows);
 
-    var bits: [qrz.requiredCells(qrz.max_version)]bool = undefined;
+    var bits: [zymbol.requiredCells(zymbol.max_version)]bool = undefined;
     try fillBits(rows, bits[0..cell_count]);
 
-    var decode_cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
-    var decode_scratch: [qrz.requiredDecodeScratch(qrz.max_version)]u8 = undefined;
+    var decode_cells: [zymbol.requiredCells(zymbol.max_version)]zymbol.Cell = undefined;
+    var decode_scratch: [zymbol.requiredDecodeScratch(zymbol.max_version)]u8 = undefined;
     var output: [4096]u8 = undefined;
-    const decoded = try qrz.decode(
+    const decoded = try zymbol.decode(
         bits[0..cell_count],
-        qrz.size(version),
+        zymbol.size(version),
         decode_cells[0..cell_count],
-        decode_scratch[0..qrz.requiredDecodeScratch(version)],
+        decode_scratch[0..zymbol.requiredDecodeScratch(version)],
         &output,
     );
 
@@ -86,46 +86,46 @@ fn verifyStructuredAppendReference(
     rows: []const []const u8,
     exact_encode: bool,
 ) !void {
-    const version: qrz.Version = 1;
-    const level: qrz.EcLevel = .m;
+    const version: zymbol.Version = 1;
+    const level: zymbol.EcLevel = .m;
     const mask: u3 = 4;
-    const cell_count = qrz.requiredCells(version);
+    const cell_count = zymbol.requiredCells(version);
 
-    var data: [qrz.dataCodewords(version, level)]u8 = undefined;
-    var writer = qrz.BitWriter.init(&data);
-    try qrz.appendStructuredAppend(&writer, .{
+    var data: [zymbol.dataCodewords(version, level)]u8 = undefined;
+    var writer = zymbol.BitWriter.init(&data);
+    try zymbol.appendStructuredAppend(&writer, .{
         .index = index,
         .count = count,
         .parity = parity,
     });
-    try qrz.appendAlphanumeric(&writer, version, payload);
-    try qrz.finalizeSegments(&writer);
+    try zymbol.appendAlphanumeric(&writer, version, payload);
+    try zymbol.finalizeSegments(&writer);
 
-    var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
-    var encode_scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
+    var cells: [zymbol.requiredCells(zymbol.max_version)]zymbol.Cell = undefined;
+    var encode_scratch: [zymbol.requiredEncodeScratch(zymbol.max_version)]u8 = undefined;
     if (exact_encode) {
-        const symbol = try qrz.encodeRaw(
+        const symbol = try zymbol.encodeRaw(
             &data,
             version,
             level,
             mask,
             cells[0..cell_count],
-            encode_scratch[0..qrz.requiredEncodeScratch(version)],
+            encode_scratch[0..zymbol.requiredEncodeScratch(version)],
         );
         try expectSymbolRows(symbol, rows);
     }
 
-    var bits: [qrz.requiredCells(qrz.max_version)]bool = undefined;
+    var bits: [zymbol.requiredCells(zymbol.max_version)]bool = undefined;
     try fillBits(rows, bits[0..cell_count]);
 
-    var decode_cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
-    var decode_scratch: [qrz.requiredDecodeScratch(qrz.max_version)]u8 = undefined;
+    var decode_cells: [zymbol.requiredCells(zymbol.max_version)]zymbol.Cell = undefined;
+    var decode_scratch: [zymbol.requiredDecodeScratch(zymbol.max_version)]u8 = undefined;
     var output: [64]u8 = undefined;
-    const decoded = try qrz.decode(
+    const decoded = try zymbol.decode(
         bits[0..cell_count],
-        qrz.size(version),
+        zymbol.size(version),
         decode_cells[0..cell_count],
-        decode_scratch[0..qrz.requiredDecodeScratch(version)],
+        decode_scratch[0..zymbol.requiredDecodeScratch(version)],
         &output,
     );
 
@@ -139,16 +139,16 @@ fn verifyStructuredAppendReference(
 
 fn verifyMicroReference(
     payload: []const u8,
-    version: qrz.MicroVersion,
-    level: qrz.EcLevel,
+    version: zymbol.MicroVersion,
+    level: zymbol.EcLevel,
     forced_mask: ?u2,
     expected_mask: u2,
     rows: []const []const u8,
 ) !void {
-    const cell_count = qrz.requiredMicroCells(version);
+    const cell_count = zymbol.requiredMicroCells(version);
 
-    var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
-    const symbol = try qrz.encodeMicroText(
+    var cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
+    const symbol = try zymbol.encodeMicroText(
         payload,
         .{
             .min_version = version,
@@ -164,14 +164,14 @@ fn verifyMicroReference(
     try std.testing.expectEqual(@as(u3, expected_mask), symbol.mask);
     try expectSymbolRows(symbol, rows);
 
-    var bits: [qrz.requiredMicroCells(.m4)]bool = undefined;
+    var bits: [zymbol.requiredMicroCells(.m4)]bool = undefined;
     try fillBits(rows, bits[0..cell_count]);
 
-    var decode_cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    var decode_cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
     var output: [128]u8 = undefined;
-    const decoded = try qrz.decodeMicro(
+    const decoded = try zymbol.decodeMicro(
         bits[0..cell_count],
-        qrz.microSize(version),
+        zymbol.microSize(version),
         decode_cells[0..cell_count],
         &output,
     );
@@ -352,31 +352,31 @@ test "Segno independent M4-M boosted-level reference matrix" {
 }
 
 test "external QR data capacities match all versions and EC levels" {
-    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+    const levels = [_]zymbol.EcLevel{ .l, .m, .q, .h };
 
-    var version: qrz.Version = 1;
-    while (version <= qrz.max_version) : (version += 1) {
+    var version: zymbol.Version = 1;
+    while (version <= zymbol.max_version) : (version += 1) {
         for (levels, 0..) |level, level_index| {
             const expected: usize = qr_tables.qr_data_codewords[version - 1][level_index];
-            try std.testing.expectEqual(expected, qrz.dataCodewords(version, level));
+            try std.testing.expectEqual(expected, zymbol.dataCodewords(version, level));
         }
     }
 }
 
 test "external QR byte capacity boundaries fit exactly" {
-    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
-    var payload: [qrz.dataCodewords(qrz.max_version, .l)]u8 = @splat(0x80);
-    var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
+    const levels = [_]zymbol.EcLevel{ .l, .m, .q, .h };
+    var payload: [zymbol.dataCodewords(zymbol.max_version, .l)]u8 = @splat(0x80);
+    var cells: [zymbol.requiredCells(zymbol.max_version)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(zymbol.max_version)]u8 = undefined;
 
-    var version: qrz.Version = 1;
-    while (version <= qrz.max_version) : (version += 1) {
+    var version: zymbol.Version = 1;
+    while (version <= zymbol.max_version) : (version += 1) {
         const count_bits: usize = if (version <= 9) 8 else 16;
 
         for (levels, 0..) |level, level_index| {
             const data_codewords: usize = qr_tables.qr_data_codewords[version - 1][level_index];
             const max_payload = (data_codewords * 8 - 4 - count_bits) / 8;
-            const options: qrz.EncodeOptions = .{
+            const options: zymbol.EncodeOptions = .{
                 .min_version = version,
                 .max_version = version,
                 .ec_level = level,
@@ -384,22 +384,22 @@ test "external QR byte capacity boundaries fit exactly" {
                 .mask = 0,
             };
 
-            const symbol = try qrz.encodeBytes(
+            const symbol = try zymbol.encodeBytes(
                 payload[0..max_payload],
                 options,
-                cells[0..qrz.requiredCells(version)],
-                scratch[0..qrz.requiredEncodeScratch(version)],
+                cells[0..zymbol.requiredCells(version)],
+                scratch[0..zymbol.requiredEncodeScratch(version)],
             );
             try std.testing.expectEqual(version, symbol.version);
             try std.testing.expectEqual(level, symbol.ec_level);
 
             try std.testing.expectError(
                 error.DataTooLong,
-                qrz.encodeBytes(
+                zymbol.encodeBytes(
                     payload[0 .. max_payload + 1],
                     options,
-                    cells[0..qrz.requiredCells(version)],
-                    scratch[0..qrz.requiredEncodeScratch(version)],
+                    cells[0..zymbol.requiredCells(version)],
+                    scratch[0..zymbol.requiredEncodeScratch(version)],
                 ),
             );
         }
@@ -410,64 +410,64 @@ test "QR character-count widths transition at version bands" {
     var writer_storage: [8192]u8 = undefined;
 
     var byte_payload: [256]u8 = @splat(0x80);
-    var writer = qrz.BitWriter.init(&writer_storage);
-    try qrz.appendByte(&writer, 9, byte_payload[0..255]);
+    var writer = zymbol.BitWriter.init(&writer_storage);
+    try zymbol.appendByte(&writer, 9, byte_payload[0..255]);
 
-    writer = qrz.BitWriter.init(&writer_storage);
+    writer = zymbol.BitWriter.init(&writer_storage);
     try std.testing.expectError(
         error.TooManyCharacters,
-        qrz.appendByte(&writer, 9, &byte_payload),
+        zymbol.appendByte(&writer, 9, &byte_payload),
     );
 
-    writer = qrz.BitWriter.init(&writer_storage);
-    try qrz.appendByte(&writer, 10, &byte_payload);
+    writer = zymbol.BitWriter.init(&writer_storage);
+    try zymbol.appendByte(&writer, 10, &byte_payload);
 
     var numeric_payload: [4096]u8 = @splat('7');
-    writer = qrz.BitWriter.init(&writer_storage);
-    try qrz.appendNumeric(&writer, 9, numeric_payload[0..1023]);
+    writer = zymbol.BitWriter.init(&writer_storage);
+    try zymbol.appendNumeric(&writer, 9, numeric_payload[0..1023]);
 
-    writer = qrz.BitWriter.init(&writer_storage);
+    writer = zymbol.BitWriter.init(&writer_storage);
     try std.testing.expectError(
         error.TooManyCharacters,
-        qrz.appendNumeric(&writer, 9, numeric_payload[0..1024]),
+        zymbol.appendNumeric(&writer, 9, numeric_payload[0..1024]),
     );
 
-    writer = qrz.BitWriter.init(&writer_storage);
-    try qrz.appendNumeric(&writer, 26, numeric_payload[0..4095]);
+    writer = zymbol.BitWriter.init(&writer_storage);
+    try zymbol.appendNumeric(&writer, 26, numeric_payload[0..4095]);
 
-    writer = qrz.BitWriter.init(&writer_storage);
+    writer = zymbol.BitWriter.init(&writer_storage);
     try std.testing.expectError(
         error.TooManyCharacters,
-        qrz.appendNumeric(&writer, 26, &numeric_payload),
+        zymbol.appendNumeric(&writer, 26, &numeric_payload),
     );
 
-    writer = qrz.BitWriter.init(&writer_storage);
-    try qrz.appendNumeric(&writer, 27, &numeric_payload);
+    writer = zymbol.BitWriter.init(&writer_storage);
+    try zymbol.appendNumeric(&writer, 27, &numeric_payload);
 
     var alphanumeric_payload: [2048]u8 = @splat('A');
-    writer = qrz.BitWriter.init(&writer_storage);
-    try qrz.appendAlphanumeric(&writer, 9, alphanumeric_payload[0..511]);
+    writer = zymbol.BitWriter.init(&writer_storage);
+    try zymbol.appendAlphanumeric(&writer, 9, alphanumeric_payload[0..511]);
 
-    writer = qrz.BitWriter.init(&writer_storage);
+    writer = zymbol.BitWriter.init(&writer_storage);
     try std.testing.expectError(
         error.TooManyCharacters,
-        qrz.appendAlphanumeric(&writer, 9, alphanumeric_payload[0..512]),
+        zymbol.appendAlphanumeric(&writer, 9, alphanumeric_payload[0..512]),
     );
 
-    writer = qrz.BitWriter.init(&writer_storage);
-    try qrz.appendAlphanumeric(&writer, 26, alphanumeric_payload[0..2047]);
+    writer = zymbol.BitWriter.init(&writer_storage);
+    try zymbol.appendAlphanumeric(&writer, 26, alphanumeric_payload[0..2047]);
 
-    writer = qrz.BitWriter.init(&writer_storage);
+    writer = zymbol.BitWriter.init(&writer_storage);
     try std.testing.expectError(
         error.TooManyCharacters,
-        qrz.appendAlphanumeric(&writer, 26, &alphanumeric_payload),
+        zymbol.appendAlphanumeric(&writer, 26, &alphanumeric_payload),
     );
 
-    writer = qrz.BitWriter.init(&writer_storage);
-    try qrz.appendAlphanumeric(&writer, 27, &alphanumeric_payload);
+    writer = zymbol.BitWriter.init(&writer_storage);
+    try zymbol.appendAlphanumeric(&writer, 27, &alphanumeric_payload);
 }
 
-fn numericSegmentBits(version: qrz.Version, count: usize) usize {
+fn numericSegmentBits(version: zymbol.Version, count: usize) usize {
     const count_bits: usize = if (version <= 9) 10 else if (version <= 26) 12 else 14;
     const groups = count / 3;
     const tail_bits: usize = switch (count % 3) {
@@ -479,34 +479,34 @@ fn numericSegmentBits(version: qrz.Version, count: usize) usize {
     return 4 + count_bits + groups * 10 + tail_bits;
 }
 
-fn alphanumericSegmentBits(version: qrz.Version, count: usize) usize {
+fn alphanumericSegmentBits(version: zymbol.Version, count: usize) usize {
     const count_bits: usize = if (version <= 9) 9 else if (version <= 26) 11 else 13;
     return 4 + count_bits + (count / 2) * 11 + (count % 2) * 6;
 }
 
 fn maxCharactersForCapacity(
-    version: qrz.Version,
+    version: zymbol.Version,
     capacity_bits: usize,
-    comptime bitLength: fn (qrz.Version, usize) usize,
+    comptime bitLength: fn (zymbol.Version, usize) usize,
 ) usize {
     var count: usize = 0;
     while (bitLength(version, count + 1) <= capacity_bits) : (count += 1) {}
     return count;
 }
 
-fn kanjiSegmentBits(version: qrz.Version, count: usize) usize {
+fn kanjiSegmentBits(version: zymbol.Version, count: usize) usize {
     const count_bits: usize = if (version <= 9) 8 else if (version <= 26) 10 else 12;
     return 4 + count_bits + count * 13;
 }
 
 test "external QR numeric and alphanumeric capacity boundaries fit exactly" {
-    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+    const levels = [_]zymbol.EcLevel{ .l, .m, .q, .h };
     var numeric_payload: [8192]u8 = @splat('7');
     var alphanumeric_payload: [8192]u8 = @splat('A');
-    var storage: [qrz.dataCodewords(qrz.max_version, .l)]u8 = undefined;
+    var storage: [zymbol.dataCodewords(zymbol.max_version, .l)]u8 = undefined;
 
-    var version: qrz.Version = 1;
-    while (version <= qrz.max_version) : (version += 1) {
+    var version: zymbol.Version = 1;
+    while (version <= zymbol.max_version) : (version += 1) {
         for (levels, 0..) |_, level_index| {
             const data_codewords: usize = qr_tables.qr_data_codewords[version - 1][level_index];
             const capacity_bits = data_codewords * 8;
@@ -516,14 +516,14 @@ test "external QR numeric and alphanumeric capacity boundaries fit exactly" {
                 capacity_bits,
                 numericSegmentBits,
             );
-            var writer = qrz.BitWriter.init(storage[0..data_codewords]);
-            try qrz.appendNumeric(&writer, version, numeric_payload[0..numeric_max]);
-            try qrz.finalizeSegments(&writer);
+            var writer = zymbol.BitWriter.init(storage[0..data_codewords]);
+            try zymbol.appendNumeric(&writer, version, numeric_payload[0..numeric_max]);
+            try zymbol.finalizeSegments(&writer);
 
-            writer = qrz.BitWriter.init(storage[0..data_codewords]);
+            writer = zymbol.BitWriter.init(storage[0..data_codewords]);
             try std.testing.expectError(
                 error.BufferFull,
-                qrz.appendNumeric(&writer, version, numeric_payload[0 .. numeric_max + 1]),
+                zymbol.appendNumeric(&writer, version, numeric_payload[0 .. numeric_max + 1]),
             );
 
             const alphanumeric_max = maxCharactersForCapacity(
@@ -531,18 +531,18 @@ test "external QR numeric and alphanumeric capacity boundaries fit exactly" {
                 capacity_bits,
                 alphanumericSegmentBits,
             );
-            writer = qrz.BitWriter.init(storage[0..data_codewords]);
-            try qrz.appendAlphanumeric(
+            writer = zymbol.BitWriter.init(storage[0..data_codewords]);
+            try zymbol.appendAlphanumeric(
                 &writer,
                 version,
                 alphanumeric_payload[0..alphanumeric_max],
             );
-            try qrz.finalizeSegments(&writer);
+            try zymbol.finalizeSegments(&writer);
 
-            writer = qrz.BitWriter.init(storage[0..data_codewords]);
+            writer = zymbol.BitWriter.init(storage[0..data_codewords]);
             try std.testing.expectError(
                 error.BufferFull,
-                qrz.appendAlphanumeric(
+                zymbol.appendAlphanumeric(
                     &writer,
                     version,
                     alphanumeric_payload[0 .. alphanumeric_max + 1],
@@ -553,16 +553,16 @@ test "external QR numeric and alphanumeric capacity boundaries fit exactly" {
 }
 
 test "external QR Kanji capacity boundaries fit exactly" {
-    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+    const levels = [_]zymbol.EcLevel{ .l, .m, .q, .h };
     var payload: [8192]u8 = undefined;
     for (0..payload.len / 2) |index| {
         payload[index * 2] = 0x81;
         payload[index * 2 + 1] = 0x40;
     }
-    var storage: [qrz.dataCodewords(qrz.max_version, .l)]u8 = undefined;
+    var storage: [zymbol.dataCodewords(zymbol.max_version, .l)]u8 = undefined;
 
-    var version: qrz.Version = 1;
-    while (version <= qrz.max_version) : (version += 1) {
+    var version: zymbol.Version = 1;
+    while (version <= zymbol.max_version) : (version += 1) {
         for (levels, 0..) |_, level_index| {
             const data_codewords: usize = qr_tables.qr_data_codewords[version - 1][level_index];
             const capacity_bits = data_codewords * 8;
@@ -572,14 +572,14 @@ test "external QR Kanji capacity boundaries fit exactly" {
                 kanjiSegmentBits,
             );
 
-            var writer = qrz.BitWriter.init(storage[0..data_codewords]);
-            try qrz.appendKanji(&writer, version, payload[0 .. max_chars * 2]);
-            try qrz.finalizeSegments(&writer);
+            var writer = zymbol.BitWriter.init(storage[0..data_codewords]);
+            try zymbol.appendKanji(&writer, version, payload[0 .. max_chars * 2]);
+            try zymbol.finalizeSegments(&writer);
 
-            writer = qrz.BitWriter.init(storage[0..data_codewords]);
+            writer = zymbol.BitWriter.init(storage[0..data_codewords]);
             try std.testing.expectError(
                 error.BufferFull,
-                qrz.appendKanji(
+                zymbol.appendKanji(
                     &writer,
                     version,
                     payload[0 .. (max_chars + 1) * 2],
@@ -698,8 +698,8 @@ test "ISO Structured Append symbol 4 reference matrix" {
 }
 
 test "Segno Structured Append parity vectors" {
-    try std.testing.expectEqual(@as(u8, 0x31), qrz.structuredAppendParity("123456789"));
-    try std.testing.expectEqual(@as(u8, 0xA0), qrz.structuredAppendParity("M\xFCrrisch"));
+    try std.testing.expectEqual(@as(u8, 0x31), zymbol.structuredAppendParity("123456789"));
+    try std.testing.expectEqual(@as(u8, 0xA0), zymbol.structuredAppendParity("M\xFCrrisch"));
 }
 
 test "Structured Append aligned streams use standard pad codeword" {
@@ -728,14 +728,14 @@ test "Structured Append aligned streams use standard pad codeword" {
 
     for (cases) |case| {
         var data: [16]u8 = undefined;
-        var writer = qrz.BitWriter.init(&data);
-        try qrz.appendStructuredAppend(&writer, .{
+        var writer = zymbol.BitWriter.init(&data);
+        try zymbol.appendStructuredAppend(&writer, .{
             .index = case.index,
             .count = 4,
             .parity = 0x01,
         });
-        try qrz.appendAlphanumeric(&writer, 1, case.payload);
-        try qrz.finalizeSegments(&writer);
+        try zymbol.appendAlphanumeric(&writer, 1, case.payload);
+        try zymbol.finalizeSegments(&writer);
         try std.testing.expectEqualSlices(u8, &case.expected, &data);
     }
 }

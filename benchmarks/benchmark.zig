@@ -1,15 +1,15 @@
 const std = @import("std");
-const qrz = @import("qrz");
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
-const version: qrz.Version = 20;
+const version: zymbol.Version = 20;
 const samples = 5;
 
-var cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
-var encode_scratch: [qrz.requiredEncodeScratch(version)]u8 = undefined;
-var decode_cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
-var decode_scratch: [qrz.requiredDecodeScratch(version)]u8 = undefined;
-var bits: [qrz.requiredCells(version)]bool = undefined;
+var cells: [zymbol.requiredCells(version)]zymbol.Cell = undefined;
+var encode_scratch: [zymbol.requiredEncodeScratch(version)]u8 = undefined;
+var decode_cells: [zymbol.requiredCells(version)]zymbol.Cell = undefined;
+var decode_scratch: [zymbol.requiredDecodeScratch(version)]u8 = undefined;
+var bits: [zymbol.requiredCells(version)]bool = undefined;
 var decoded: [2048]u8 = undefined;
 var png_output: [512 * 1024]u8 = undefined;
 var svg_output: [512 * 1024]u8 = undefined;
@@ -18,7 +18,7 @@ var mixed_payload: [512]u8 = undefined;
 pub fn main(init: std.process.Init) !void {
     preparePayload();
 
-    const prepared = try qrz.encodeText(
+    const prepared = try zymbol.encodeText(
         &mixed_payload,
         .{
             .min_version = version,
@@ -45,9 +45,9 @@ pub fn main(init: std.process.Init) !void {
         .{
             version,
             mixed_payload.len,
-            qrz.requiredCells(version) * @sizeOf(qrz.Cell),
-            qrz.requiredEncodeScratch(version),
-            qrz.requiredDecodeScratch(version),
+            zymbol.requiredCells(version) * @sizeOf(zymbol.Cell),
+            zymbol.requiredEncodeScratch(version),
+            zymbol.requiredDecodeScratch(version),
         },
     );
     std.debug.print(
@@ -64,7 +64,7 @@ pub fn main(init: std.process.Init) !void {
 }
 
 fn preparePayload() void {
-    const pattern = "1234567890ABCDEFGHIJabcdefghij-QRZ/";
+    const pattern = "1234567890ABCDEFGHIJabcdefghij-ZYMBOL/";
     for (&mixed_payload, 0..) |*byte, index| {
         byte.* = pattern[index % pattern.len];
     }
@@ -97,7 +97,7 @@ fn benchEncodeAuto(io: std.Io) !void {
     for (0..samples) |sample| {
         const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
-            const symbol = try qrz.encodeText(
+            const symbol = try zymbol.encodeText(
                 &mixed_payload,
                 .{
                     .min_version = version,
@@ -119,8 +119,8 @@ fn benchEncodeAuto(io: std.Io) !void {
         iterations,
         &elapsed,
         0,
-        qrz.requiredCells(version) * @sizeOf(qrz.Cell) +
-            qrz.requiredEncodeScratch(version),
+        zymbol.requiredCells(version) * @sizeOf(zymbol.Cell) +
+            zymbol.requiredEncodeScratch(version),
     );
 }
 
@@ -131,7 +131,7 @@ fn benchEncodeFixed(io: std.Io) !void {
     for (0..samples) |sample| {
         const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
-            const symbol = try qrz.encodeText(
+            const symbol = try zymbol.encodeText(
                 &mixed_payload,
                 .{
                     .min_version = version,
@@ -154,8 +154,8 @@ fn benchEncodeFixed(io: std.Io) !void {
         iterations,
         &elapsed,
         0,
-        qrz.requiredCells(version) * @sizeOf(qrz.Cell) +
-            qrz.requiredEncodeScratch(version),
+        zymbol.requiredCells(version) * @sizeOf(zymbol.Cell) +
+            zymbol.requiredEncodeScratch(version),
     );
 }
 
@@ -166,9 +166,9 @@ fn benchDecode(io: std.Io) !void {
     for (0..samples) |sample| {
         const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
-            const result = try qrz.decode(
+            const result = try zymbol.decode(
                 &bits,
-                qrz.size(version),
+                zymbol.size(version),
                 &decode_cells,
                 &decode_scratch,
                 &decoded,
@@ -186,7 +186,7 @@ fn benchDecode(io: std.Io) !void {
         &elapsed,
         mixed_payload.len,
         bits.len * @sizeOf(bool) +
-            decode_cells.len * @sizeOf(qrz.Cell) +
+            decode_cells.len * @sizeOf(zymbol.Cell) +
             decode_scratch.len +
             decoded.len,
     );
@@ -194,7 +194,7 @@ fn benchDecode(io: std.Io) !void {
 
 fn benchPng(
     io: std.Io,
-    symbol: qrz.Symbol,
+    symbol: zymbol.Symbol,
     options: render.PngOptions,
     required: usize,
 ) !void {
@@ -226,7 +226,7 @@ fn benchPng(
 
 fn benchSvg(
     io: std.Io,
-    symbol: qrz.Symbol,
+    symbol: zymbol.Symbol,
     options: render.SvgOptions,
     required: usize,
 ) !void {
@@ -265,7 +265,7 @@ fn benchEncodePng(io: std.Io) !void {
     for (0..samples) |sample| {
         const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
-            const symbol = try qrz.encodeText(
+            const symbol = try zymbol.encodeText(
                 &mixed_payload,
                 .{
                     .min_version = version,
@@ -295,8 +295,8 @@ fn benchEncodePng(io: std.Io) !void {
         iterations,
         &elapsed,
         last_len,
-        qrz.requiredCells(version) * @sizeOf(qrz.Cell) +
-            qrz.requiredEncodeScratch(version) +
+        zymbol.requiredCells(version) * @sizeOf(zymbol.Cell) +
+            zymbol.requiredEncodeScratch(version) +
             last_len,
     );
 }

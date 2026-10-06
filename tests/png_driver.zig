@@ -1,9 +1,9 @@
 const std = @import("std");
-const qrz = @import("qrz");
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
 pub fn main(init: std.process.Init) !void {
-    const case_name = init.environ_map.get("QRZ_PNG_CASE") orelse "qr-default";
+    const case_name = init.environ_map.get("ZYMBOL_PNG_CASE") orelse "qr-default";
 
     var output: [512 * 1024]u8 = undefined;
     const png = if (std.mem.eql(u8, case_name, "micro-default"))
@@ -17,21 +17,21 @@ pub fn main(init: std.process.Init) !void {
             .background = .{ .r = 240, .g = 230, .b = 220 },
         })
     else if (std.mem.eql(u8, case_name, "qr-transparent"))
-        try renderQr(&output, "QRZ TRANSPARENT", 2, .{
+        try renderQr(&output, "ZYMBOL TRANSPARENT", 2, .{
             .scale = 2,
             .background = null,
         })
     else if (std.mem.eql(u8, case_name, "qr-reversed"))
-        try renderQr(&output, "QRZ REVERSED", 2, .{
+        try renderQr(&output, "ZYMBOL REVERSED", 2, .{
             .scale = 2,
             .reflectance = .reversed,
         })
     else if (std.mem.eql(u8, case_name, "qr-scale4"))
-        try renderQr(&output, "QRZ PNG PRODUCTION VALIDATION", 4, .{
+        try renderQr(&output, "ZYMBOL PNG PRODUCTION VALIDATION", 4, .{
             .scale = 4,
         })
     else if (std.mem.eql(u8, case_name, "qr-default"))
-        try renderQr(&output, "QRZ PNG DEFAULT", 1, .{
+        try renderQr(&output, "ZYMBOL PNG DEFAULT", 1, .{
             .scale = 1,
         })
     else
@@ -46,12 +46,12 @@ pub fn main(init: std.process.Init) !void {
 fn renderQr(
     output: []u8,
     payload: []const u8,
-    version: qrz.Version,
+    version: zymbol.Version,
     options: render.PngOptions,
 ) ![]const u8 {
-    var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [zymbol.requiredCells(zymbol.max_version)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(zymbol.max_version)]u8 = undefined;
+    const symbol = try zymbol.encodeText(
         payload,
         .{
             .min_version = version,
@@ -60,20 +60,20 @@ fn renderQr(
             .boost_ec_level = false,
             .mask = 0,
         },
-        cells[0..qrz.requiredCells(version)],
-        scratch[0..qrz.requiredEncodeScratch(version)],
+        cells[0..zymbol.requiredCells(version)],
+        scratch[0..zymbol.requiredEncodeScratch(version)],
     );
     return render.renderPng(&symbol, output, options);
 }
 
 fn renderMicro(
     output: []u8,
-    version: qrz.MicroVersion,
+    version: zymbol.MicroVersion,
     payload: []const u8,
     options: render.PngOptions,
 ) ![]const u8 {
-    var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
-    const symbol = try qrz.encodeMicroText(
+    var cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
+    const symbol = try zymbol.encodeMicroText(
         payload,
         .{
             .min_version = version,
@@ -82,7 +82,7 @@ fn renderMicro(
             .boost_ec_level = false,
             .mask = 0,
         },
-        cells[0..qrz.requiredMicroCells(version)],
+        cells[0..zymbol.requiredMicroCells(version)],
     );
     return render.renderPng(&symbol, output, options);
 }

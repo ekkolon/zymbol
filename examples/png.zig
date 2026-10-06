@@ -1,15 +1,16 @@
 const std = @import("std");
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
 const output_dir = "zig-out/examples";
-const output_path = output_dir ++ "/qrz.png";
+const output_path = output_dir ++ "/zymbol.png";
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
 
     var image = try render.pngText(
         init.gpa,
-        "https://example.com/qrz",
+        "https://example.com/zymbol",
         .{
             .encode = .{
                 .min_version = 6,

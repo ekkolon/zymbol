@@ -1,6 +1,6 @@
 const std = @import("std");
-const qrz = @import("qrz");
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
 const Protocol = enum {
     kitty,
@@ -23,7 +23,7 @@ pub fn main(init: std.process.Init) !void {
         .kitty => {
             var image = try render.pngText(
                 init.gpa,
-                "https://example.com/qrz",
+                "https://example.com/zymbol",
                 .{
                     .encode = .{
                         .min_version = 6,
@@ -40,7 +40,7 @@ pub fn main(init: std.process.Init) !void {
         .iterm2 => {
             var image = try render.pngText(
                 init.gpa,
-                "https://example.com/qrz",
+                "https://example.com/zymbol",
                 .{
                     .encode = .{
                         .min_version = 6,
@@ -57,7 +57,7 @@ pub fn main(init: std.process.Init) !void {
         .vscode => {
             var image = try render.pngText(
                 init.gpa,
-                "https://example.com/qrz",
+                "https://example.com/zymbol",
                 .{
                     .encode = .{
                         .min_version = 6,
@@ -161,16 +161,16 @@ fn writeIterm2(writer: *std.Io.Writer, png: []const u8) !void {
 }
 
 fn writeSixel(writer: *std.Io.Writer) !void {
-    const version: qrz.Version = 6;
+    const version: zymbol.Version = 6;
     const scale: usize = 4;
     const quiet_zone: usize = 4;
     const module_side: usize = 17 + 4 * @as(usize, version);
     const image_side: usize = (module_side + quiet_zone * 2) * scale;
 
-    var cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(version)]u8 = undefined;
-    const symbol = try qrz.encodeText(
-        "https://example.com/qrz",
+    var cells: [zymbol.requiredCells(version)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(version)]u8 = undefined;
+    const symbol = try zymbol.encodeText(
+        "https://example.com/zymbol",
         .{ .min_version = version, .max_version = version, .ec_level = .q },
         &cells,
         &scratch,
@@ -271,11 +271,11 @@ fn encodeBase64(input: []const u8, output: *[4096]u8) usize {
 }
 
 fn writeBlockFallback(writer: *std.Io.Writer) !void {
-    const version: qrz.Version = 6;
-    var cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(version)]u8 = undefined;
-    const symbol = try qrz.encodeText(
-        "https://example.com/qrz",
+    const version: zymbol.Version = 6;
+    var cells: [zymbol.requiredCells(version)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(version)]u8 = undefined;
+    const symbol = try zymbol.encodeText(
+        "https://example.com/zymbol",
         .{ .min_version = version, .max_version = version, .ec_level = .q },
         &cells,
         &scratch,
@@ -304,7 +304,7 @@ fn writeBlockFallback(writer: *std.Io.Writer) !void {
     }
 }
 
-fn moduleDark(symbol: *const qrz.Symbol, x: i32, y: i32) bool {
+fn moduleDark(symbol: *const zymbol.Symbol, x: i32, y: i32) bool {
     const side: i32 = symbol.size;
     if (x < 0 or y < 0 or x >= side or y >= side) return false;
     return symbol.isDark(@intCast(x), @intCast(y));

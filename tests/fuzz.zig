@@ -1,6 +1,6 @@
 const std = @import("std");
-const qrz = @import("qrz");
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
 const release_corpus = [_][]const u8{
     "\\x00",
@@ -10,27 +10,27 @@ const release_corpus = [_][]const u8{
     "\\x00\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08\\x09\\x0a\\x0b\\x0c\\x0d\\x0e\\x0f",
 };
 
-const max_cells = qrz.requiredCells(qrz.max_version);
-const max_encode_scratch = qrz.requiredEncodeScratch(qrz.max_version);
-const max_decode_scratch = qrz.requiredDecodeScratch(qrz.max_version);
+const max_cells = zymbol.requiredCells(zymbol.max_version);
+const max_encode_scratch = zymbol.requiredEncodeScratch(zymbol.max_version);
+const max_decode_scratch = zymbol.requiredDecodeScratch(zymbol.max_version);
 
 test "fuzz decoder arbitrary module grids" {
     try std.testing.fuzz({}, fuzzDecoder, .{ .corpus = &release_corpus });
 }
 
 fn fuzzDecoder(_: void, smith: *std.testing.Smith) !void {
-    const version: qrz.Version = @intCast(1 + smith.value(u8) % 40);
-    const side = qrz.size(version);
-    const cell_count = qrz.requiredCells(version);
+    const version: zymbol.Version = @intCast(1 + smith.value(u8) % 40);
+    const side = zymbol.size(version);
+    const cell_count = zymbol.requiredCells(version);
 
     var bits: [max_cells]bool = undefined;
     for (bits[0..cell_count]) |*bit| bit.* = smith.value(bool);
 
-    var cells: [max_cells]qrz.Cell = undefined;
+    var cells: [max_cells]zymbol.Cell = undefined;
     var scratch: [max_decode_scratch]u8 = undefined;
     var output: [4096]u8 = undefined;
 
-    const result = qrz.decode(
+    const result = zymbol.decode(
         bits[0..cell_count],
         side,
         &cells,
@@ -38,7 +38,7 @@ fn fuzzDecoder(_: void, smith: *std.testing.Smith) !void {
         &output,
     ) catch return;
 
-    try std.testing.expect(qrz.isValidVersion(result.version));
+    try std.testing.expect(zymbol.isValidVersion(result.version));
     try std.testing.expect(result.len <= output.len);
     try std.testing.expect(result.mask <= 7);
 }
@@ -52,13 +52,13 @@ fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
     const len = @as(usize, smith.value(u16)) % (payload.len + 1);
     for (payload[0..len]) |*byte| byte.* = smith.value(u8);
 
-    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+    const levels = [_]zymbol.EcLevel{ .l, .m, .q, .h };
     const level = levels[smith.value(u8) % levels.len];
     const boost = smith.value(bool);
 
-    var cells: [max_cells]qrz.Cell = undefined;
+    var cells: [max_cells]zymbol.Cell = undefined;
     var encode_scratch: [max_encode_scratch]u8 = undefined;
-    const symbol = qrz.encodeBytes(
+    const symbol = zymbol.encodeBytes(
         payload[0..len],
         .{
             .ec_level = level,
@@ -85,10 +85,10 @@ fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
         }
     }
 
-    var decode_cells: [max_cells]qrz.Cell = undefined;
+    var decode_cells: [max_cells]zymbol.Cell = undefined;
     var decode_scratch: [max_decode_scratch]u8 = undefined;
     var output: [4096]u8 = undefined;
-    const result = try qrz.decode(
+    const result = try zymbol.decode(
         bits[0..cell_count],
         symbol.size,
         &decode_cells,
@@ -159,8 +159,8 @@ fn fuzzPng(_: void, smith: *std.testing.Smith) !void {
     };
 
     const requirements = render.pngRequirements(options) catch return;
-    var cells: [qrz.requiredCells(10)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(10)]u8 = undefined;
+    var cells: [zymbol.requiredCells(10)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(10)]u8 = undefined;
     var output: [128 * 1024]u8 = undefined;
     if (requirements.output > output.len) return;
 
@@ -191,7 +191,7 @@ fn fuzzControlModes(_: void, smith: *std.testing.Smith) !void {
     for (payload[0..len]) |*byte| byte.* = smith.value(u8);
 
     const control = smith.value(u8);
-    const fnc1: qrz.Fnc1 = switch (control % 3) {
+    const fnc1: zymbol.Fnc1 = switch (control % 3) {
         0 => .none,
         1 => .first_position,
         else => .{ .second_position = .{
@@ -199,19 +199,19 @@ fn fuzzControlModes(_: void, smith: *std.testing.Smith) !void {
         } },
     };
 
-    const structured: ?qrz.StructuredAppend = if (smith.value(bool)) blk: {
+    const structured: ?zymbol.StructuredAppend = if (smith.value(bool)) blk: {
         const count: u5 = @intCast(1 + smith.value(u8) % 16);
         const index: u4 = @intCast(smith.value(u8) % @as(u8, count));
         break :blk .{
             .index = index,
             .count = count,
-            .parity = qrz.structuredAppendParity(payload[0..len]),
+            .parity = zymbol.structuredAppendParity(payload[0..len]),
         };
     } else null;
 
-    var cells: [max_cells]qrz.Cell = undefined;
+    var cells: [max_cells]zymbol.Cell = undefined;
     var encode_scratch: [max_encode_scratch]u8 = undefined;
-    const symbol = qrz.encodeBytes(
+    const symbol = zymbol.encodeBytes(
         payload[0..len],
         .{
             .max_version = 20,
@@ -228,10 +228,10 @@ fn fuzzControlModes(_: void, smith: *std.testing.Smith) !void {
     const cell_count = @as(usize, symbol.size) * symbol.size;
     for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
 
-    var decode_cells: [max_cells]qrz.Cell = undefined;
+    var decode_cells: [max_cells]zymbol.Cell = undefined;
     var decode_scratch: [max_decode_scratch]u8 = undefined;
     var output: [512]u8 = undefined;
-    const result = try qrz.decode(
+    const result = try zymbol.decode(
         bits[0..cell_count],
         symbol.size,
         &decode_cells,
@@ -270,17 +270,17 @@ test "fuzz Micro QR arbitrary module grids" {
 }
 
 fn fuzzMicroDecoder(_: void, smith: *std.testing.Smith) !void {
-    const versions = [_]qrz.MicroVersion{ .m1, .m2, .m3, .m4 };
+    const versions = [_]zymbol.MicroVersion{ .m1, .m2, .m3, .m4 };
     const version = versions[smith.value(u8) % versions.len];
-    const side = qrz.microSize(version);
-    const cell_count = qrz.requiredMicroCells(version);
+    const side = zymbol.microSize(version);
+    const cell_count = zymbol.requiredMicroCells(version);
 
-    var bits: [qrz.requiredMicroCells(.m4)]bool = undefined;
+    var bits: [zymbol.requiredMicroCells(.m4)]bool = undefined;
     for (bits[0..cell_count]) |*bit| bit.* = smith.value(bool);
 
-    var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    var cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
     var output: [64]u8 = undefined;
-    const result = qrz.decodeMicro(
+    const result = zymbol.decodeMicro(
         bits[0..cell_count],
         side,
         &cells,
@@ -301,11 +301,11 @@ fn fuzzMicroRoundTrip(_: void, smith: *std.testing.Smith) !void {
     const len = @as(usize, smith.value(u8)) % (payload.len + 1);
     for (payload[0..len]) |*byte| byte.* = smith.value(u8);
 
-    const levels = [_]qrz.EcLevel{ .l, .m, .q };
+    const levels = [_]zymbol.EcLevel{ .l, .m, .q };
     const level = levels[smith.value(u8) % levels.len];
 
-    var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
-    const symbol = qrz.encodeMicroBytes(
+    var cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
+    const symbol = zymbol.encodeMicroBytes(
         payload[0..len],
         .{
             .max_version = .m4,
@@ -320,7 +320,7 @@ fn fuzzMicroRoundTrip(_: void, smith: *std.testing.Smith) !void {
     const side: usize = symbol.size;
     const cell_count = side * side;
 
-    var bits: [qrz.requiredMicroCells(.m4)]bool = undefined;
+    var bits: [zymbol.requiredMicroCells(.m4)]bool = undefined;
     for (0..side) |y| {
         for (0..side) |x| {
             const source = if (mirrored)
@@ -332,9 +332,9 @@ fn fuzzMicroRoundTrip(_: void, smith: *std.testing.Smith) !void {
         }
     }
 
-    var decode_cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    var decode_cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
     var output: [64]u8 = undefined;
-    const result = try qrz.decodeMicro(
+    const result = try zymbol.decodeMicro(
         bits[0..cell_count],
         symbol.size,
         &decode_cells,
@@ -370,10 +370,10 @@ test "fuzz legal Micro QR mode and ECC combinations" {
 }
 
 fn fuzzMicroModes(_: void, smith: *std.testing.Smith) !void {
-    const versions = [_]qrz.MicroVersion{ .m1, .m2, .m3, .m4 };
+    const versions = [_]zymbol.MicroVersion{ .m1, .m2, .m3, .m4 };
     const version = versions[smith.value(u8) % versions.len];
 
-    const level: qrz.EcLevel = switch (version) {
+    const level: zymbol.EcLevel = switch (version) {
         .m1 => .l,
         .m2, .m3 => if (smith.value(bool)) .l else .m,
         .m4 => switch (smith.value(u8) % 3) {
@@ -401,16 +401,16 @@ fn fuzzMicroModes(_: void, smith: *std.testing.Smith) !void {
         .m3, .m4 => smith.value(u8) % 4,
     };
 
-    const segment: qrz.MicroSegment = switch (choice) {
+    const segment: zymbol.MicroSegment = switch (choice) {
         0 => .{ .numeric = numeric[0 .. 1 + @as(usize, smith.value(u8)) % numeric.len] },
         1 => .{ .alphanumeric = alpha[0 .. 1 + @as(usize, smith.value(u8)) % alpha.len] },
         2 => .{ .byte = bytes[0 .. 1 + @as(usize, smith.value(u8)) % bytes.len] },
         else => .{ .kanji = kanji[0 .. 2 + 2 * (@as(usize, smith.value(u8)) % 2)] },
     };
-    const segments = [_]qrz.MicroSegment{segment};
+    const segments = [_]zymbol.MicroSegment{segment};
 
-    var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
-    const symbol = qrz.encodeMicroSegments(
+    var cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
+    const symbol = zymbol.encodeMicroSegments(
         &segments,
         .{
             .min_version = version,
@@ -424,12 +424,12 @@ fn fuzzMicroModes(_: void, smith: *std.testing.Smith) !void {
 
     const side: usize = symbol.size;
     const cell_count = side * side;
-    var bits: [qrz.requiredMicroCells(.m4)]bool = undefined;
+    var bits: [zymbol.requiredMicroCells(.m4)]bool = undefined;
     for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
 
-    var decode_cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    var decode_cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
     var output: [64]u8 = undefined;
-    const result = try qrz.decodeMicro(
+    const result = try zymbol.decodeMicro(
         bits[0..cell_count],
         symbol.size,
         &decode_cells,
@@ -454,7 +454,7 @@ fn fuzzDecodeAnyBoundaries(_: void, smith: *std.testing.Smith) !void {
     var bits: [max_cells]bool = undefined;
     for (bits[0..cell_count]) |*bit| bit.* = smith.value(bool);
 
-    var cells: [max_cells]qrz.Cell = undefined;
+    var cells: [max_cells]zymbol.Cell = undefined;
     var scratch: [max_decode_scratch]u8 = undefined;
     var output: [4096]u8 = undefined;
 
@@ -462,7 +462,7 @@ fn fuzzDecodeAnyBoundaries(_: void, smith: *std.testing.Smith) !void {
     const scratch_len = @as(usize, smith.value(u16)) % (scratch.len + 1);
     const output_len = @as(usize, smith.value(u16)) % (output.len + 1);
 
-    const decoded = qrz.decodeAny(
+    const decoded = zymbol.decodeAny(
         bits[0..cell_count],
         side,
         cells[0..cells_len],
@@ -485,14 +485,14 @@ fn fuzzBchRecovery(_: void, smith: *std.testing.Smith) !void {
     const len = 1 + @as(usize, smith.value(u8) % payload.len);
     for (payload[0..len]) |*byte| byte.* = smith.value(u8);
 
-    const version: qrz.Version = @intCast(7 + smith.value(u8) % 34);
-    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+    const version: zymbol.Version = @intCast(7 + smith.value(u8) % 34);
+    const levels = [_]zymbol.EcLevel{ .l, .m, .q, .h };
     const level = levels[smith.value(u8) % levels.len];
     const mask: u3 = @intCast(smith.value(u8) % 8);
 
-    var cells: [max_cells]qrz.Cell = undefined;
+    var cells: [max_cells]zymbol.Cell = undefined;
     var encode_scratch: [max_encode_scratch]u8 = undefined;
-    const symbol = qrz.encodeBytes(
+    const symbol = zymbol.encodeBytes(
         payload[0..len],
         .{
             .min_version = version,
@@ -547,10 +547,10 @@ fn fuzzBchRecovery(_: void, smith: *std.testing.Smith) !void {
         bits[version_indices[slot]] = !bits[version_indices[slot]];
     }
 
-    var decode_cells: [max_cells]qrz.Cell = undefined;
+    var decode_cells: [max_cells]zymbol.Cell = undefined;
     var decode_scratch: [max_decode_scratch]u8 = undefined;
     var output: [4096]u8 = undefined;
-    const result = try qrz.decode(
+    const result = try zymbol.decode(
         bits[0..cell_count],
         symbol.size,
         &decode_cells,
@@ -605,8 +605,8 @@ fn fuzzSvg(_: void, smith: *std.testing.Smith) !void {
     };
 
     const requirements = render.svgRequirements(options) catch return;
-    var cells: [qrz.requiredCells(10)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(10)]u8 = undefined;
+    var cells: [zymbol.requiredCells(10)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(10)]u8 = undefined;
     var output: [256 * 1024]u8 = undefined;
     if (requirements.output > output.len) return;
 
@@ -628,9 +628,9 @@ test "fuzz renderer undersized output boundaries" {
 }
 
 fn fuzzRendererBoundaries(_: void, smith: *std.testing.Smith) !void {
-    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
-    const symbol = qrz.encodeText(
+    var cells: [zymbol.requiredCells(4)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = zymbol.encodeText(
         "QRZ",
         .{
             .min_version = 1,
