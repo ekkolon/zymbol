@@ -271,11 +271,15 @@ pub fn build(b: *std.Build) void {
     const run_rs_benchmark = b.addRunArtifact(benchmark_rs_exe);
     run_rs_benchmark.step.dependOn(&run_benchmark.step);
 
+    const run_png_compare = b.addSystemCommand(&.{ python, "benchmarks/png_compare.py" });
+    run_png_compare.addArtifactArg(png_validation_driver);
+    run_png_compare.step.dependOn(&run_rs_benchmark.step);
+
     const benchmark_step = b.step(
         "benchmark",
         "Run the reproducible ReleaseFast v1 performance suite",
     );
-    benchmark_step.dependOn(&run_rs_benchmark.step);
+    benchmark_step.dependOn(&run_png_compare.step);
 
     const terminal_example_module = b.createModule(.{
         .root_source_file = b.path("examples/terminal.zig"),
