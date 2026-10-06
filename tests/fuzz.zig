@@ -357,3 +357,233 @@ fn fuzzMicroRoundTrip(_: void, smith: *std.testing.Smith) !void {
         png[0..8],
     );
 }
+
+
+test "fuzz decodeAny hostile sizes and caller buffers" {
+    try std.testing.fuzz({}, fuzzDecodeAnyBoundaries, .{});
+}
+
+fn fuzzDecodeAnyBoundaries(_: void, smith: *std.testing.Smith) !void {
+    const side: u16 = @intCast(smith.value(u8) % 178);
+    const requested_cells = @as(usize, side) * side;
+    const cell_count = @min(requested_cells, max_cells);
+
+    var bits: [max_cells]bool = undefined;
+    for (bits[0..cell_count]) |*bit| bit.* = smith.value(bool);
+
+    var cells: [max_cells]qrz.Cell = undefined;
+    var scratch: [max_decode_scratch]u8 = undefined;
+    var output: [4096]u8 = undefined;
+
+    const cells_len = @as(usize, smith.value(u16)) % (cells.len + 1);
+    const scratch_len = @as(usize, smith.value(u16)) % (scratch.len + 1);
+    const output_len = @as(usize, smith.value(u16)) % (output.len + 1);
+
+    const decoded = qrz.decodeAny(
+        bits[0..cell_count],
+        side,
+        cells[0..cells_len],
+        scratch[0..scratch_len],
+        output[0..output_len],
+    ) catch return;
+
+    switch (decoded) {
+        .qr => |result| try std.testing.expect(result.len <= output_len),
+        .micro_qr => |result| try std.testing.expect(result.len <= output_len),
+    }
+}
+
+test "fuzz BCH recovery within advertised radius" {
+    try std.testing.fuzz({}, fuzzBchRecovery, .{});
+}
+
+fn fuzzBchRecovery(_: void, smith: *std.testing.Smith) !void {
+    var payload: [96]u8 = undefined;
+    const len = 1 + @as(usize, smith.value(u8) % payload.len);
+    for (payload[0..len]) |*byte| byte.* = smith.value(u8);
+
+    const version: qrz.Version = @intCast(7 + smith.value(u8) % 34);
+    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+    const level = levels[smith.value(u8) % levels.len];
+    const mask: u3 = @intCast(smith.value(u8) % 8);
+
+    var cells: [max_cells]qrz.Cell = undefined;
+    var encode_scratch: [max_encode_scratch]u8 = undefined;
+    const symbol = qrz.encodeBytes(
+        payload[0..len],
+        .{
+            .min_version = version,
+            .max_version = version,
+            .ec_level = level,
+            .boost_ec_level = false,
+            .mask = mask,
+        },
+        &cells,
+        &encode_scratch,
+    ) catch return;
+
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    var bits: [max_cells]bool = undefined;
+    for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
+
+    var format_indices: [32]usize = undefined;
+    var format_len: usize = 0;
+    var version_indices: [40]usize = undefined;
+    var version_len: usize = 0;
+    for (symbol.cells[0..cell_count], 0..) |cell, index| {
+        switch (cell.kind) {
+            .format => {
+                format_indices[format_len] = index;
+                format_len += 1;
+            },
+            .version => {
+                version_indices[version_len] = index;
+                version_len += 1;
+            },
+            else => {},
+        }
+    }
+
+    const format_flips = @as(usize, smith.value(u8) % 4);
+    var used_format: [32]bool = @splat(false);
+    for (0..format_flips) |_| {
+        if (format_len == 0) break;
+        var slot = @as(usize, smith.value(u8)) % format_len;
+        while (used_format[slot]) slot = (slot + 1) % format_len;
+        used_format[slot] = true;
+        bits[format_indices[slot]] = !bits[format_indices[slot]];
+    }
+
+    const version_flips = @as(usize, smith.value(u8) % 4);
+    var used_version: [40]bool = @splat(false);
+    for (0..version_flips) |_| {
+        if (version_len == 0) break;
+        var slot = @as(usize, smith.value(u8)) % version_len;
+        while (used_version[slot]) slot = (slot + 1) % version_len;
+        used_version[slot] = true;
+        bits[version_indices[slot]] = !bits[version_indices[slot]];
+    }
+
+    var decode_cells: [max_cells]qrz.Cell = undefined;
+    var decode_scratch: [max_decode_scratch]u8 = undefined;
+    var output: [4096]u8 = undefined;
+    const result = try qrz.decode(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &decode_scratch,
+        &output,
+    );
+
+    try std.testing.expectEqualSlices(u8, payload[0..len], output[0..result.len]);
+    try std.testing.expectEqual(symbol.version, result.version);
+    try std.testing.expectEqual(symbol.ec_level, result.ec_level);
+    try std.testing.expectEqual(symbol.mask, result.mask);
+}
+
+test "fuzz SVG serialization invariants" {
+    try std.testing.fuzz({}, fuzzSvg, .{});
+}
+
+fn fuzzSvg(_: void, smith: *std.testing.Smith) !void {
+    var payload: [128]u8 = undefined;
+    const len = @as(usize, smith.value(u8)) % (payload.len + 1);
+    for (payload[0..len]) |*byte| byte.* = smith.value(u8);
+
+    const reversed = smith.value(bool);
+    const transparent = smith.value(bool);
+    const options = render.SvgEncodeOptions{
+        .encode = .{
+            .max_version = 10,
+            .ec_level = .m,
+            .boost_ec_level = smith.value(bool),
+        },
+        .render = .{
+            .quiet_zone = smith.value(u8) % 9,
+            .foreground = .{
+                .r = smith.value(u8),
+                .g = smith.value(u8),
+                .b = smith.value(u8),
+            },
+            .background = if (transparent)
+                null
+            else
+                .{
+                    .r = smith.value(u8),
+                    .g = smith.value(u8),
+                    .b = smith.value(u8),
+                },
+            .reflectance = if (reversed) .reversed else .normal,
+            .explicit_size = if (smith.value(bool))
+                1 + @as(u32, smith.value(u16))
+            else
+                null,
+        },
+    };
+
+    const requirements = render.svgRequirements(options) catch return;
+    var cells: [qrz.requiredCells(10)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(10)]u8 = undefined;
+    var output: [256 * 1024]u8 = undefined;
+    if (requirements.output > output.len) return;
+
+    const svg = render.svgBytesInto(
+        payload[0..len],
+        options,
+        cells[0..requirements.cells],
+        scratch[0..requirements.scratch],
+        output[0..requirements.output],
+    ) catch return;
+
+    try std.testing.expect(svg.len <= requirements.output);
+    try std.testing.expect(std.mem.startsWith(u8, svg, "<svg "));
+    try std.testing.expect(std.mem.endsWith(u8, svg, "</svg>"));
+}
+
+test "fuzz renderer undersized output boundaries" {
+    try std.testing.fuzz({}, fuzzRendererBoundaries, .{});
+}
+
+fn fuzzRendererBoundaries(_: void, smith: *std.testing.Smith) !void {
+    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = qrz.encodeText(
+        "QRZ",
+        .{
+            .min_version = 1,
+            .max_version = 4,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+        &scratch,
+    ) catch return;
+
+    const png_options = render.PngOptions{
+        .scale = 1 + @as(u16, smith.value(u8) % 8),
+        .quiet_zone = smith.value(u8) % 9,
+    };
+    const png_required = render.requiredPngBytes(&symbol, png_options) catch return;
+    var png_output: [128 * 1024]u8 = undefined;
+    if (png_required <= png_output.len and png_required > 0) {
+        const short_len = @as(usize, smith.value(u32)) % png_required;
+        try std.testing.expectError(
+            error.OutputTooSmall,
+            render.renderPng(&symbol, png_output[0..short_len], png_options),
+        );
+    }
+
+    const svg_options = render.SvgOptions{
+        .quiet_zone = smith.value(u8) % 9,
+    };
+    const svg_required = render.requiredSvgBytes(&symbol, svg_options) catch return;
+    var svg_output: [64 * 1024]u8 = undefined;
+    if (svg_required <= svg_output.len and svg_required > 0) {
+        const short_len = @as(usize, smith.value(u32)) % svg_required;
+        try std.testing.expectError(
+            error.OutputTooSmall,
+            render.renderSvg(&symbol, svg_output[0..short_len], svg_options),
+        );
+    }
+}
