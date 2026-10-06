@@ -157,9 +157,9 @@ fn writeSixel(writer: *std.Io.Writer) !void {
         const rows = @min(@as(usize, 6), image_side - y);
         const white_mask: u8 = (@as(u8, 1) << @intCast(rows)) - 1;
 
-        @memset(&sixel_row, 63 + white_mask);
+        @memset(sixel_row[0..], 63 + white_mask);
         try writer.writeAll("#0");
-        try writer.writeAll(&sixel_row);
+        try writer.writeAll(sixel_row[0..]);
 
         for (0..image_side) |x| {
             var bits: u8 = 0;
@@ -278,4 +278,18 @@ test "base64 encoder matches RFC vectors" {
     try std.testing.expectEqualStrings("Zg==", output[0..encodeBase64("f", &output)]);
     try std.testing.expectEqualStrings("Zm8=", output[0..encodeBase64("fo", &output)]);
     try std.testing.expectEqualStrings("Zm9v", output[0..encodeBase64("foo", &output)]);
+}
+
+
+test "SIXEL output is framed" {
+    var output: [64 * 1024]u8 = undefined;
+    var writer: std.Io.Writer = .fixed(&output);
+
+    try writeSixel(&writer);
+
+    const encoded = output[0..writer.end];
+    try std.testing.expect(std.mem.startsWith(u8, encoded, "\x1bPq"));
+    try std.testing.expect(std.mem.endsWith(u8, encoded, "\x1b\\\n"));
+    try std.testing.expect(std.mem.indexOf(u8, encoded, "#0;2;100;100;100") != null);
+    try std.testing.expect(std.mem.indexOf(u8, encoded, "#1;2;0;0;0") != null);
 }
