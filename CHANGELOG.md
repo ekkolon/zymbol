@@ -10,6 +10,7 @@
 - Added an opt-in QEMU runtime portability gate covering 32-bit little-endian x86 and 64-bit big-endian PowerPC64 execution.
 
 - Expanded coverage-guided fuzzing to raw segment parsing, Reed-Solomon correction, BCH damage, decodeAny/buffer boundaries, Micro QR legal modes, SVG, and renderer boundary cases.
+- Added checked-in fuzz seed corpora and a finite v1 sustained-fuzz criterion of 100M executions per target with deterministic replay in ordinary test runs.
 
 - Replaced PNG stored-DEFLATE output with deterministic fixed-Huffman compression and bounded LZ77 matching; added an independent PNG CRC/Adler/inflate validation gate.
 
