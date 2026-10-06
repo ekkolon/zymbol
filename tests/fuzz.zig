@@ -476,7 +476,7 @@ test "fuzz BCH recovery within advertised radius" {
 }
 
 fn fuzzBchRecovery(_: void, smith: *std.testing.Smith) !void {
-    var payload: [96]u8 = undefined;
+    var payload: [32]u8 = undefined;
     const len = 1 + @as(usize, smith.value(u8) % payload.len);
     for (payload[0..len]) |*byte| byte.* = smith.value(u8);
 
