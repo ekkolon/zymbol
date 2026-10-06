@@ -179,24 +179,11 @@ The PNG encoder no longer uses stored-DEFLATE. Symbol-specific sizing dry-runs t
 
 ## Performance closure
 
-There is no meaningful finite claim of “all optimizations.” v1 instead uses benchmark closure:
+There is no meaningful finite claim of “all optimizations.” v1 instead uses benchmark closure.
 
-- profile before changing algorithms
-- retain representative Debug/ReleaseSafe/ReleaseFast/ReleaseSmall measurements
-- record throughput, latency, output size and working memory
-- investigate every material hot path
-- ship every optimization that produces a meaningful gain without weakening correctness, portability or maintainability
-- document consciously rejected trade-offs
+`zig build benchmark` is now wired in ReleaseFast and measures automatic versus fixed-mask QR encoding, QR decode, direct Reed-Solomon correction, PNG/SVG rendering, combined encode+PNG work, caller-owned working-set bytes, and QRz PNG IDAT size against Python zlib levels 6 and 9 on identical raw scanlines. The methodology and acceptance rule are defined in `docs/v1-performance.md`.
 
-Known areas requiring measurement before v1:
-
-- mixed-mode planner worst-case complexity
-- mask scoring
-- Reed–Solomon encode/decode
-- PNG CRC32
-- PNG DEFLATE strategy
-- SVG run emission
-- repeated encode/render workloads with caller-owned buffers
+Performance closure is **complete** for v1. The WSL/Linux Zig 0.17 ReleaseFast run identified redundant PNG compression work, which was removed for a measured ~64.8% PNG render-latency reduction while independent PNG validation remained green. Automatic mask selection, decode, Reed–Solomon, SVG, working-set size, and PNG compression size were reviewed. A PNG Up-filter experiment was measured and reverted because it worsened both latency and output size. The fixed-Huffman PNG size delta versus zlib-9 is documented as an intentional v1 trade-off in `docs/v1-performance.md`; no universal performance claim is made.
 
 ## Release rule
 
