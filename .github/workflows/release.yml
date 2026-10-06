@@ -1,6 +1,12 @@
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release version to validate
+        required: true
+        default: v1.0.0
   push:
     tags:
       - "v*.*.*"
@@ -13,6 +19,7 @@ jobs:
     if: ${{ github.event.repository.private == false }}
     name: Validate and publish
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -21,30 +28,47 @@ jobs:
           persist-credentials: false
 
       - name: Install Zig
+        uses: ./.github/actions/setup-zig
+        with:
+          version: 0.17.0
+
+      - name: Resolve release tag
         shell: bash
         run: |
-          set -euo pipefail
-          version="0.17.0"
-          sha256="1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026"
-          archive="zig-x86_64-linux-${version}.tar.xz"
-          curl --fail --location --silent --show-error             --output "$archive"             "https://ziglang.org/download/${version}/${archive}"
-          echo "${sha256}  ${archive}" | sha256sum --check -
-          tar -xJf "$archive"
-          echo "$PWD/zig-x86_64-linux-${version}" >> "$GITHUB_PATH"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            echo "RELEASE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_TAG=${{ inputs.tag }}" >> "$GITHUB_ENV"
+          fi
 
       - name: Validate release metadata
-        run: python3 tools/release.py "${GITHUB_REF_NAME}" --notes-out release-notes.md
-
-      - name: Install QEMU
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes qemu-user python3-venv
+        run: python3 tools/release.py "$RELEASE_TAG" --notes-out release-notes.md
 
       - name: Format
         run: zig fmt --check build.zig src tests examples benchmarks
 
       - name: Check API docs
         run: python3 tools/check_api_docs.py
+
+      - name: Consumer smoke
+        working-directory: tests/consumer
+        run: zig build test
+
+      - name: Remote package smoke
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            ref="refs/tags/$RELEASE_TAG"
+          else
+            ref="$GITHUB_SHA"
+          fi
+          python3 tools/package_smoke.py \
+            "https://github.com/$GITHUB_REPOSITORY/archive/$ref.tar.gz"
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes qemu-user python3-venv
 
       - name: Qualify
         run: zig build qualify
@@ -58,14 +82,6 @@ jobs:
       - name: Validate SVG
         run: zig build svg-validate
 
-      - name: Consumer smoke
-        working-directory: tests/consumer
-        run: zig build test
-
-      - name: Remote package smoke
-        run: |
-          python3 tools/package_smoke.py "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
-
       - name: ZXing interoperability
         run: |
           python3 -m venv .venv
@@ -73,10 +89,11 @@ jobs:
           zig build interop -Dpython=.venv/bin/python
 
       - name: Publish GitHub Release
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
+          gh release create "$RELEASE_TAG" \
             --verify-tag \
-            --title "${GITHUB_REF_NAME}" \
+            --title "$RELEASE_TAG" \
             --notes-file release-notes.md
