@@ -232,3 +232,56 @@ test "owned helpers encode PNG and SVG from text" {
     defer svg_image.deinit();
     try std.testing.expect(std.mem.startsWith(u8, svg_image.bytes, "<svg "));
 }
+
+
+test "buffer requirements cover allocation-free helpers" {
+    const png_options = PngEncodeOptions{
+        .encode = .{
+            .min_version = 1,
+            .max_version = 4,
+            .ec_level = .q,
+        },
+        .render = .{ .scale = 2 },
+    };
+    const png_required = try pngRequirements(png_options);
+
+    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
+    var png_output: [16 * 1024]u8 = undefined;
+
+    try std.testing.expectEqual(cells.len, png_required.cells);
+    try std.testing.expectEqual(scratch.len, png_required.scratch);
+    try std.testing.expect(png_required.output <= png_output.len);
+
+    const png_bytes = try pngTextInto(
+        "QRZ",
+        png_options,
+        &cells,
+        &scratch,
+        png_output[0..png_required.output],
+    );
+    try std.testing.expect(png_bytes.len <= png_required.output);
+
+    const svg_options = SvgEncodeOptions{
+        .encode = .{
+            .min_version = 1,
+            .max_version = 4,
+            .ec_level = .q,
+        },
+    };
+    const svg_required = try svgRequirements(svg_options);
+    var svg_output: [128 * 1024]u8 = undefined;
+
+    try std.testing.expectEqual(cells.len, svg_required.cells);
+    try std.testing.expectEqual(scratch.len, svg_required.scratch);
+    try std.testing.expect(svg_required.output <= svg_output.len);
+
+    const svg_bytes = try svgTextInto(
+        "QRZ",
+        svg_options,
+        &cells,
+        &scratch,
+        svg_output[0..svg_required.output],
+    );
+    try std.testing.expect(svg_bytes.len <= svg_required.output);
+}
