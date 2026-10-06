@@ -4,9 +4,12 @@ const qrz = @import("qrz");
 pub const Error = error{
     InvalidSymbol,
     InvalidVersion,
+    InvalidSize,
     OutputTooSmall,
     SizeOverflow,
 };
+
+pub const WriteError = Error || std.Io.Writer.Error;
 
 pub const Rgb = struct {
     r: u8,
@@ -21,13 +24,14 @@ pub const Options = struct {
     quiet_zone: u16 = 4,
     foreground: Rgb = Rgb.black,
     background: ?Rgb = Rgb.white,
+    explicit_size: ?u32 = null,
 };
 
-const Sink = struct {
+const BufferSink = struct {
     buffer: ?[]u8,
     position: usize = 0,
 
-    fn write(self: *Sink, bytes: []const u8) Error!void {
+    fn write(self: *BufferSink, bytes: []const u8) Error!void {
         if (bytes.len > std.math.maxInt(usize) - self.position) {
             return Error.SizeOverflow;
         }
@@ -39,38 +43,46 @@ const Sink = struct {
         }
         self.position = end;
     }
+};
 
-    fn writeUnsigned(self: *Sink, value: usize) Error!void {
-        var scratch: [20]u8 = undefined;
-        var index = scratch.len;
-        var remaining = value;
+const WriterSink = struct {
+    writer: *std.Io.Writer,
 
-        if (remaining == 0) {
-            try self.write("0");
-            return;
-        }
-
-        while (remaining != 0) {
-            index -= 1;
-            scratch[index] = '0' + @as(u8, @intCast(remaining % 10));
-            remaining /= 10;
-        }
-        try self.write(scratch[index..]);
-    }
-
-    fn writeColor(self: *Sink, color: Rgb) Error!void {
-        const hex = "0123456789ABCDEF";
-        const bytes = [_]u8{
-            hex[color.r >> 4],
-            hex[color.r & 0x0F],
-            hex[color.g >> 4],
-            hex[color.g & 0x0F],
-            hex[color.b >> 4],
-            hex[color.b & 0x0F],
-        };
-        try self.write(&bytes);
+    fn write(self: *WriterSink, bytes: []const u8) std.Io.Writer.Error!void {
+        try self.writer.writeAll(bytes);
     }
 };
+
+fn writeUnsigned(sink: anytype, value: usize) !void {
+    var scratch: [20]u8 = undefined;
+    var index = scratch.len;
+    var remaining = value;
+
+    if (remaining == 0) {
+        try sink.write("0");
+        return;
+    }
+
+    while (remaining != 0) {
+        index -= 1;
+        scratch[index] = '0' + @as(u8, @intCast(remaining % 10));
+        remaining /= 10;
+    }
+    try sink.write(scratch[index..]);
+}
+
+fn writeColor(sink: anytype, color: Rgb) !void {
+    const hex = "0123456789ABCDEF";
+    const bytes = [_]u8{
+        hex[color.r >> 4],
+        hex[color.r & 0x0F],
+        hex[color.g >> 4],
+        hex[color.g & 0x0F],
+        hex[color.b >> 4],
+        hex[color.b & 0x0F],
+    };
+    try sink.write(&bytes);
+}
 
 fn validateSymbol(symbol: *const qrz.Symbol) Error!void {
     if (!qrz.isValidVersion(symbol.version)) return Error.InvalidSymbol;
@@ -78,33 +90,42 @@ fn validateSymbol(symbol: *const qrz.Symbol) Error!void {
     if (symbol.cells.len < qrz.requiredCells(symbol.version)) return Error.InvalidSymbol;
 }
 
-fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
+fn emit(symbol: *const qrz.Symbol, options: Options, sink: anytype) !void {
     try validateSymbol(symbol);
 
     const side = @as(usize, symbol.size) + @as(usize, options.quiet_zone) * 2;
+    if (options.explicit_size) |size| {
+        if (size == 0) return Error.InvalidSize;
+    }
 
     try sink.write("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ");
-    try sink.writeUnsigned(side);
+    try writeUnsigned(sink, side);
     try sink.write(" ");
-    try sink.writeUnsigned(side);
-    try sink.write("\" width=\"");
-    try sink.writeUnsigned(side);
-    try sink.write("\" height=\"");
-    try sink.writeUnsigned(side);
-    try sink.write("\" shape-rendering=\"crispEdges\">");
+    try writeUnsigned(sink, side);
+    try sink.write("\" preserveAspectRatio=\"xMidYMid meet\"");
+
+    if (options.explicit_size) |size| {
+        try sink.write(" width=\"");
+        try writeUnsigned(sink, size);
+        try sink.write("\" height=\"");
+        try writeUnsigned(sink, size);
+        try sink.write("\"");
+    }
+
+    try sink.write(" shape-rendering=\"crispEdges\">");
 
     if (options.background) |background| {
         try sink.write("<path fill=\"#");
-        try sink.writeColor(background);
+        try writeColor(sink, background);
         try sink.write("\" d=\"M0 0H");
-        try sink.writeUnsigned(side);
+        try writeUnsigned(sink, side);
         try sink.write("V");
-        try sink.writeUnsigned(side);
+        try writeUnsigned(sink, side);
         try sink.write("H0Z\"/>");
     }
 
     try sink.write("<path fill=\"#");
-    try sink.writeColor(options.foreground);
+    try writeColor(sink, options.foreground);
     try sink.write("\" d=\"");
 
     const modules: usize = symbol.size;
@@ -131,15 +152,15 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
             const bottom = top + 1;
 
             try sink.write("M");
-            try sink.writeUnsigned(left);
+            try writeUnsigned(sink, left);
             try sink.write(" ");
-            try sink.writeUnsigned(top);
+            try writeUnsigned(sink, top);
             try sink.write("H");
-            try sink.writeUnsigned(right);
+            try writeUnsigned(sink, right);
             try sink.write("V");
-            try sink.writeUnsigned(bottom);
+            try writeUnsigned(sink, bottom);
             try sink.write("H");
-            try sink.writeUnsigned(left);
+            try writeUnsigned(sink, left);
             try sink.write("Z");
         }
     }
@@ -156,6 +177,9 @@ fn decimalDigits(value: usize) usize {
 
 pub fn maxBytesForVersion(version: qrz.Version, options: Options) Error!usize {
     if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
+    if (options.explicit_size) |size| {
+        if (size == 0) return Error.InvalidSize;
+    }
 
     const modules: usize = qrz.size(version);
     const quiet = @as(usize, options.quiet_zone) * 2;
@@ -179,7 +203,7 @@ pub fn maxBytesForVersion(version: qrz.Version, options: Options) Error!usize {
 }
 
 pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
-    var sink = Sink{ .buffer = null };
+    var sink = BufferSink{ .buffer = null };
     try emit(symbol, options, &sink);
     return sink.position;
 }
@@ -189,9 +213,18 @@ pub fn render(
     output: []u8,
     options: Options,
 ) Error![]const u8 {
-    var sink = Sink{ .buffer = output };
+    var sink = BufferSink{ .buffer = output };
     try emit(symbol, options, &sink);
     return output[0..sink.position];
+}
+
+pub fn write(
+    symbol: *const qrz.Symbol,
+    writer: *std.Io.Writer,
+    options: Options,
+) WriteError!void {
+    var sink = WriterSink{ .writer = writer };
+    try emit(symbol, options, &sink);
 }
 
 fn testSymbol(cells: *[qrz.requiredCells(1)]qrz.Cell) qrz.Symbol {
@@ -214,7 +247,7 @@ test "SVG size query exactly matches rendered bytes" {
     var symbol = testSymbol(&cells);
 
     const expected =
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 23 23\" width=\"23\" height=\"23\" shape-rendering=\"crispEdges\">" ++
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 23 23\" preserveAspectRatio=\"xMidYMid meet\" shape-rendering=\"crispEdges\">" ++
         "<path fill=\"#FFFFFF\" d=\"M0 0H23V23H0Z\"/>" ++
         "<path fill=\"#000000\" d=\"M1 1H2V2H1ZM2 2H3V3H2Z\"/></svg>";
 
@@ -239,6 +272,54 @@ test "SVG can render with transparent background" {
 
     try std.testing.expect(std.mem.indexOf(u8, rendered, "#FFFFFF") == null);
     try std.testing.expect(std.mem.indexOf(u8, rendered, "#000000") != null);
+}
+
+test "SVG explicit size stays square and centered" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
+
+    var output: [512]u8 = undefined;
+    const rendered = try render(
+        &symbol,
+        &output,
+        .{ .quiet_zone = 1, .explicit_size = 256 },
+    );
+
+    try std.testing.expect(std.mem.indexOf(
+        u8,
+        rendered,
+        "preserveAspectRatio=\"xMidYMid meet\"",
+    ) != null);
+    try std.testing.expect(std.mem.indexOf(
+        u8,
+        rendered,
+        "width=\"256\" height=\"256\"",
+    ) != null);
+}
+
+test "SVG writes directly to std Io Writer" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
+
+    var expected_buffer: [512]u8 = undefined;
+    const expected = try render(&symbol, &expected_buffer, .{ .quiet_zone = 1 });
+
+    var output: [512]u8 = undefined;
+    var writer: std.Io.Writer = .fixed(&output);
+    try write(&symbol, &writer, .{ .quiet_zone = 1 });
+
+    try std.testing.expectEqualStrings(expected, output[0..writer.end]);
+}
+
+test "SVG rejects zero explicit size" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
+    var output: [512]u8 = undefined;
+
+    try std.testing.expectError(
+        Error.InvalidSize,
+        render(&symbol, &output, .{ .explicit_size = 0 }),
+    );
 }
 
 test "SVG rejects malformed symbols and undersized output" {
