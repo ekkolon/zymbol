@@ -1637,7 +1637,7 @@ test "Micro mask 10 matrix matches independent reference" {
     }
 }
 
-fn bitsFromRows(comptime rows: []const []const u8) [17 * 17]bool {
+fn bitsFromRows(rows: []const []const u8) [17 * 17]bool {
     var bits: [17 * 17]bool = @splat(false);
     var y: usize = 0;
     while (y < rows.len) : (y += 1) {
