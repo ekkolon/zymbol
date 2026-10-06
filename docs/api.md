@@ -103,11 +103,36 @@ thresholding, finder detection, and perspective correction are outside QRz.
 ### Micro QR
 
 ```zig
-qrz.encodeMicroText(...)
-qrz.encodeMicroBytes(...)
-qrz.encodeMicroKanji(...)
-qrz.encodeMicroSegments(...)
-qrz.decodeMicro(...)
+qrz.encodeMicroText(
+    text: []const u8,
+    options: qrz.MicroEncodeOptions,
+    cells: []qrz.Cell,
+) qrz.MicroError!qrz.Symbol
+
+qrz.encodeMicroBytes(
+    data: []const u8,
+    options: qrz.MicroEncodeOptions,
+    cells: []qrz.Cell,
+) qrz.MicroError!qrz.Symbol
+
+qrz.encodeMicroKanji(
+    sjis: []const u8,
+    options: qrz.MicroEncodeOptions,
+    cells: []qrz.Cell,
+) qrz.MicroError!qrz.Symbol
+
+qrz.encodeMicroSegments(
+    segments: []const qrz.MicroSegment,
+    options: qrz.MicroEncodeOptions,
+    cells: []qrz.Cell,
+) qrz.MicroError!qrz.Symbol
+
+qrz.decodeMicro(
+    bits: []const bool,
+    side: u16,
+    cells: []qrz.Cell,
+    out: []u8,
+) qrz.MicroError!qrz.MicroDecodeResult
 ```
 
 `MicroVersion` is `.m1`, `.m2`, `.m3`, or `.m4`.
@@ -168,6 +193,13 @@ Invalid QR versions return zero from the public QR sizing helpers.
 error-correction level, and mask. Its public methods are `contains`, `isDark`,
 `kindAt`, `setData`, and `set`. `setData` rejects function modules;
 `set` is a raw bounded mutation.
+
+`Cell` is exactly one byte. `dark` and `kind` carry its semantics. `_reserved`
+must be left at its default zero value; it has no user-visible meaning.
+
+`BitWriter` should be constructed with `BitWriter.init` and manipulated through
+its methods. Its `bytes` and `bit_len` fields are visible because Zig struct
+fields are visible, but direct cursor mutation is not a supported usage pattern.
 
 ### Exported names
 
