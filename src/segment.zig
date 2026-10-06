@@ -490,3 +490,54 @@ test "ECI supports all standard assignment widths" {
 }
 
 
+
+
+test "structured append header encodes index count and parity" {
+    var buf: [3]u8 = undefined;
+    var writer = bitstream.Writer.init(&buf);
+    try appendStructuredAppend(&writer, .{ .index = 2, .count = 4, .parity = 0xA5 });
+
+    var reader = bitstream.Reader.init(writer.filled());
+    try std.testing.expectEqual(@as(u32, 0b0011), try reader.read(4));
+    try std.testing.expectEqual(@as(u32, 2), try reader.read(4));
+    try std.testing.expectEqual(@as(u32, 3), try reader.read(4));
+    try std.testing.expectEqual(@as(u32, 0xA5), try reader.read(8));
+}
+
+test "FNC1 headers encode both standard positions" {
+    var first_buf: [1]u8 = undefined;
+    var first = bitstream.Writer.init(&first_buf);
+    try appendFnc1(&first, .first_position);
+    var first_reader = bitstream.Reader.init(first.filled());
+    try std.testing.expectEqual(@as(u32, 0b0101), try first_reader.read(4));
+
+    var second_buf: [2]u8 = undefined;
+    var second = bitstream.Writer.init(&second_buf);
+    try appendFnc1(&second, .{ .second_position = .{ .letter = 'A' } });
+    var second_reader = bitstream.Reader.init(second.filled());
+    try std.testing.expectEqual(@as(u32, 0b1001), try second_reader.read(4));
+    try std.testing.expectEqual(@as(u32, 165), try second_reader.read(8));
+}
+
+test "structured append parity XORs original bytes" {
+    try std.testing.expectEqual(
+        @as(u8, 0x04),
+        structuredAppendParity(&.{ 0x31, 0x32, 0x33, 0x34 }),
+    );
+}
+
+test "invalid ISO control metadata is rejected" {
+    var buf: [4]u8 = undefined;
+
+    var structured = bitstream.Writer.init(&buf);
+    try std.testing.expectError(
+        Error.InvalidStructuredAppend,
+        appendStructuredAppend(&structured, .{ .index = 4, .count = 4, .parity = 0 }),
+    );
+
+    var fnc1 = bitstream.Writer.init(&buf);
+    try std.testing.expectError(
+        Error.InvalidApplicationIndicator,
+        appendFnc1(&fnc1, .{ .second_position = .{ .letter = '!' } }),
+    );
+}
