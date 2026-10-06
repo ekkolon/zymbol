@@ -242,14 +242,14 @@ fn segmentBits(version: Version, mode: Mode, count: usize) usize {
 fn plan(version: Version, data: []const u8, trace: ?*[max_input_len + 1]Trace) ?usize {
     if (data.len > max_input_len) return null;
 
-    const unreachable = std.math.maxInt(u16);
-    var costs: [max_input_len + 1]u16 = @splat(unreachable);
+    const unreachable_cost = std.math.maxInt(u16);
+    var costs: [max_input_len + 1]u16 = @splat(unreachable_cost);
     costs[0] = 0;
 
     const modes = [_]Mode{ .numeric, .alphanumeric, .byte };
     var start: usize = 0;
     while (start < data.len) : (start += 1) {
-        if (costs[start] == unreachable) continue;
+        if (costs[start] == unreachable_cost) continue;
 
         for (modes) |mode| {
             if (!modeAllowed(version, mode)) continue;
@@ -273,7 +273,7 @@ fn plan(version: Version, data: []const u8, trace: ?*[max_input_len + 1]Trace) ?
         }
     }
 
-    if (costs[data.len] == unreachable) return null;
+    if (costs[data.len] == unreachable_cost) return null;
     return costs[data.len];
 }
 
