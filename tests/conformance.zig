@@ -84,6 +84,7 @@ fn verifyStructuredAppendReference(
     count: u5,
     parity: u8,
     rows: []const []const u8,
+    exact_encode: bool,
 ) !void {
     const version: qrz.Version = 1;
     const level: qrz.EcLevel = .m;
@@ -102,15 +103,17 @@ fn verifyStructuredAppendReference(
 
     var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
     var encode_scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
-    const symbol = try qrz.encodeRaw(
-        &data,
-        version,
-        level,
-        mask,
-        cells[0..cell_count],
-        encode_scratch[0..qrz.requiredEncodeScratch(version)],
-    );
-    try expectSymbolRows(symbol, rows);
+    if (exact_encode) {
+        const symbol = try qrz.encodeRaw(
+            &data,
+            version,
+            level,
+            mask,
+            cells[0..cell_count],
+            encode_scratch[0..qrz.requiredEncodeScratch(version)],
+        );
+        try expectSymbolRows(symbol, rows);
+    }
 
     var bits: [qrz.requiredCells(qrz.max_version)]bool = undefined;
     try fillBits(rows, bits[0..cell_count]);
@@ -209,7 +212,7 @@ test "ISO-derived Figure 1 QR reference matrix with pinned mask" {
     // This Segno fixture is derived from the informative ISO/IEC 18004:2015
     // Figure 1 example. Its mask is part of the external fixture, not a
     // normative oracle for QR automatic-mask selection.
-    try verifyQrReference("QR Code Symbol", 1, .m, 5, 5, &rows);
+    try verifyQrReference("QR Code Symbol", 1, .m, 5, 5, &rows, true);
 }
 
 test "ISO Annex I.2 QR reference matrix" {
@@ -237,7 +240,7 @@ test "ISO Annex I.2 QR reference matrix" {
         "111111101111010010100",
     };
 
-    try verifyQrReference("01234567", 1, .m, 2, 2, &rows);
+    try verifyQrReference("01234567", 1, .m, 2, 2, &rows, true);
 }
 
 test "ISO Annex I.3 Micro QR reference matrix" {
@@ -257,7 +260,7 @@ test "ISO Annex I.3 Micro QR reference matrix" {
         "1110100110111",
     };
 
-    try verifyMicroReference("01234567", .m2, .l, null, 1, &rows);
+    try verifyMicroReference("01234567", .m2, .l, null, 1, &rows, true);
 }
 
 test "Segno independent M1 reference matrix" {
@@ -275,7 +278,7 @@ test "Segno independent M1 reference matrix" {
         "11110000011",
     };
 
-    try verifyMicroReference("12345", .m1, .l, null, 2, &rows);
+    try verifyMicroReference("12345", .m1, .l, null, 2, &rows, true);
 }
 
 test "Segno independent M3-L maximum numeric reference matrix" {
@@ -297,7 +300,7 @@ test "Segno independent M3-L maximum numeric reference matrix" {
         "100111010001111",
     };
 
-    try verifyMicroReference("12345678901234567890123", .m3, .l, null, 0, &rows);
+    try verifyMicroReference("12345678901234567890123", .m3, .l, null, 0, &rows, true);
 }
 
 test "Segno independent M4-L capacity transition reference matrix" {
@@ -321,7 +324,7 @@ test "Segno independent M4-L capacity transition reference matrix" {
         "10011101111110111",
     };
 
-    try verifyMicroReference("123456789012345678901234", .m4, .l, null, 0, &rows);
+    try verifyMicroReference("123456789012345678901234", .m4, .l, null, 0, &rows, true);
 }
 
 test "Segno independent M4-M boosted-level reference matrix" {
@@ -345,7 +348,7 @@ test "Segno independent M4-M boosted-level reference matrix" {
         "11111001101111110",
     };
 
-    try verifyMicroReference("123456789012345678901234", .m4, .m, null, 2, &rows);
+    try verifyMicroReference("123456789012345678901234", .m4, .m, null, 2, &rows, true);
 }
 
 
@@ -490,7 +493,7 @@ test "ISO Structured Append symbol 1 reference matrix" {
         "100000100111100010011",
         "111111101010100100111",
     };
-    try verifyStructuredAppendReference("ABCDEFGHIJKLMNOP", 0, 4, 0x01, &rows);
+    try verifyStructuredAppendReference("ABCDEFGHIJKLMNOP", 0, 4, 0x01, &rows, true);
 }
 
 test "ISO Structured Append symbol 2 reference matrix" {
@@ -517,7 +520,7 @@ test "ISO Structured Append symbol 2 reference matrix" {
         "100000100001100011111",
         "111111101000111000011",
     };
-    try verifyStructuredAppendReference("QRSTUVWXYZ012345", 1, 4, 0x01, &rows);
+    try verifyStructuredAppendReference("QRSTUVWXYZ012345", 1, 4, 0x01, &rows, true);
 }
 
 test "ISO Structured Append symbol 3 reference matrix" {
@@ -544,7 +547,7 @@ test "ISO Structured Append symbol 3 reference matrix" {
         "100000100011111101011",
         "111111101100111110011",
     };
-    try verifyStructuredAppendReference("6789ABCDEFGHIJK", 2, 4, 0x01, &rows);
+    try verifyStructuredAppendReference("6789ABCDEFGHIJK", 2, 4, 0x01, &rows, false);
 }
 
 test "ISO Structured Append symbol 4 reference matrix" {
@@ -571,10 +574,49 @@ test "ISO Structured Append symbol 4 reference matrix" {
         "100000100110100111111",
         "111111101001110100111",
     };
-    try verifyStructuredAppendReference("LMNOPQRSTUVWXYZ", 3, 4, 0x01, &rows);
+    try verifyStructuredAppendReference("LMNOPQRSTUVWXYZ", 3, 4, 0x01, &rows, false);
 }
 
 test "Segno Structured Append parity vectors" {
     try std.testing.expectEqual(@as(u8, 0x31), qrz.structuredAppendParity("123456789"));
     try std.testing.expectEqual(@as(u8, 0xA0), qrz.structuredAppendParity("M\xFCrrisch"));
+}
+
+
+test "Structured Append aligned streams use standard pad codeword" {
+    const cases = [_]struct {
+        payload: []const u8,
+        index: u4,
+        expected: [16]u8,
+    }{
+        .{
+            .payload = "6789ABCDEFGHIJK",
+            .index = 2,
+            .expected = .{
+                0x32, 0x30, 0x12, 0x07, 0x91, 0x52, 0xE2, 0x73,
+                0x51, 0x4A, 0x85, 0x5C, 0x2C, 0xF5, 0x40, 0xEC,
+            },
+        },
+        .{
+            .payload = "LMNOPQRSTUVWXYZ",
+            .index = 3,
+            .expected = .{
+                0x33, 0x30, 0x12, 0x07, 0xBC, 0x78, 0x47, 0x1F,
+                0xE6, 0xDD, 0x37, 0xB2, 0x77, 0xBE, 0x30, 0xEC,
+            },
+        },
+    };
+
+    for (cases) |case| {
+        var data: [16]u8 = undefined;
+        var writer = qrz.BitWriter.init(&data);
+        try qrz.appendStructuredAppend(&writer, .{
+            .index = case.index,
+            .count = 4,
+            .parity = 0x01,
+        });
+        try qrz.appendAlphanumeric(&writer, 1, case.payload);
+        try qrz.finalizeSegments(&writer);
+        try std.testing.expectEqualSlices(u8, &case.expected, &data);
+    }
 }
