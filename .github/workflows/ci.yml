@@ -78,6 +78,12 @@ jobs:
         working-directory: tests/consumer
         run: zig build test
 
+      - name: Remote package smoke
+        shell: bash
+        run: |
+          python3 tools/package_smoke.py \
+            "https://github.com/$GITHUB_REPOSITORY/archive/$GITHUB_SHA.tar.gz"
+
   host:
     needs:
       - preflight
