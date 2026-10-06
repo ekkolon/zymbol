@@ -18,6 +18,12 @@ pub fn main(init: std.process.Init) !void {
 
     const protocol = detectProtocol(init.environ_map);
     std.log.info("terminal image protocol: {s}", .{@tagName(protocol)});
+    if (isVsCode(init.environ_map)) {
+        std.log.info(
+            "VS Code requires terminal.integrated.enableImages=true for inline images",
+            .{},
+        );
+    }
 
     switch (protocol) {
         .kitty => {
@@ -64,6 +70,17 @@ pub fn main(init: std.process.Init) !void {
     try stdout.flush();
 }
 
+fn isVsCode(environ_map: anytype) bool {
+    for (environ_map.keys(), environ_map.values()) |key, value| {
+        if (std.mem.eql(u8, key, "TERM_PROGRAM") and
+            std.mem.eql(u8, value, "vscode"))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 fn detectProtocol(environ_map: anytype) Protocol {
     var term: ?[]const u8 = null;
     var term_program: ?[]const u8 = null;
@@ -99,7 +116,7 @@ fn detectProtocol(environ_map: anytype) Protocol {
         {
             return .iterm2;
         }
-        if (std.mem.eql(u8, program, "vscode")) return .sixel;
+        if (std.mem.eql(u8, program, "vscode")) return .iterm2;
     }
 
     if (has_mintty) return .iterm2;
