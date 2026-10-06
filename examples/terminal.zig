@@ -16,7 +16,7 @@ pub fn main(init: std.process.Init) !void {
     var stdout_writer = std.Io.File.stdout().writer(init.io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    switch (try detectProtocol(init.gpa)) {
+    switch (detectProtocol(init.environ_map)) {
         .kitty => {
             var image = try render.pngText(
                 init.gpa,
@@ -61,27 +61,39 @@ pub fn main(init: std.process.Init) !void {
     try stdout.flush();
 }
 
-fn detectProtocol(allocator: std.mem.Allocator) !Protocol {
-    var env = try std.process.getEnvMap(allocator);
-    defer env.deinit();
+fn detectProtocol(environ_map: anytype) Protocol {
+    var term: ?[]const u8 = null;
+    var term_program: ?[]const u8 = null;
+    var has_kitty_window = false;
+    var has_windows_terminal = false;
 
-    if (env.get("KITTY_WINDOW_ID") != null) return .kitty;
-
-    if (env.get("TERM")) |term| {
-        if (std.mem.eql(u8, term, "xterm-kitty")) return .kitty;
+    for (environ_map.keys(), environ_map.values()) |key, value| {
+        if (std.mem.eql(u8, key, "KITTY_WINDOW_ID")) {
+            has_kitty_window = true;
+        } else if (std.mem.eql(u8, key, "WT_SESSION")) {
+            has_windows_terminal = true;
+        } else if (std.mem.eql(u8, key, "TERM")) {
+            term = value;
+        } else if (std.mem.eql(u8, key, "TERM_PROGRAM")) {
+            term_program = value;
+        }
     }
 
-    if (env.get("TERM_PROGRAM")) |program| {
+    if (has_kitty_window) return .kitty;
+    if (term) |value| {
+        if (std.mem.eql(u8, value, "xterm-kitty")) return .kitty;
+    }
+
+    if (term_program) |program| {
         if (std.mem.eql(u8, program, "iTerm.app") or
-            std.mem.eql(u8, program, "vscode") or
             std.mem.eql(u8, program, "WezTerm"))
         {
             return .iterm2;
         }
+        if (std.mem.eql(u8, program, "vscode")) return .sixel;
     }
 
-    if (env.get("WT_SESSION") != null) return .sixel;
-
+    if (has_windows_terminal) return .sixel;
     return .none;
 }
 
