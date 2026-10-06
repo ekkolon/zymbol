@@ -2,7 +2,7 @@
 
 QR Code Model 2 encoding and decoding for Zig with no runtime dependencies and no mandatory heap allocation.
 
-QRz operates on caller-owned buffers. The core library does not perform file I/O, image decoding, rasterization, or rendering.
+QRz operates on caller-owned buffers. QR semantics live in `qrz`; rendering lives in the separate `qrz_render` module. Neither module performs file I/O or depends on image codecs.
 
 ## Status
 
@@ -17,6 +17,7 @@ The current implementation covers the Model 2 symbol mechanics used by QR versio
 - UTF-8 text through ECI assignment 26 when required
 - arbitrary binary payloads
 - caller-owned module and codeword buffers
+- allocation-free raster and SVG rendering through `qrz_render`
 - `wasm32-freestanding` compilation
 
 The implementation targets the QR Code Model 2 rules in ISO/IEC 18004:2024. Structured Append and FNC1 application semantics are not part of the current high-level API.
@@ -58,6 +59,64 @@ const symbol = try qrz.encodeBytes(
 ```
 
 `encodeBytes` preserves arbitrary byte values and does not attach text-encoding semantics.
+
+## Rendering
+
+Rendering is a separate module from the QR core:
+
+```zig
+const qrz = @import("qrz");
+const render = @import("qrz_render");
+
+const version = 6;
+var cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
+var scratch: [qrz.requiredEncodeScratch(version)]u8 = undefined;
+
+const symbol = try qrz.encodeText(
+    "https://example.com",
+    .{ .max_version = version, .ec_level = .m },
+    &cells,
+    &scratch,
+);
+```
+
+For raster output, the caller chooses the pixel type and owns the buffer:
+
+```zig
+const options = render.RasterOptions{
+    .scale = 4,
+    .quiet_zone = 4,
+};
+
+const pixel_count = try render.requiredRasterPixels(&symbol, options);
+_ = pixel_count;
+
+var pixels: [512 * 512]u8 = undefined;
+const image = try render.renderRaster(
+    u8,
+    &symbol,
+    &pixels,
+    0,
+    255,
+    options,
+);
+```
+
+`renderRasterStrided` supports caller-owned images whose rows contain padding. The renderer writes only the active image width and leaves stride padding untouched.
+
+SVG output uses the same ownership model:
+
+```zig
+const required = try render.requiredSvgBytes(&symbol, .{});
+_ = required;
+
+var output: [64 * 1024]u8 = undefined;
+const svg = try render.renderSvg(&symbol, &output, .{});
+```
+
+The default quiet zone is four modules. Raster output uses integer module scaling, so module edges stay aligned to pixels. SVG output uses integer coordinates and `shape-rendering="crispEdges"`.
+
+QRz does not write files and does not encode PNG, JPEG, WebP, AVIF, or other raster file formats. Applications can pass the rendered raster buffer to the image codec or UI surface they already use.
 
 ## Decoding
 
@@ -106,6 +165,7 @@ The decoder corrects one Reed-Solomon block at a time instead of materializing e
 zig build test
 zig build wasm
 zig build example
+zig build example-svg
 zig build qualify
 ```
 
@@ -123,6 +183,7 @@ The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
 - `src/matrix.zig` — function patterns, data traversal, masks, penalty scoring
 - `src/encoder.zig` — version selection, interleaving, symbol construction
 - `src/decoder.zig` — format recovery, deinterleaving, correction, parsing
+- `src/render/` — allocation-free raster and SVG rendering
 - `src/root.zig` — public API and integration tests
 
 ## License
