@@ -227,6 +227,56 @@ pub fn build(b: *std.Build) void {
     wasm_step.dependOn(&b.addInstallArtifact(wasm_library, .{}).step);
     wasm_step.dependOn(&b.addInstallArtifact(wasm_render_library, .{}).step);
 
+    const benchmark_core_module = b.createModule(.{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = .ReleaseFast,
+    });
+    const benchmark_render_module = b.createModule(.{
+        .root_source_file = b.path("src/render/root.zig"),
+        .target = target,
+        .optimize = .ReleaseFast,
+        .imports = &.{.{ .name = "qrz", .module = benchmark_core_module }},
+    });
+    const benchmark_module = b.createModule(.{
+        .root_source_file = b.path("benchmarks/benchmark.zig"),
+        .target = target,
+        .optimize = .ReleaseFast,
+        .imports = &.{
+            .{ .name = "qrz", .module = benchmark_core_module },
+            .{ .name = "qrz_render", .module = benchmark_render_module },
+        },
+    });
+    const benchmark_exe = b.addExecutable(.{
+        .name = "qrz-benchmark",
+        .root_module = benchmark_module,
+    });
+    const run_benchmark = b.addRunArtifact(benchmark_exe);
+
+    const benchmark_rs_module = b.createModule(.{
+        .root_source_file = b.path("src/reed_solomon.zig"),
+        .target = target,
+        .optimize = .ReleaseFast,
+    });
+    const benchmark_rs_root = b.createModule(.{
+        .root_source_file = b.path("benchmarks/rs_benchmark.zig"),
+        .target = target,
+        .optimize = .ReleaseFast,
+        .imports = &.{.{ .name = "qrz_rs", .module = benchmark_rs_module }},
+    });
+    const benchmark_rs_exe = b.addExecutable(.{
+        .name = "qrz-rs-benchmark",
+        .root_module = benchmark_rs_root,
+    });
+    const run_rs_benchmark = b.addRunArtifact(benchmark_rs_exe);
+    run_rs_benchmark.step.dependOn(&run_benchmark.step);
+
+    const benchmark_step = b.step(
+        "benchmark",
+        "Run the reproducible ReleaseFast v1 performance suite",
+    );
+    benchmark_step.dependOn(&run_rs_benchmark.step);
+
     const terminal_example_module = b.createModule(.{
         .root_source_file = b.path("examples/terminal.zig"),
         .target = target,
