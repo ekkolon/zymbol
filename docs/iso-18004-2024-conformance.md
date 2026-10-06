@@ -136,6 +136,8 @@ Representation assumptions that cross architecture boundaries must be compile-ti
 
 Fuzzing is part of release qualification.
 
+QRz keeps Zig 0.16.0 as its minimum supported compiler, but sustained release fuzzing is executed with Zig 0.17.0. Zig 0.16.0's built-in fuzz test runner contains an upstream stack-trace type mismatch that fails while compiling the runner itself; this does not originate in QRz fuzz targets. The ordinary test and portability gates continue to qualify the minimum compiler.
+
 Current coverage-guided targets:
 
 - arbitrary module grids into the decoder
