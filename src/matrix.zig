@@ -20,6 +20,12 @@ pub const Cell = packed struct(u8) {
     _reserved: u4 = 0,
 };
 
+comptime {
+    if (@sizeOf(Cell) != 1 or @bitSizeOf(Cell) != 8) {
+        @compileError("qrz.Cell must remain exactly one byte");
+    }
+}
+
 pub fn requiredCells(version: u6) usize {
     const s: usize = spec.size(version);
     return s * s;
