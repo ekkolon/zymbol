@@ -138,9 +138,10 @@ pub fn render(
 }
 
 fn testSymbol(cells: *[qrz.requiredCells(1)]qrz.Cell) qrz.Symbol {
-    @memset(cells, qrz.Cell{});
+    @memset(cells[0..], qrz.Cell{});
     cells[0].dark = true;
-    cells[1 * qrz.size(1) + 1].dark = true;
+    const side: usize = qrz.size(1);
+    cells[side + 1].dark = true;
 
     return .{
         .cells = cells,
