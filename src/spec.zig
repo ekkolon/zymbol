@@ -126,9 +126,67 @@ pub const Mode = enum(u4) {
     // Backing values are the literal 4-bit mode indicators from Table 2.
     numeric = 0b0001,
     alphanumeric = 0b0010,
+    structured_append = 0b0011,
     byte = 0b0100,
-    kanji = 0b1000,
+    fnc1_first_position = 0b0101,
     eci = 0b0111,
+    kanji = 0b1000,
+    fnc1_second_position = 0b1001,
+};
+
+pub const StructuredAppend = struct {
+    index: u4,
+    count: u5,
+    parity: u8,
+
+    pub fn isValid(self: StructuredAppend) bool {
+        return self.count >= 1 and self.count <= 16 and self.index < self.count;
+    }
+};
+
+pub const ApplicationIndicator = union(enum) {
+    numeric: u7,
+    letter: u8,
+
+    pub fn encoded(self: ApplicationIndicator) ?u8 {
+        return switch (self) {
+            .numeric => |value| if (value <= 99) @as(u8, @intCast(value)) else null,
+            .letter => |value| if ((value >= 'A' and value <= 'Z') or
+                (value >= 'a' and value <= 'z'))
+                value + 100
+            else
+                null,
+        };
+    }
+
+    pub fn fromEncoded(value: u8) ?ApplicationIndicator {
+        if (value <= 99) return .{ .numeric = @intCast(value) };
+        if ((value >= 165 and value <= 190) or (value >= 197 and value <= 222)) {
+            return .{ .letter = value - 100 };
+        }
+        return null;
+    }
+};
+
+pub const Fnc1 = union(enum) {
+    none,
+    first_position,
+    second_position: ApplicationIndicator,
+
+    pub fn overheadBits(self: Fnc1) usize {
+        return switch (self) {
+            .none => 0,
+            .first_position => 4,
+            .second_position => 12,
+        };
+    }
+
+    pub fn isValid(self: Fnc1) bool {
+        return switch (self) {
+            .none, .first_position => true,
+            .second_position => |indicator| indicator.encoded() != null,
+        };
+    }
 };
 
 /// Character-count field width for the mode/version band.
@@ -139,7 +197,11 @@ pub fn charCountBits(mode: Mode, version: u6) u5 {
         .alphanumeric => ([3]u5{ 9, 11, 13 })[band],
         .byte => ([3]u5{ 8, 16, 16 })[band],
         .kanji => ([3]u5{ 8, 10, 12 })[band],
-        .eci => 0,
+        .structured_append,
+        .fnc1_first_position,
+        .eci,
+        .fnc1_second_position,
+        => 0,
     };
 }
 
