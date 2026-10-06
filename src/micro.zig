@@ -37,10 +37,18 @@ pub const Options = struct {
     mask: ?u2 = null,
 };
 
+pub const Segment = union(enum) {
+    numeric: []const u8,
+    alphanumeric: []const u8,
+    byte: []const u8,
+    kanji: []const u8,
+};
+
 pub const Error = bitstream.Error || error{
     DataTooLong,
     InvalidVersionRange,
     UnsupportedEcLevel,
+    UnsupportedMode,
     InvalidCharacter,
     InvalidKanjiByte,
     OddKanjiLength,
@@ -355,6 +363,52 @@ fn appendKanji(writer: *bitstream.Writer, version: Version, sjis: []const u8) !v
     }
 }
 
+fn validateKanji(sjis: []const u8) Error!usize {
+    if ((sjis.len & 1) != 0) return Error.OddKanjiLength;
+
+    var index: usize = 0;
+    while (index < sjis.len) : (index += 2) {
+        const value = (@as(u16, sjis[index]) << 8) | sjis[index + 1];
+        if (!((value >= 0x8140 and value <= 0x9FFC) or
+            (value >= 0xE040 and value <= 0xEBBF)))
+        {
+            return Error.InvalidKanjiByte;
+        }
+    }
+    return sjis.len / 2;
+}
+
+fn segmentInfo(segment_value: Segment) Error!struct { mode: Mode, count: usize } {
+    return switch (segment_value) {
+        .numeric => |data| blk: {
+            if (!allNumeric(data)) return Error.InvalidCharacter;
+            break :blk .{ .mode = .numeric, .count = data.len };
+        },
+        .alphanumeric => |data| blk: {
+            if (!allAlphanumeric(data)) return Error.InvalidCharacter;
+            break :blk .{ .mode = .alphanumeric, .count = data.len };
+        },
+        .byte => |data| .{ .mode = .byte, .count = data.len },
+        .kanji => |data| .{
+            .mode = .kanji,
+            .count = try validateKanji(data),
+        },
+    };
+}
+
+fn appendSegment(
+    writer: *bitstream.Writer,
+    version: Version,
+    segment_value: Segment,
+) Error!void {
+    switch (segment_value) {
+        .numeric => |data| try appendNumeric(writer, version, data),
+        .alphanumeric => |data| try appendAlphanumeric(writer, version, data),
+        .byte => |data| try appendByte(writer, version, data),
+        .kanji => |data| try appendKanji(writer, version, data),
+    }
+}
+
 fn appendPlanned(
     writer: *bitstream.Writer,
     version: Version,
@@ -480,6 +534,50 @@ fn selectKanji(
     }
 
     if (!has_legal_level) return Error.UnsupportedEcLevel;
+    return Error.DataTooLong;
+}
+
+fn selectSegments(
+    segments: []const Segment,
+    options: Options,
+) Error!struct { version: Version, level: spec.EcLevel, bits: usize } {
+    try validateOptions(options);
+
+    for (segments) |segment_value| _ = try segmentInfo(segment_value);
+
+    var has_legal_level = false;
+    var has_legal_mode_set = false;
+    var number = options.min_version.number();
+    while (number <= options.max_version.number()) : (number += 1) {
+        const version = versionFromNumber(number).?;
+        const cap = capacity(version, options.ec_level) orelse continue;
+        has_legal_level = true;
+
+        var total_bits: usize = 0;
+        var modes_legal = true;
+        for (segments) |segment_value| {
+            const info = try segmentInfo(segment_value);
+            if (!modeAllowed(version, info.mode) or
+                info.count > maxCount(version, info.mode))
+            {
+                modes_legal = false;
+                break;
+            }
+            total_bits += segmentBits(version, info.mode, info.count);
+        }
+        if (!modes_legal) continue;
+        has_legal_mode_set = true;
+        if (total_bits > cap.data_bits) continue;
+
+        const level = if (options.boost_ec_level)
+            strongestLevel(version, options.ec_level, total_bits)
+        else
+            options.ec_level;
+        return .{ .version = version, .level = level, .bits = total_bits };
+    }
+
+    if (!has_legal_level) return Error.UnsupportedEcLevel;
+    if (!has_legal_mode_set) return Error.UnsupportedMode;
     return Error.DataTooLong;
 }
 
@@ -852,6 +950,31 @@ pub fn encodeKanji(
     var bytes: [max_data_codewords]u8 = @splat(0);
     var writer = bitstream.Writer.init(bytes[0..@as(usize, cap.data_codewords)]);
     try appendKanji(&writer, selected.version, sjis);
+    try finalizeData(&writer, selected.version, cap);
+
+    return buildSymbol(
+        selected.version,
+        selected.level,
+        options.mask,
+        &bytes,
+        cap,
+        cells,
+    );
+}
+
+pub fn encodeSegments(
+    segments: []const Segment,
+    options: Options,
+    cells: []matrix.Cell,
+) Error!matrix.Symbol {
+    const selected = try selectSegments(segments, options);
+    const cap = capacity(selected.version, selected.level).?;
+
+    var bytes: [max_data_codewords]u8 = @splat(0);
+    var writer = bitstream.Writer.init(bytes[0..@as(usize, cap.data_codewords)]);
+    for (segments) |segment_value| {
+        try appendSegment(&writer, selected.version, segment_value);
+    }
     try finalizeData(&writer, selected.version, cap);
 
     return buildSymbol(
@@ -1523,6 +1646,42 @@ test "M1 through M4 round trip legal modes" {
         try std.testing.expectEqual(sample.min, result.version);
         try std.testing.expectEqual(sample.level, result.ec_level);
     }
+}
+
+test "explicit Micro segments support mixed Kanji streams" {
+    const segments = [_]Segment{
+        .{ .numeric = "12" },
+        .{ .kanji = &.{ 0x93, 0x5F } },
+        .{ .alphanumeric = "AB" },
+        .{ .byte = &.{ 0xFF } },
+    };
+    const expected = [_]u8{ '1', '2', 0x93, 0x5F, 'A', 'B', 0xFF };
+
+    var cells: [max_cells]matrix.Cell = undefined;
+    const symbol = try encodeSegments(
+        &segments,
+        .{
+            .min_version = .m4,
+            .max_version = .m4,
+            .ec_level = .l,
+            .boost_ec_level = false,
+        },
+        &cells,
+    );
+
+    var bits: [max_cells]bool = undefined;
+    const count = @as(usize, symbol.size) * symbol.size;
+    for (0..count) |index| bits[index] = symbol.cells[index].dark;
+
+    var decode_cells: [max_cells]matrix.Cell = undefined;
+    var out: [32]u8 = undefined;
+    const result = try decode(
+        bits[0..count],
+        symbol.size,
+        &decode_cells,
+        &out,
+    );
+    try std.testing.expectEqualSlices(u8, &expected, out[0..result.len]);
 }
 
 test "Micro QR decoder normalizes mirror and reversed reflectance" {
