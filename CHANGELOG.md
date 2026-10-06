@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- Added isolated `qrz_render` raster and SVG rendering with caller-owned buffers and no file I/O or allocator requirement.
-- Added a dependency-free PNG integration example that keeps codec and filesystem concerns outside `qrz_render`.
+- Added isolated `qrz_render` raster rendering and built-in PNG/SVG codecs.
+- Added one-call owned PNG/SVG helpers plus allocation-free buffer APIs for WASM and freestanding targets.
 
 - Added a one-command local release qualification step covering Debug, ReleaseSafe, ReleaseFast, ReleaseSmall, and wasm32-freestanding.
 - Added the v1 public compatibility contract.
