@@ -185,12 +185,7 @@ pub fn svgBytesInto(
 }
 
 test "owned helpers encode PNG and SVG from text" {
-    var gpa = std.heap.DebugAllocator(.{}).init;
-    defer {
-        const status = gpa.deinit();
-        std.testing.expect(status == .ok) catch @panic("leaked memory");
-    }
-    const allocator = gpa.allocator();
+    const allocator = std.testing.allocator;
 
     var png_image = try pngText(allocator, "QRZ", .{
         .encode = .{ .max_version = 4 },
