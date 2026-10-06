@@ -142,25 +142,20 @@ Fuzzing is part of release qualification.
 
 QRz keeps Zig 0.16.0 as its minimum supported compiler, while sustained release fuzzing is executed with Zig 0.17.0. The fuzz test executable is explicitly compiled with the LLVM backend because affected Zig toolchains can produce an empty coverage entry-point PC list with the self-hosted backend, causing `std.Build.Fuzz` to panic before the campaign starts. This is an upstream fuzzer/toolchain failure rather than a QRz target failure. Ordinary builds and portability qualification remain free to use the default backend.
 
-Current coverage-guided targets:
+Coverage-guided targets now include:
 
-- arbitrary QR module grids into the decoder
-- arbitrary QR binary encode/decode round trips, including mirror and polarity transforms
-- FNC1 and Structured Append encode/decode semantics
+- arbitrary QR module grids and hostile `decodeAny` size/buffer combinations
+- QR binary encode/decode round trips, including mirror and polarity transforms
+- targeted format/version BCH corruption within the advertised correction radius
+- raw malformed/truncated QR segment streams, including ECI/FNC1/Structured Append parser states
+- direct Reed–Solomon correction-radius and arbitrary-block campaigns
 - arbitrary Micro QR module grids
-- Micro QR encode/decode round trips, mirror/polarity transforms and PNG rendering
-- PNG encoding options and payloads
+- Micro QR round trips plus explicit M1-M4 legal mode/EC combinations
+- PNG option/payload fuzzing including reflectance interactions
+- SVG serialization
+- renderer undersized-output boundaries
 
-Before v1 the fuzz surface expands to:
-
-- every public parser/decoder entry point
-- format/version BCH recovery
-- Reed–Solomon block correction
-- segment parsing, including malformed and truncated headers
-- ECI/FNC1/Structured Append parsing
-- direct Micro QR mode/format/ECC boundaries
-- PNG and SVG serializers
-- buffer-size boundaries and caller mistakes that remain inside the API contract
+The fuzz surface is closed for v1. Sustained release campaigns and corpus replay remain required before the release branch is cut.
 
 Every discovered crash or invariant violation becomes a permanent regression test. Release qualification must replay the accumulated corpus. Long-running fuzzing is performed separately from the bounded zig build qualify gate.
 
