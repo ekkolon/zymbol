@@ -117,11 +117,67 @@ pub fn build(b: *std.Build) void {
     const png_example_step = b.step("example-png", "Write zig-out/examples/qrz.png");
     png_example_step.dependOn(&run_png_example.step);
 
+    const portability_step = b.step(
+        "portability",
+        "Cross-compile core and renderer for the v1 architecture matrix",
+    );
+
+    const portability_targets = [_]struct {
+        name: []const u8,
+        query: std.Target.Query,
+    }{
+        .{ .name = "x86_64-windows", .query = .{ .cpu_arch = .x86_64, .os_tag = .windows } },
+        .{ .name = "x86-windows", .query = .{ .cpu_arch = .x86, .os_tag = .windows } },
+        .{ .name = "aarch64-windows", .query = .{ .cpu_arch = .aarch64, .os_tag = .windows } },
+        .{ .name = "x86_64-linux-musl", .query = .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .musl } },
+        .{ .name = "x86-linux-musl", .query = .{ .cpu_arch = .x86, .os_tag = .linux, .abi = .musl } },
+        .{ .name = "aarch64-linux-musl", .query = .{ .cpu_arch = .aarch64, .os_tag = .linux, .abi = .musl } },
+        .{ .name = "arm-linux-musleabihf", .query = .{ .cpu_arch = .arm, .os_tag = .linux, .abi = .musleabihf } },
+        .{ .name = "riscv64-linux-musl", .query = .{ .cpu_arch = .riscv64, .os_tag = .linux, .abi = .musl } },
+        .{ .name = "powerpc64-linux-musl", .query = .{ .cpu_arch = .powerpc64, .os_tag = .linux, .abi = .musl } },
+        .{ .name = "s390x-linux-gnu", .query = .{ .cpu_arch = .s390x, .os_tag = .linux, .abi = .gnu } },
+        .{ .name = "x86_64-macos", .query = .{ .cpu_arch = .x86_64, .os_tag = .macos } },
+        .{ .name = "aarch64-macos", .query = .{ .cpu_arch = .aarch64, .os_tag = .macos } },
+        .{ .name = "wasm32-freestanding", .query = .{ .cpu_arch = .wasm32, .os_tag = .freestanding } },
+        .{ .name = "arm-freestanding", .query = .{ .cpu_arch = .arm, .os_tag = .freestanding } },
+        .{ .name = "riscv32-freestanding", .query = .{ .cpu_arch = .riscv32, .os_tag = .freestanding } },
+        .{ .name = "riscv64-freestanding", .query = .{ .cpu_arch = .riscv64, .os_tag = .freestanding } },
+    };
+
+    for (portability_targets) |entry| {
+        const portability_target = b.resolveTargetQuery(entry.query);
+        const portability_core_module = b.createModule(.{
+            .root_source_file = b.path("src/root.zig"),
+            .target = portability_target,
+            .optimize = .ReleaseSafe,
+        });
+        const portability_core = b.addLibrary(.{
+            .name = b.fmt("qrz-{s}", .{entry.name}),
+            .root_module = portability_core_module,
+            .linkage = .static,
+        });
+        portability_step.dependOn(&portability_core.step);
+
+        const portability_render_module = b.createModule(.{
+            .root_source_file = b.path("src/render/root.zig"),
+            .target = portability_target,
+            .optimize = .ReleaseSafe,
+            .imports = &.{.{ .name = "qrz", .module = portability_core_module }},
+        });
+        const portability_render = b.addLibrary(.{
+            .name = b.fmt("qrz-render-{s}", .{entry.name}),
+            .root_module = portability_render_module,
+            .linkage = .static,
+        });
+        portability_step.dependOn(&portability_render.step);
+    }
+
     const qualify_step = b.step("qualify", "Run release qualification");
     qualify_step.dependOn(&terminal_example.step);
     qualify_step.dependOn(&svg_example.step);
     qualify_step.dependOn(&png_example.step);
     qualify_step.dependOn(&b.addRunArtifact(terminal_tests).step);
+    qualify_step.dependOn(portability_step);
 
     inline for ([_]std.builtin.OptimizeMode{ .Debug, .ReleaseSafe, .ReleaseFast, .ReleaseSmall }) |mode| {
         const qualification_module = b.createModule(.{
