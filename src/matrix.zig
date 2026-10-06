@@ -477,10 +477,19 @@ test "N3 finder-like penalty recognizes symbol-edge quiet region" {
         symbol.cells[x].dark = dark;
     }
 
+    // The light quiet region outside the left edge satisfies N3.
     try std.testing.expectEqual(penalty_n3, finderPenaltyLine(&symbol, 0, true));
 
-    // A dark module inside the four-module light area invalidates the match.
-    symbol.cells[7].dark = true;
+    @memset(&cells, Cell{});
+    for (pattern, 0..) |dark, offset| {
+        symbol.cells[4 + offset].dark = dark;
+    }
+    try std.testing.expectEqual(penalty_n3, finderPenaltyLine(&symbol, 0, true));
+
+    // With the core away from an edge, blocking both four-module light
+    // regions must remove the N3 match.
+    symbol.cells[0].dark = true;
+    symbol.cells[11].dark = true;
     try std.testing.expectEqual(@as(i32, 0), finderPenaltyLine(&symbol, 0, true));
 }
 
