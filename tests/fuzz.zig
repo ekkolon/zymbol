@@ -74,7 +74,23 @@ fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
         &output,
     );
 
-    try std.testing.expectEqual(payload.len, result.len);
+    if (result.len != payload.len) {
+        const prefix_len = @min(payload.len, 16);
+        std.debug.print(
+            "binary round-trip mismatch: payload_len={} decoded_len={} version={} ec={s} mask={} boost={} prefix={any}\n",
+            .{
+                payload.len,
+                result.len,
+                symbol.version,
+                @tagName(symbol.ec_level),
+                symbol.mask,
+                boost,
+                payload[0..prefix_len],
+            },
+        );
+        return error.TestUnexpectedResult;
+    }
+
     try std.testing.expectEqualSlices(u8, payload[0..len], output[0..result.len]);
     try std.testing.expectEqual(symbol.version, result.version);
     try std.testing.expectEqual(symbol.ec_level, result.ec_level);
