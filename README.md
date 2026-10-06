@@ -4,7 +4,7 @@ QR Code Model 2 and Micro QR for Zig.
 
 QRz encodes and decodes QR module grids and renders them as raster pixels, SVG, or PNG. Core encoding, decoding, and low-level rendering use caller-owned memory and do not require an allocator.
 
-> **Status:** 1.0.0 release candidate. The v1 API is being frozen. The tag will be cut after the final ISO/IEC 18004:2024 text review and sustained fuzz run.
+> **Status:** pre-1.0 release candidate. Compatibility is not guaranteed until `v1.0.0`.
 
 ## Features
 
@@ -23,7 +23,7 @@ QRz decodes already sampled module grids. Camera input, thresholding, finder det
 
 ## Requirements
 
-QRz supports Zig 0.16.0 and newer. Release fuzzing uses Zig 0.17.0.
+Zig 0.16.0 and 0.17.0 are tested. Release fuzzing uses Zig 0.17.0.
 
 ## Installation
 
@@ -48,10 +48,11 @@ const app = b.createModule(.{
     .root_source_file = b.path("src/main.zig"),
     .target = target,
     .optimize = optimize,
+    .imports = &.{
+        .{ .name = "qrz", .module = qrz_dep.module("qrz") },
+        .{ .name = "qrz_render", .module = qrz_dep.module("qrz_render") },
+    },
 });
-
-app.addImport("qrz", qrz_dep.module("qrz"));
-app.addImport("qrz_render", qrz_dep.module("qrz_render"));
 
 const exe = b.addExecutable(.{
     .name = "app",

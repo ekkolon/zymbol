@@ -25,6 +25,8 @@ type shapes. `tools/check_api_docs.py` keeps the exported-name reference in
 Run on the exact candidate commit:
 
 ```sh
+zig fmt build.zig src tests examples benchmarks
+git diff --check
 zig fmt --check build.zig src tests examples benchmarks
 python3 tools/check_api_docs.py
 
@@ -62,8 +64,9 @@ Before creating the first public release:
 4. enable GitHub Actions;
 5. enable private vulnerability reporting so `SECURITY.md` has a private
    reporting path;
-6. let the full CI workflow pass on the public repository;
-7. protect `main` and require the CI checks before merge.
+6. mark the release-candidate PR ready only after the local structural qualification passes;
+7. let the staged CI workflow pass on the public repository;
+8. protect `main` and require the CI checks before merge.
 
 Do not create `v1.0.0` merely to test the release workflow.
 
@@ -109,13 +112,14 @@ After the preceding gates pass:
    zig build conformance
    zig build qualify
    ```
-5. commit only those release-metadata changes.
+5. commit only those release-metadata changes;
+6. run the `Release` workflow manually with `tag=v1.0.0`. This is a dry run: it validates the exact release commit and its remote source archive but does not create a tag or GitHub Release.
 
 ## 6. Tag and publish
 
-Create `v1.0.0` on the exact release commit.
+Only after the manual release dry run passes, create `v1.0.0` on the exact release commit.
 
-The tag workflow must pass before the GitHub Release is created. It verifies
+The tag-triggered workflow repeats the release checks before the GitHub Release is created. It verifies
 release metadata, deterministic qualification, QEMU runtime portability,
 PNG/SVG validation, the local external-consumer fixture, ZXing-cpp
 interoperability, and a real `zig fetch --save` against the tagged GitHub

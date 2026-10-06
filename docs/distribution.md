@@ -20,17 +20,14 @@ their Zig target and optimization settings.
 zig fetch --save https://github.com/ekkolon/qrz/archive/refs/tags/v1.0.0.tar.gz
 ```
 
-Zig records the dependency URL and content hash in the consumer's
-`build.zig.zon`. The application then imports the `qrz` and/or
-`qrz_render` modules from the dependency.
+Zig records the dependency URL and content hash in the consumer's `build.zig.zon`. The package name `qrz` becomes the default dependency key. The application then imports the `qrz` and/or `qrz_render` modules from the dependency.
 
 The exact build wiring is shown in the repository README and exercised by
 `tests/consumer`.
 
 ## Publishing
 
-The release workflow runs only for version tags. Before creating a GitHub
-Release it verifies:
+The release workflow also supports a manual dry run on the exact release commit. A version-tag push repeats the same checks and creates the GitHub Release only after they pass. It verifies:
 
 - the repository is public;
 - the tag matches `build.zig.zon`;
@@ -46,9 +43,4 @@ created. They are intentionally not hidden inside the tag workflow.
 
 ## Discovery
 
-GitHub is the canonical package location. Community Zig package indexes may
-index the repository for discovery, but they are not the release authority.
-
-Before the repository is made public, its description and topics should be set
-to reflect the library accurately. Include the `zig-package` topic so Zig
-package indexes can discover it.
+GitHub is the canonical package location; QRz does not require a separate registry publication. Community indexes are discovery layers only. Before the repository is made public, set an accurate description and add the `zig-package` topic so services such as Zigistry and zig.pm can index it.

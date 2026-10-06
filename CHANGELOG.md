@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Tightened the pre-1.0 public surface by removing accidental raw `Symbol` mutators and the non-semantic reserved `Cell` field.
+- Added staged public CI and a dry-run release workflow so expensive validation runs only after local preflight passes.
+
 - Froze the v1 exported root declaration surface with a release qualification test and completed the repository evidence audit with no remaining `missing` or `verify` ledger entries.
 - Fixed package contents so every declared build step, including benchmarks, is present in published source packages.
 
