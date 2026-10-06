@@ -23,7 +23,7 @@ const exp_table: [512]u8 = blk: {
 
 const log_table: [256]u8 = blk: {
     @setEvalBranchQuota(4000);
-    var table: [256]u8 = [_]u8{0} ** 256;
+    var table: [256]u8 = @splat(0);
     var i: usize = 0;
     while (i < 255) : (i += 1) {
         table[exp_table[i]] = @intCast(i);
