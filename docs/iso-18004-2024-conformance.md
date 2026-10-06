@@ -88,7 +88,7 @@ Status meanings:
 - Structured Append metadata reporting: **verify**
 - Micro QR decoding: **implemented**
 - mirror/reversed symbol normalization: **verify**
-- reference-decoder behavioral differential tests: **missing**
+- reference-decoder behavioral differential tests: **verify** — opt-in bidirectional ZXing-cpp 3.1.1 gate present; final release campaign still requires recorded local execution.
 - autodiscrimination behavior applicable to QR/Micro QR: **implemented**
 
 ### Rendering and symbol production
@@ -110,11 +110,11 @@ Status meanings:
 
 This is only the foundation of the v1 evidence set. The missing Annex A/B sweep and independent decoder differential campaign remain release blockers.
 
-Self-round-trips are regression evidence, not sufficient conformance evidence. v1 requires all of the following:
+`zig build interop` runs the test-only bidirectional differential gate against pinned ZXing-cpp 3.1.1 after installing `tests/interop-requirements.txt`; it is intentionally excluded from the dependency-free default gates. Self-round-trips are regression evidence, not sufficient conformance evidence. v1 requires all of the following:
 
 1. Clause-derived golden vectors covering every supported symbol family, mode, version boundary, EC level, mask and special header.
-2. Independent encoder -> QRz decoder interoperability.
-3. QRz encoder -> independent decoder interoperability.
+2. Independent encoder -> QRz decoder interoperability. **Representative QR/Micro corpus wired through ZXing-cpp; final campaign execution pending.**
+3. QRz encoder -> independent decoder interoperability. **Representative QR/Micro corpus wired through ZXing-cpp; final campaign execution pending.**
 4. Exact matrix comparison where the standard fixes all relevant choices.
 5. Boundary vectors at every character-count-width transition and capacity edge. **QR capacity and count-width coverage present; non-byte mode capacity edges still pending.**
 6. BCH tests through and beyond the correction radius. **Covered for QR format information; version BCH exact tables and four-bit rejection are covered.**
