@@ -744,7 +744,7 @@ fn buildSymbol(
     if (cells.len < required) return Error.CellBufferTooSmall;
 
     var ec: [max_ec_codewords]u8 = undefined;
-    reed_solomon.encode(data[0..cap.data_codewords], cap.ec_codewords, ec[0..cap.ec_codewords]);
+    reed_solomon.encode(data[0..@as(usize, cap.data_codewords)], cap.ec_codewords, ec[0..@as(usize, cap.ec_codewords)]);
 
     var stream: [max_stream_bits]bool = undefined;
     var stream_len: usize = 0;
@@ -757,7 +757,7 @@ fn buildSymbol(
         stream_len += 1;
     }
 
-    for (ec[0..cap.ec_codewords]) |byte| {
+    for (ec[0..@as(usize, cap.ec_codewords)]) |byte| {
         var bit: u4 = 0;
         while (bit < 8) : (bit += 1) {
             stream[stream_len] = ((byte >> @intCast(7 - bit)) & 1) != 0;
@@ -804,7 +804,7 @@ fn encodeAuto(
     const cap = capacity(selected.version, selected.level).?;
 
     var bytes: [max_data_codewords]u8 = @splat(0);
-    var writer = bitstream.Writer.init(bytes[0..cap.data_codewords]);
+    var writer = bitstream.Writer.init(bytes[0..@as(usize, cap.data_codewords)]);
     try appendPlanned(&writer, selected.version, data);
     try finalizeData(&writer, selected.version, cap);
 
@@ -846,7 +846,7 @@ pub fn encodeKanji(
     const cap = capacity(selected.version, selected.level).?;
 
     var bytes: [max_data_codewords]u8 = @splat(0);
-    var writer = bitstream.Writer.init(bytes[0..cap.data_codewords]);
+    var writer = bitstream.Writer.init(bytes[0..@as(usize, cap.data_codewords)]);
     try appendKanji(&writer, selected.version, sjis);
     try finalizeData(&writer, selected.version, cap);
 
@@ -1107,7 +1107,7 @@ fn decodeTransformed(
         @as(usize, cap.data_codewords) + @as(usize, cap.ec_codewords);
     const corrected = reed_solomon.decode(
         block[0..total_codewords],
-        cap.ec_codewords,
+        @as(usize, cap.ec_codewords),
     ) catch return Error.UnrecoverableBlock;
 
     const len = try parseData(
@@ -1215,7 +1215,7 @@ test "Micro QR data padding matches independent codeword vectors" {
     for (cases) |case| {
         const cap = capacity(case.version, case.level).?;
         var bytes: [max_data_codewords]u8 = @splat(0);
-        var writer = bitstream.Writer.init(bytes[0..cap.data_codewords]);
+        var writer = bitstream.Writer.init(bytes[0..@as(usize, cap.data_codewords)]);
         try appendPlanned(&writer, case.version, case.input);
         try finalizeData(&writer, case.version, cap);
 
