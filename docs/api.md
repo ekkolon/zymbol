@@ -260,7 +260,8 @@ qrz_render.writeSvg
 
 `SvgOptions` contains `quiet_zone`, `foreground`, `background`,
 `reflectance`, and optional square `explicit_size`. SVG is responsive by
-default and omits intrinsic width/height.
+default and omits intrinsic width/height. `SvgWriteError` is `SvgError` plus
+`WriteFailed` from `std.Io.Writer`.
 
 ### PNG
 
@@ -290,7 +291,10 @@ qrz_render.svgMicroText
 qrz_render.svgMicroBytes
 ```
 
-Call `OwnedBytes.deinit()` when finished.
+Call `OwnedBytes.deinit()` when finished. Combined QR encode/render operations
+use `PngEncodeError` or `SvgEncodeError`; Micro QR variants use
+`PngMicroEncodeError` or `SvgMicroEncodeError`. Allocating helpers can also
+return `OutOfMemory`, and SVG writer helpers can return `WriteFailed`.
 
 ### Caller-owned convenience API
 
@@ -335,6 +339,7 @@ RasterDimensions
 RasterError
 SvgOptions
 SvgError
+SvgWriteError
 PngOptions
 PngError
 Rgb
@@ -343,6 +348,10 @@ PngEncodeOptions
 SvgEncodeOptions
 PngMicroEncodeOptions
 SvgMicroEncodeOptions
+PngEncodeError
+SvgEncodeError
+PngMicroEncodeError
+SvgMicroEncodeError
 BufferRequirements
 rasterDimensions
 requiredRasterPixels
