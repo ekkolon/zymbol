@@ -132,7 +132,7 @@ fn encodeBase64(input: []const u8, output: *[4096]u8) usize {
         const value =
             (@as(u24, input[input_index]) << 16) |
             (@as(u24, input[input_index + 1]) << 8) |
-            input[input_index + 2];
+            @as(u24, input[input_index + 2]);
 
         output[output_index] = base64_alphabet[@intCast((value >> 18) & 0x3F)];
         output[output_index + 1] = base64_alphabet[@intCast((value >> 12) & 0x3F)];
@@ -175,7 +175,7 @@ fn writeBlockFallback(writer: *std.Io.Writer) !void {
     );
 
     const quiet: i32 = 4;
-    const side: i32 = symbol.size;
+    const side: i32 = @intCast(symbol.size);
 
     var y: i32 = -quiet;
     while (y < side + quiet) : (y += 2) {
