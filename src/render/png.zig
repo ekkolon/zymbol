@@ -270,7 +270,7 @@ fn writeFixedSymbol(bits: *DeflateBits, symbol: u16) Error!void {
     try bits.write(reverseBits(code, count), count);
 }
 
-const length_base = [_]u16{
+const length_base = [_]usize{
     3, 4, 5, 6, 7, 8, 9, 10,
     11, 13, 15, 17,
     19, 23, 27, 31,
@@ -286,7 +286,7 @@ const length_extra = [_]u5{
     4, 4, 4, 4,
     5, 5, 5, 5, 0,
 };
-const distance_base = [_]u16{
+const distance_base = [_]usize{
     1, 2, 3, 4,
     5, 7, 9, 13,
     17, 25, 33, 49,
@@ -352,7 +352,7 @@ fn matchLength(
     position: usize,
     distance: usize,
 ) usize {
-    if (distance == 0 or distance > position) return 0;
+    if (distance == 0 or distance > 32768 or distance > position) return 0;
 
     const limit = @min(@as(usize, 258), raw_len - position);
     var length: usize = 0;
@@ -607,8 +607,8 @@ test "PNG transparent background emits tRNS" {
 
 
 test "PNG fixed-Huffman output is deterministic and compressed" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
+    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
     const symbol = try qrz.encodeText(
         "QRZ PNG COMPRESSION",
         .{
