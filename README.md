@@ -2,7 +2,7 @@
 
 QR Code Model 2 encoding and decoding for Zig with no runtime dependencies and no mandatory heap allocation.
 
-QRz operates on caller-owned buffers. The core library does not perform file I/O, image decoding, rasterization, or rendering.
+QRz separates QR semantics from output formats. `qrz` encodes and decodes symbols; `qrz_render` turns those symbols into raster pixels, SVG, or PNG. Neither module performs file I/O.
 
 ## Status
 
@@ -17,6 +17,7 @@ The current implementation covers the Model 2 symbol mechanics used by QR versio
 - UTF-8 text through ECI assignment 26 when required
 - arbitrary binary payloads
 - caller-owned module and codeword buffers
+- allocation-free raster rendering plus built-in SVG and PNG encoding through `qrz_render`
 - `wasm32-freestanding` compilation
 
 The implementation targets the QR Code Model 2 rules in ISO/IEC 18004:2024. Structured Append and FNC1 application semantics are not part of the current high-level API.
@@ -58,6 +59,128 @@ const symbol = try qrz.encodeBytes(
 ```
 
 `encodeBytes` preserves arbitrary byte values and does not attach text-encoding semantics.
+
+## Rendering
+
+For normal applications, PNG and SVG are one call:
+
+```zig
+const render = @import("qrz_render");
+
+var png = try render.pngText(init.gpa, "https://example.com", .{});
+defer png.deinit();
+
+var svg = try render.svgText(init.gpa, "https://example.com", .{});
+defer svg.deinit();
+```
+
+`pngText` and `svgText` encode the QR symbol, allocate exactly-sized output, and return owned bytes. Binary payloads use `pngBytes` and `svgBytes`; the same arbitrary byte sequence is preserved by the QR encoder.
+
+Format and QR options stay explicit when needed:
+
+```zig
+var png = try render.pngText(
+    init.gpa,
+    "https://example.com",
+    .{
+        .encode = .{
+            .ec_level = .q,
+            .max_version = 10,
+        },
+        .render = .{
+            .scale = 6,
+            .quiet_zone = 4,
+            .foreground = .{ .r = 20, .g = 20, .b = 20 },
+            .background = .{ .r = 255, .g = 255, .b = 255 },
+        },
+    },
+);
+defer png.deinit();
+```
+
+PNG is encoded directly from the QR symbol as a 1-bit indexed image. It does not materialize an intermediate raster buffer. A transparent PNG background is selected with `.background = null`.
+
+SVG is responsive by default: QRz emits a square `viewBox`, symmetric quiet zone, integer module coordinates, and `preserveAspectRatio="xMidYMid meet"`. It omits intrinsic `width`/`height`, allowing the embedding layout to choose the rendered size without distorting or off-centering the QR.
+
+Set an explicit square intrinsic size when required:
+
+```zig
+var svg = try render.svgText(
+    init.gpa,
+    "https://example.com",
+    .{
+        .render = .{ .explicit_size = 256 },
+    },
+);
+defer svg.deinit();
+```
+
+SVG can also stream directly to any Zig 0.16 `std.Io.Writer`, avoiding the SVG output allocation:
+
+```zig
+try std.Io.Dir.cwd().createDirPath(init.io, "zig-out/examples");
+
+var file = try std.Io.Dir.cwd().createFile(
+    init.io,
+    "zig-out/examples/qrz.svg",
+    .{},
+);
+defer file.close(init.io);
+
+var write_buffer: [4096]u8 = undefined;
+var file_writer = file.writer(init.io, &write_buffer);
+
+try render.writeSvgText(
+    init.gpa,
+    &file_writer.interface,
+    "https://example.com",
+    .{},
+);
+try file_writer.interface.flush();
+```
+
+`writeSvgBytes` is the binary-payload equivalent. `writeSvg` streams an already encoded `qrz.Symbol`; `writeSvgTextInto` and `writeSvgBytesInto` additionally keep the QR workspace caller-owned for WASM/freestanding or reusable hot paths.
+
+The low-level APIs remain allocation-free:
+
+```zig
+const required = try render.requiredPngBytes(&symbol, .{});
+const png = try render.renderPng(&symbol, output, .{});
+
+const svg_required = try render.requiredSvgBytes(&symbol, .{});
+const svg = try render.renderSvg(&symbol, svg_output, .{});
+```
+
+Raw raster output is available through `renderRaster` and `renderRasterStrided` when an application already owns a pixel surface or wants to feed another image codec.
+
+### WASM and freestanding
+
+The same codecs compile for `wasm32-freestanding`. No filesystem or platform I/O is required.
+
+For hosts that own WebAssembly linear memory, `pngRequirements` and `svgRequirements` return the cell, encoder-scratch, and output capacities for the configured maximum QR version. The matching `pngTextInto`, `pngBytesInto`, `svgTextInto`, and `svgBytesInto` functions encode directly into those caller-provided buffers:
+
+```zig
+const options = render.PngEncodeOptions{
+    .encode = .{ .max_version = 10 },
+};
+
+const required = try render.pngRequirements(options);
+
+// Host/WASM integration provides these slices from linear memory.
+const png = try render.pngTextInto(
+    text,
+    options,
+    cells[0..required.cells],
+    scratch[0..required.scratch],
+    output[0..required.output],
+);
+```
+
+This keeps the WebAssembly ABI and allocator policy outside QRz while using exactly the same QR and PNG implementation as native code. An application that already has a Zig allocator in WASM can use `pngText`/`svgText` directly instead.
+
+The default quiet zone is four modules. Raster output uses integer module scaling. SVG uses integer coordinates, `shape-rendering="crispEdges"`, and centered aspect-ratio preservation.
+
+QRz produces PNG/SVG bytes but deliberately does not open files, write sockets, or own browser/DOM integration. Those are application concerns.
 
 ## Decoding
 
@@ -105,11 +228,17 @@ The decoder corrects one Reed-Solomon block at a time instead of materializing e
 ```text
 zig build test
 zig build wasm
-zig build example
+zig build example-terminal
+zig build example-svg
+zig build example-png
 zig build qualify
 ```
 
-The package currently supports Zig 0.16.0 as its minimum version. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall and compiles the core for `wasm32-freestanding` in ReleaseFast.
+The package currently supports Zig 0.16.0 as its minimum version. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall, compiles the examples without executing them, and compiles the core/render modules for `wasm32-freestanding` in ReleaseFast.
+
+`zig build example-png` writes `zig-out/examples/qrz.png`. `zig build example-svg` writes `zig-out/examples/qrz.svg`. `zig build example-terminal` renders the in-memory PNG through Kitty or the iTerm inline-image protocol on iTerm2, mintty and WezTerm; Windows Terminal uses SIXEL. VS Code receives the PNG control sequence and also retains the block QR because `terminal.integrated.enableImages` is not visible to child processes. Generated example artifacts stay under the gitignored `zig-out/` tree.
+
+> **VS Code terminal:** enable `terminal.integrated.enableImages` in Settings to display the actual inline PNG. VS Code does not expose that setting to child processes, so QRz cannot detect when it is disabled.
 
 The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
 
@@ -123,6 +252,8 @@ The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
 - `src/matrix.zig` — function patterns, data traversal, masks, penalty scoring
 - `src/encoder.zig` — version selection, interleaving, symbol construction
 - `src/decoder.zig` — format recovery, deinterleaving, correction, parsing
+- `src/render/` — raster rendering, PNG/SVG codecs, and owned-output conveniences
+- `examples/png.zig`, `examples/svg.zig`, `examples/terminal.zig` — output and terminal integrations
 - `src/root.zig` — public API and integration tests
 
 ## License
