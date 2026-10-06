@@ -9,6 +9,7 @@
         "build.zig.zon",
         "src",
         "examples/terminal_demo.zig",
+        "examples/svg_demo.zig",
         "LICENSE",
         "README.md",
         "CHANGELOG.md",
