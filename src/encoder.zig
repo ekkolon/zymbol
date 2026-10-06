@@ -184,7 +184,7 @@ fn encodePayload(
     var version = options.min_version;
 
     while (true) : (version += 1) {
-        const payload_bits = if (options.fnc1 == .none) blk: {
+        const payload_bits = if (options.fnc1.isNone()) blk: {
             const band = versionBand(version);
             break :blk cached_payload_bits[band] orelse cached: {
                 const bits = try segment.optimalBitLength(version, payload, costs);
@@ -225,7 +225,7 @@ fn encodePayload(
     if (options.structured_append) |value| try segment.appendStructuredAppend(&writer, value);
     try segment.appendFnc1(&writer, options.fnc1);
     if (utf8_eci) try segment.appendEci(&writer, 26);
-    if (options.fnc1 == .none) {
+    if (options.fnc1.isNone()) {
         try segment.writeOptimal(&writer, version, payload, costs, trace);
     } else {
         try segment.appendByte(&writer, version, payload);
