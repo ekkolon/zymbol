@@ -334,7 +334,7 @@ fn appendByte(writer: *bitstream.Writer, version: Version, data: []const u8) !vo
 }
 
 fn appendKanji(writer: *bitstream.Writer, version: Version, sjis: []const u8) !void {
-    if (sjis.len & 1 != 0) return Error.OddKanjiLength;
+    if ((sjis.len & 1) != 0) return Error.OddKanjiLength;
     const characters = sjis.len / 2;
     try appendMode(writer, version, .kanji);
     try appendCount(writer, version, .kanji, characters);
@@ -458,7 +458,7 @@ fn selectKanji(
     options: Options,
 ) Error!struct { version: Version, level: spec.EcLevel, bits: usize } {
     try validateOptions(options);
-    if (sjis.len & 1 != 0) return Error.OddKanjiLength;
+    if ((sjis.len & 1) != 0) return Error.OddKanjiLength;
 
     const characters = sjis.len / 2;
     var has_legal_level = false;
@@ -515,7 +515,7 @@ fn finalizeData(
         const pad_bytes = bits_left / 8;
         var index: usize = 0;
         while (index < pad_bytes) : (index += 1) {
-            try writer.append(if (index & 1 == 0) 0xEC else 0x11, 8);
+            try writer.append(if ((index & 1) == 0) 0xEC else 0x11, 8);
         }
 
         if (half_last) try writer.append(0, 4);
@@ -547,7 +547,7 @@ fn layout(
 
     var i: usize = 0;
     while (i < side_usize) : (i += 1) {
-        const dark = i & 1 == 0;
+        const dark = (i & 1) == 0;
         setCell(cells, side, i, 0, dark, .timing);
         setCell(cells, side, 0, i, dark, .timing);
     }
@@ -744,7 +744,11 @@ fn buildSymbol(
     if (cells.len < required) return Error.CellBufferTooSmall;
 
     var ec: [max_ec_codewords]u8 = undefined;
-    reed_solomon.encode(data[0..@as(usize, cap.data_codewords)], cap.ec_codewords, ec[0..@as(usize, cap.ec_codewords)]);
+    reed_solomon.encode(
+        data[0..@as(usize, cap.data_codewords)],
+        @as(usize, cap.ec_codewords),
+        ec[0..@as(usize, cap.ec_codewords)],
+    );
 
     var stream: [max_stream_bits]bool = undefined;
     var stream_len: usize = 0;
