@@ -70,6 +70,30 @@ pub fn build(b: *std.Build) void {
     conformance_step.dependOn(&run_bch_conformance_tests.step);
     conformance_step.dependOn(&run_rs_conformance_tests.step);
 
+    const interop_module = b.createModule(.{
+        .root_source_file = b.path("tests/interop_driver.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "qrz", .module = qrz }},
+    });
+    const interop_driver = b.addExecutable(.{
+        .name = "qrz-interop-driver",
+        .root_module = interop_module,
+    });
+    const python = b.option(
+        []const u8,
+        "python",
+        "Python executable for the optional ZXing-cpp interop gate",
+    ) orelse "python3";
+    const run_interop = b.addSystemCommand(&.{ python, "tests/interop_zxing.py" });
+    run_interop.addArtifactArg(interop_driver);
+
+    const interop_step = b.step(
+        "interop",
+        "Run bidirectional differential tests against ZXing-cpp",
+    );
+    interop_step.dependOn(&run_interop.step);
+
     const fuzz_module = b.createModule(.{
         .root_source_file = b.path("tests/fuzz.zig"),
         .target = target,
