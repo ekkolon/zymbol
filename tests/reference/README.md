@@ -7,7 +7,7 @@ Pinned source: `heuer/segno@b11dc2913c22b22b3bc0a6efaa989904c44977bf`.
 Current fixtures:
 
 - `qr_tables.zig`: QR versions 1-40 data-codeword capacities for L/M/Q/H, transcribed from Segno `SYMBOL_CAPACITY` at the pinned commit.
-- `ecc_tables.zig`: QR format/version BCH tables and Annex A Reed-Solomon generator coefficients for every degree used by QR Code, transcribed from Segno at the pinned commit.
+- `ecc_tables.zig`: QR format/version BCH tables and Annex A Reed-Solomon generator exponents for every degree used by QR Code, transcribed from Segno at the pinned commit.
 - `tests/ref_matrix/iso-fig-1.txt`: QR Code Symbol, QR version 1-M.
 - `tests/ref_matrix/iso-i2.txt`: 01234567, QR version 1-M, mask 2.
 - `tests/ref_matrix/iso-i3.txt`: 01234567, Micro QR M2-L.
@@ -20,4 +20,4 @@ Segno identifies the first three matrices as examples derived from ISO/IEC 18004
 
 For the QR Figure 1 fixture, mask 5 is pinned as part of the external matrix. Annex I / worked symbol examples are informative, and external implementations differ on whether the surrounding quiet zone participates in QR N3 mask scoring. QRz automatic mask selection is therefore tested against the normative Step 6 / Table 11 rules over the QR symbol itself; the quiet zone is not part of the symbol size. The fixture still independently verifies data construction, masking, format information, exact matrix output, and decoding for the specified mask.
 
-The release gate must continue to expand beyond these fixtures. Annex A generator coefficients, QR capacity/count-width boundaries, and BCH/RS correction-radius behavior now have executable evidence. Remaining work includes the rest of the Annex audit, non-byte capacity edges, special-header vectors, and behavioral differential tests against independent decoders.
+The release gate must continue to expand beyond these fixtures. Annex A generator exponents are independently converted to GF(256) coefficients and checked against QRz; QR capacity/count-width boundaries and BCH/RS correction-radius behavior also have executable evidence. Remaining work includes the rest of the Annex audit, non-byte capacity edges, special-header vectors, and behavioral differential tests against independent decoders.
