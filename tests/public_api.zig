@@ -68,6 +68,7 @@ const expected_render_api = [_][]const u8{
     "RasterError",
     "SvgOptions",
     "SvgError",
+    "SvgWriteError",
     "PngOptions",
     "PngError",
     "Rgb",
@@ -76,6 +77,10 @@ const expected_render_api = [_][]const u8{
     "SvgEncodeOptions",
     "PngMicroEncodeOptions",
     "SvgMicroEncodeOptions",
+    "PngEncodeError",
+    "SvgEncodeError",
+    "PngMicroEncodeError",
+    "SvgMicroEncodeError",
     "BufferRequirements",
     "rasterDimensions",
     "requiredRasterPixels",
@@ -433,6 +438,15 @@ test "v1 render public type shapes" {
         "InvalidReflectance",
         "OutputTooSmall",
         "SizeOverflow",
+    });
+    try expectExactFieldSet(render.SvgWriteError, &.{
+        "InvalidSymbol",
+        "InvalidVersion",
+        "InvalidSize",
+        "InvalidReflectance",
+        "OutputTooSmall",
+        "SizeOverflow",
+        "WriteFailed",
     });
 
     try expectExactFields(render.PngOptions, &.{
