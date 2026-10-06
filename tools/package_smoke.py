@@ -14,7 +14,7 @@ MANIFEST = """.{
     .name = .qrz_remote_smoke,
     .version = "0.0.0",
     .fingerprint = 0xe8d435b331415927,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{},
     .paths = .{
         "build.zig",

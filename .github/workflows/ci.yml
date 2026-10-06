@@ -44,15 +44,9 @@ jobs:
 
   linux:
     needs: preflight
-    name: Linux / Zig ${{ matrix.zig }}
+    name: Linux / Zig 0.17.0
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    strategy:
-      fail-fast: true
-      matrix:
-        zig:
-          - 0.16.0
-          - 0.17.0
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,16 +56,9 @@ jobs:
       - name: Install Zig
         uses: ./.github/actions/setup-zig
         with:
-          version: ${{ matrix.zig }}
-
-      - name: Compatibility
-        if: matrix.zig == '0.16.0'
-        run: |
-          zig build test
-          zig build conformance
+          version: 0.17.0
 
       - name: Qualify
-        if: matrix.zig == '0.17.0'
         run: zig build qualify
 
       - name: Consumer smoke

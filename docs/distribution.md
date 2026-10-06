@@ -25,8 +25,7 @@ Zig records the dependency URL and content hash in the consumer's `build.zig.zon
 The exact build wiring is shown in the repository README and exercised by
 `tests/consumer`. `tools/package_smoke.py` reuses that consumer fixture in a
 temporary project, runs `zig fetch --save` against a repository archive, and
-then builds the fetched dependency. Public CI runs that remote package smoke on
-every supported Zig version.
+then builds the fetched dependency. Public CI runs that remote package smoke on Zig 0.17.0.
 
 ## Publishing
 
