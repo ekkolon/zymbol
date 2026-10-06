@@ -1230,6 +1230,89 @@ test "ISO Figure 38 Micro QR matrix matches reference" {
     }
 }
 
+test "M1 maximum numeric matrix matches independent reference" {
+    const expected = [_][]const u8{
+        "11111110101",
+        "10000010110",
+        "10111010100",
+        "10111010000",
+        "10111010111",
+        "10000010011",
+        "11111110100",
+        "00000000011",
+        "11001110011",
+        "01010001100",
+        "11110000011",
+    };
+
+    var cells: [11 * 11]matrix.Cell = undefined;
+    const symbol = try encodeText(
+        "12345",
+        .{
+            .min_version = .m1,
+            .max_version = .m1,
+            .ec_level = .l,
+            .boost_ec_level = false,
+        },
+        &cells,
+    );
+
+    try std.testing.expectEqual(Version.m1.number(), symbol.version);
+    try std.testing.expectEqual(@as(u3, 2), symbol.mask);
+
+    const side: usize = symbol.size;
+    for (expected, 0..) |row, y| {
+        for (row, 0..) |character, x| {
+            try std.testing.expectEqual(
+                character == '1',
+                symbol.cells[y * side + x].dark,
+            );
+        }
+    }
+}
+
+test "Micro mask 10 matrix matches independent reference" {
+    const expected = [_][]const u8{
+        "1111111010101",
+        "1000001010001",
+        "1011101001111",
+        "1011101010110",
+        "1011101011010",
+        "1000001010110",
+        "1111111010101",
+        "0000000011010",
+        "1110110110010",
+        "0101001111001",
+        "1010100101010",
+        "0100011010010",
+        "1111111010011",
+    };
+
+    var cells: [13 * 13]matrix.Cell = undefined;
+    const symbol = try encodeText(
+        "12345",
+        .{
+            .min_version = .m2,
+            .max_version = .m2,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 2,
+        },
+        &cells,
+    );
+
+    try std.testing.expectEqual(@as(u3, 2), symbol.mask);
+    const side: usize = symbol.size;
+    for (expected, 0..) |row, y| {
+        for (row, 0..) |character, x| {
+            try std.testing.expectEqual(
+                character == '1',
+                symbol.cells[y * side + x].dark,
+            );
+        }
+    }
+}
+
 test "M1 through M4 round trip legal modes" {
     const samples = [_]struct {
         data: []const u8,
