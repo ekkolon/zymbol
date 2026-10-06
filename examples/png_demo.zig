@@ -2,6 +2,12 @@ const std = @import("std");
 const qrz = @import("qrz");
 const render = @import("qrz_render");
 
+const demo_version: qrz.Version = 6;
+const demo_scale: usize = 4;
+const demo_quiet_zone: usize = 4;
+const demo_module_side: usize = 17 + 4 * @as(usize, demo_version);
+const demo_image_side: usize = (demo_module_side + demo_quiet_zone * 2) * demo_scale;
+
 const BufferError = error{OutputTooSmall};
 
 const BufferWriter = struct {
@@ -169,32 +175,26 @@ fn encodePng(
 }
 
 pub fn main() !void {
-    const version = 6;
-    const scale = 4;
-    const quiet_zone = 4;
-    const module_side = 17 + 4 * version;
-    const image_side = (module_side + quiet_zone * 2) * scale;
-
-    var cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(version)]u8 = undefined;
+    var cells: [qrz.requiredCells(demo_version)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(demo_version)]u8 = undefined;
     const symbol = try qrz.encodeText(
         "https://example.com/qrz",
-        .{ .min_version = version, .max_version = version, .ec_level = .q },
+        .{ .min_version = demo_version, .max_version = demo_version, .ec_level = .q },
         &cells,
         &scratch,
     );
 
-    var pixels: [image_side * image_side]u8 = undefined;
+    var pixels: [demo_image_side * demo_image_side]u8 = undefined;
     const size = try render.renderRaster(
         u8,
         &symbol,
         &pixels,
         0,
         255,
-        .{ .scale = scale, .quiet_zone = quiet_zone },
+        .{ .scale = demo_scale, .quiet_zone = demo_quiet_zone },
     );
 
-    const max_png_bytes = pngRequiredBytes(image_side, image_side);
+    const max_png_bytes: usize = comptime pngRequiredBytes(demo_image_side, demo_image_side);
     var png_buffer: [max_png_bytes]u8 = undefined;
     const png = try encodePng(&pixels, size.width, size.height, &png_buffer);
 
