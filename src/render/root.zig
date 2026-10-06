@@ -8,6 +8,8 @@ const qrz = @import("qrz");
 const raster = @import("raster.zig");
 const svg = @import("svg.zig");
 
+const max_render_side: usize = 17 + 4 * @as(usize, qrz.max_version) + 8;
+
 pub const RasterOptions = raster.Options;
 pub const RasterDimensions = raster.Dimensions;
 pub const RasterError = raster.Error;
@@ -75,11 +77,10 @@ test "encoded symbol renders consistently to raster and SVG" {
 
 test "raster projection is exact across representative versions" {
     const versions = [_]qrz.Version{ 1, 7, 20, 40 };
-    const max_side: usize = @as(usize, qrz.size(qrz.max_version)) + 8;
 
     var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
     var encode_scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
-    var pixels: [max_side * max_side]u8 = undefined;
+    var pixels: [max_render_side * max_render_side]u8 = undefined;
 
     for (versions) |version| {
         const symbol = try qrz.encodeText(
