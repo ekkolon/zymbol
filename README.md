@@ -238,7 +238,7 @@ The package currently supports Zig 0.16.0 as its minimum version. `zig build qua
 
 `zig build example-png` writes `zig-out/examples/qrz.png`. `zig build example-svg` writes `zig-out/examples/qrz.svg`. `zig build example-terminal` renders the in-memory PNG through Kitty or the iTerm inline-image protocol on iTerm2, mintty and WezTerm; Windows Terminal uses SIXEL. VS Code receives the PNG control sequence and also retains the block QR because `terminal.integrated.enableImages` is not visible to child processes. Generated example artifacts stay under the gitignored `zig-out/` tree.
 
-> **VS Code terminal:** enable `terminal.integrated.enableImages` in Settings to display the actual inline PNG. Without it, the terminal example falls back to the block QR.
+> **VS Code terminal:** enable `terminal.integrated.enableImages` in Settings to display the actual inline PNG. VS Code does not expose that setting to child processes, so QRz cannot detect when it is disabled.
 
 The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
 
