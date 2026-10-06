@@ -71,3 +71,50 @@ test "encoded symbol renders consistently to raster and SVG" {
     try std.testing.expect(std.mem.startsWith(u8, rendered_svg, "<svg "));
     try std.testing.expect(std.mem.endsWith(u8, rendered_svg, "</svg>"));
 }
+
+
+test "raster projection is exact across representative versions" {
+    const versions = [_]qrz.Version{ 1, 7, 20, 40 };
+    const max_side: usize = qrz.size(qrz.max_version) + 8;
+
+    var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
+    var encode_scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
+    var pixels: [max_side * max_side]u8 = undefined;
+
+    for (versions) |version| {
+        const symbol = try qrz.encodeText(
+            "qrz",
+            .{
+                .min_version = version,
+                .max_version = version,
+                .ec_level = .m,
+                .boost_ec_level = false,
+                .mask = 0,
+            },
+            &cells,
+            &encode_scratch,
+        );
+
+        const options = RasterOptions{ .scale = 1, .quiet_zone = 4 };
+        const size = try rasterDimensions(&symbol, options);
+        const expected_side: usize = qrz.size(version) + 8;
+        try std.testing.expectEqual(expected_side, size.width);
+        try std.testing.expectEqual(expected_side, size.height);
+
+        const required = try requiredRasterPixels(&symbol, options);
+        _ = try renderRaster(u8, &symbol, pixels[0..required], 0, 255, options);
+
+        for (0..size.height) |y| {
+            for (0..size.width) |x| {
+                const inside =
+                    x >= 4 and y >= 4 and
+                    x < 4 + symbol.size and y < 4 + symbol.size;
+                const expected: u8 = if (inside and symbol.isDark(x - 4, y - 4))
+                    0
+                else
+                    255;
+                try std.testing.expectEqual(expected, pixels[y * size.width + x]);
+            }
+        }
+    }
+}
