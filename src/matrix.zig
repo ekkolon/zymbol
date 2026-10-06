@@ -181,8 +181,7 @@ pub fn layoutFunctionPatterns(cells: []Cell, version: u6, ec_level: spec.EcLevel
     }
 
     var symbol = Symbol{ .cells = cells, .size = size, .version = version, .ec_level = ec_level, .mask = mask };
-    drawFormatInfo(&symbol);
-    if (version >= 7) drawVersionInfo(&symbol);
+    drawSymbolMetadata(&symbol);
     return symbol;
 }
 
@@ -208,6 +207,19 @@ pub fn drawFormatInfo(symbol: *Symbol) void {
     while (idx < 8) : (idx += 1) set(symbol.cells, symbol.size, size - 1 - @as(i32, idx), 8, bitAt(bits, idx), .format);
     idx = 8;
     while (idx < 15) : (idx += 1) set(symbol.cells, symbol.size, 8, size - 15 + @as(i32, idx), bitAt(bits, idx), .format);
+}
+
+pub fn clearMaskEvaluationMetadata(symbol: *Symbol) void {
+    for (symbol.cells) |*cell| {
+        if (cell.kind == .format or cell.kind == .version) {
+            cell.dark = false;
+        }
+    }
+}
+
+pub fn drawSymbolMetadata(symbol: *Symbol) void {
+    drawFormatInfo(symbol);
+    if (symbol.version >= 7) drawVersionInfo(symbol);
 }
 
 fn drawVersionInfo(symbol: *Symbol) void {
