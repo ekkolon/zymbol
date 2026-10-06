@@ -9,6 +9,7 @@
         "build.zig.zon",
         "src",
         "tests",
+        "benchmarks",
         "examples/terminal.zig",
         "examples/svg.zig",
         "examples/png.zig",
