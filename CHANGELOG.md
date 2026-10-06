@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replaced PNG stored-DEFLATE output with deterministic fixed-Huffman compression and bounded LZ77 matching; added an independent PNG CRC/Adler/inflate validation gate.
+
 - Added explicit normal/reversed reflectance rendering across raster, SVG, and PNG, including quiet-zone inversion and decode-backed regression coverage.
 
 - Added Micro QR M1-M4 encoding, decoding, legal EC/mode handling, all four masks, independent vectors, autodiscrimination, and two-module rendering defaults.

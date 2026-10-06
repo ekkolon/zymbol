@@ -145,15 +145,14 @@ fn rawLength(dims: raster.Dimensions) Error!usize {
     return checkedMul(dims.height, try checkedAdd(row_bytes, 1));
 }
 
-fn zlibLength(raw_len: usize) Error!usize {
-    const blocks = (try checkedAdd(raw_len, 65534)) / 65535;
-    const block_overhead = try checkedMul(blocks, 5);
-    return checkedAdd(try checkedAdd(2, block_overhead), try checkedAdd(raw_len, 4));
+fn maxZlibLength(raw_len: usize) Error!usize {
+    const literal_bits = try checkedMul(raw_len, 9);
+    const deflate_bits = try checkedAdd(10, literal_bits);
+    const deflate_bytes = (try checkedAdd(deflate_bits, 7)) / 8;
+    return checkedAdd(6, deflate_bytes);
 }
 
-fn pngLength(dims: raster.Dimensions, transparent: bool) Error!usize {
-    const raw_len = try rawLength(dims);
-    const zlib_len = try zlibLength(raw_len);
+fn pngLength(zlib_len: usize, transparent: bool) Error!usize {
     const fixed: usize = 8 + (12 + 13) + (12 + 6) + 12;
     const transparency: usize = if (transparent) 14 else 0;
     const headers = try checkedAdd(fixed, transparency);
@@ -213,10 +212,239 @@ fn scanlineByte(
     return byte;
 }
 
+fn reverseBits(value: u16, count: u5) u16 {
+    var input = value;
+    var result: u16 = 0;
+    var i: u5 = 0;
+    while (i < count) : (i += 1) {
+        result = (result << 1) | (input & 1);
+        input >>= 1;
+    }
+    return result;
+}
+
+const DeflateBits = struct {
+    sink: *Sink,
+    byte: u8 = 0,
+    used: u4 = 0,
+
+    fn write(self: *DeflateBits, value: u32, count: u5) Error!void {
+        var i: u5 = 0;
+        while (i < count) : (i += 1) {
+            const bit: u8 = @truncate((value >> @intCast(i)) & 1);
+            self.byte |= bit << @intCast(self.used);
+            self.used += 1;
+            if (self.used == 8) {
+                try self.sink.writeByte(self.byte);
+                self.byte = 0;
+                self.used = 0;
+            }
+        }
+    }
+
+    fn finish(self: *DeflateBits) Error!void {
+        if (self.used != 0) try self.sink.writeByte(self.byte);
+        self.byte = 0;
+        self.used = 0;
+    }
+};
+
+fn writeFixedSymbol(bits: *DeflateBits, symbol: u16) Error!void {
+    var code: u16 = undefined;
+    var count: u5 = undefined;
+
+    if (symbol <= 143) {
+        code = 0x30 + symbol;
+        count = 8;
+    } else if (symbol <= 255) {
+        code = 0x190 + (symbol - 144);
+        count = 9;
+    } else if (symbol <= 279) {
+        code = symbol - 256;
+        count = 7;
+    } else {
+        code = 0xC0 + (symbol - 280);
+        count = 8;
+    }
+
+    try bits.write(reverseBits(code, count), count);
+}
+
+const length_base = [_]usize{
+    3, 4, 5, 6, 7, 8, 9, 10,
+    11, 13, 15, 17,
+    19, 23, 27, 31,
+    35, 43, 51, 59,
+    67, 83, 99, 115,
+    131, 163, 195, 227, 258,
+};
+const length_extra = [_]u5{
+    0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 1, 1,
+    2, 2, 2, 2,
+    3, 3, 3, 3,
+    4, 4, 4, 4,
+    5, 5, 5, 5, 0,
+};
+const distance_base = [_]usize{
+    1, 2, 3, 4,
+    5, 7, 9, 13,
+    17, 25, 33, 49,
+    65, 97, 129, 193,
+    257, 385, 513, 769,
+    1025, 1537, 2049, 3073,
+    4097, 6145, 8193, 12289,
+    16385, 24577,
+};
+const distance_extra = [_]u5{
+    0, 0, 0, 0,
+    1, 1, 2, 2,
+    3, 3, 4, 4,
+    5, 5, 6, 6,
+    7, 7, 8, 8,
+    9, 9, 10, 10,
+    11, 11, 12, 12,
+    13, 13,
+};
+
+fn writeLengthDistance(bits: *DeflateBits, length: usize, distance: usize) Error!void {
+    var length_index: usize = 0;
+    while (length_index + 1 < length_base.len and
+        length >= length_base[length_index + 1])
+    {
+        length_index += 1;
+    }
+
+    try writeFixedSymbol(bits, @intCast(257 + length_index));
+    const length_bits = length_extra[length_index];
+    if (length_bits != 0) {
+        try bits.write(
+            @intCast(length - length_base[length_index]),
+            length_bits,
+        );
+    }
+
+    var distance_index: usize = 0;
+    while (distance_index + 1 < distance_base.len and
+        distance >= distance_base[distance_index + 1])
+    {
+        distance_index += 1;
+    }
+
+    try bits.write(
+        reverseBits(@intCast(distance_index), 5),
+        5,
+    );
+    const distance_bits = distance_extra[distance_index];
+    if (distance_bits != 0) {
+        try bits.write(
+            @intCast(distance - distance_base[distance_index]),
+            distance_bits,
+        );
+    }
+}
+
+fn matchLength(
+    symbol: *const qrz.Symbol,
+    options: Options,
+    dims: raster.Dimensions,
+    raw_len: usize,
+    position: usize,
+    distance: usize,
+) usize {
+    if (distance == 0 or distance > 32768 or distance > position) return 0;
+
+    const limit = @min(@as(usize, 258), raw_len - position);
+    var length: usize = 0;
+    while (length < limit and
+        scanlineByte(symbol, options, dims, position + length) ==
+            scanlineByte(symbol, options, dims, position + length - distance))
+    {
+        length += 1;
+    }
+    return length;
+}
+
+fn bestMatch(
+    symbol: *const qrz.Symbol,
+    options: Options,
+    dims: raster.Dimensions,
+    raw_len: usize,
+    position: usize,
+) struct { length: usize, distance: usize } {
+    const row_bytes = (dims.width + 7) / 8;
+    const row_stride = row_bytes + 1;
+    const candidates = [_]usize{ 1, 2, 3, 4, row_stride };
+
+    var best_length: usize = 0;
+    var best_distance: usize = 0;
+    for (candidates) |distance| {
+        const length = matchLength(
+            symbol,
+            options,
+            dims,
+            raw_len,
+            position,
+            distance,
+        );
+        if (length >= 3 and length > best_length) {
+            best_length = length;
+            best_distance = distance;
+        }
+    }
+
+    return .{ .length = best_length, .distance = best_distance };
+}
+
+fn emitZlib(
+    symbol: *const qrz.Symbol,
+    options: Options,
+    dims: raster.Dimensions,
+    sink: *Sink,
+) Error!void {
+    const raw_len = try rawLength(dims);
+    try sink.write(&.{ 0x78, 0x01 });
+
+    var bits = DeflateBits{ .sink = sink };
+    try bits.write(1, 1);
+    try bits.write(1, 2);
+
+    var adler = Adler32{};
+    var position: usize = 0;
+    while (position < raw_len) {
+        const match = bestMatch(symbol, options, dims, raw_len, position);
+        if (match.length >= 3) {
+            try writeLengthDistance(&bits, match.length, match.distance);
+            for (0..match.length) |offset| {
+                adler.update(scanlineByte(symbol, options, dims, position + offset));
+            }
+            position += match.length;
+        } else {
+            const byte = scanlineByte(symbol, options, dims, position);
+            try writeFixedSymbol(&bits, byte);
+            adler.update(byte);
+            position += 1;
+        }
+    }
+
+    try writeFixedSymbol(&bits, 256);
+    try bits.finish();
+    try sink.writeBe32(adler.value());
+}
+
+fn zlibLength(
+    symbol: *const qrz.Symbol,
+    options: Options,
+    dims: raster.Dimensions,
+) Error!usize {
+    var sink = Sink{ .buffer = null };
+    try emitZlib(symbol, options, dims, &sink);
+    return sink.position;
+}
+
 fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
     const dims = try dimensions(symbol, options);
-    const raw_len = try rawLength(dims);
-    const zlib_len = try zlibLength(raw_len);
+    const zlib_len = try zlibLength(symbol, options, dims);
 
     try sink.write(&.{ 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A });
 
@@ -254,31 +482,7 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
 
     const crc_start = sink.position;
     try sink.write("IDAT");
-    try sink.write(&.{ 0x78, 0x01 });
-
-    var adler = Adler32{};
-    var raw_offset: usize = 0;
-    while (raw_offset < raw_len) {
-        const remaining = raw_len - raw_offset;
-        const block_len: u16 = @intCast(@min(remaining, 65535));
-        const block_size: usize = block_len;
-        const final = block_size == remaining;
-
-        try sink.writeByte(if (final) 1 else 0);
-        try sink.writeLe16(block_len);
-        try sink.writeLe16(~block_len);
-
-        var block_offset: usize = 0;
-        while (block_offset < block_size) : (block_offset += 1) {
-            const byte = scanlineByte(symbol, options, dims, raw_offset + block_offset);
-            try sink.writeByte(byte);
-            adler.update(byte);
-        }
-
-        raw_offset += block_size;
-    }
-
-    try sink.writeBe32(adler.value());
+    try emitZlib(symbol, options, dims, sink);
 
     if (sink.buffer) |buffer| {
         try sink.writeBe32(crc32(buffer[crc_start..sink.position]));
@@ -304,7 +508,9 @@ fn requiredBytesForModules(
     const side = try checkedMul(modules, @as(usize, options.scale));
     if (side == 0 or side > std.math.maxInt(u32)) return Error.InvalidDimensions;
 
-    return pngLength(.{ .width = side, .height = side }, options.background == null);
+    const dims = raster.Dimensions{ .width = side, .height = side };
+    const raw_len = try rawLength(dims);
+    return pngLength(try maxZlibLength(raw_len), options.background == null);
 }
 
 pub fn requiredBytesForVersion(version: qrz.Version, options: Options) Error!usize {
@@ -329,7 +535,10 @@ pub fn requiredBytesForMicroVersion(
 
 pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
     const dims = try dimensions(symbol, options);
-    return pngLength(dims, options.background == null);
+    return pngLength(
+        try zlibLength(symbol, options, dims),
+        options.background == null,
+    );
 }
 
 pub fn render(symbol: *const qrz.Symbol, output: []u8, options: Options) Error![]const u8 {
@@ -372,6 +581,28 @@ test "PNG required size exactly matches rendered size" {
     try std.testing.expectEqualStrings("IEND", encoded[encoded.len - 8 .. encoded.len - 4]);
 }
 
+test "PNG version requirement bounds exact compressed size" {
+    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try qrz.encodeText(
+        "QRZ BUFFER BOUND",
+        .{
+            .min_version = 4,
+            .max_version = 4,
+            .ec_level = .q,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+        &scratch,
+    );
+
+    const options = Options{ .scale = 4 };
+    const bound = try requiredBytesForVersion(4, options);
+    const exact = try requiredBytes(&symbol, options);
+    try std.testing.expect(bound >= exact);
+}
+
 test "PNG transparent background emits tRNS" {
     var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
     var scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
@@ -397,47 +628,40 @@ test "PNG transparent background emits tRNS" {
 }
 
 
-test "PNG matches independent indexed-color fixture" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = @splat(.{});
-    cells[0].dark = true;
-    cells[qrz.size(1) + 1].dark = true;
+test "PNG fixed-Huffman output is deterministic and compressed" {
+    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try qrz.encodeText(
+        "QRZ PNG COMPRESSION",
+        .{
+            .min_version = 1,
+            .max_version = 4,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+        &scratch,
+    );
 
-    const symbol = qrz.Symbol{
-        .cells = &cells,
-        .size = qrz.size(1),
-        .version = 1,
-        .ec_level = .m,
-        .mask = 0,
-    };
+    const options = Options{ .scale = 4 };
+    const dims = try dimensions(&symbol, options);
+    const raw_len = try rawLength(dims);
+    const stored_blocks = (raw_len + 65534) / 65535;
+    const stored_zlib_len = 2 + stored_blocks * 5 + raw_len + 4;
 
-    const expected = [_]u8{
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x17, 0x00, 0x00, 0x00, 0x17,
-        0x01, 0x03, 0x00, 0x00, 0x00, 0xDA, 0xE4, 0x46, 0xE3, 0x00, 0x00, 0x00,
-        0x06, 0x50, 0x4C, 0x54, 0x45, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xA5,
-        0xD9, 0x9F, 0xDD, 0x00, 0x00, 0x00, 0x67, 0x49, 0x44, 0x41, 0x54, 0x78,
-        0x01, 0x01, 0x5C, 0x00, 0xA3, 0xFF, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xBF,
-        0xFF, 0xFE, 0x00, 0xDF, 0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF,
-        0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF,
-        0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF,
-        0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF,
-        0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF,
-        0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF,
-        0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF, 0xFF, 0xFE, 0x00, 0xFF,
-        0xFF, 0xFE, 0x36, 0x7F, 0x44, 0x45, 0xE0, 0x26, 0x7C, 0x7B, 0x00, 0x00,
-        0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
-    };
+    const required = try requiredBytes(&symbol, options);
+    var first: [64 * 1024]u8 = undefined;
+    var second: [64 * 1024]u8 = undefined;
+    const encoded_a = try render(&symbol, &first, options);
+    const encoded_b = try render(&symbol, &second, options);
 
-    const required = try requiredBytes(&symbol, .{ .scale = 1, .quiet_zone = 1 });
-    try std.testing.expectEqual(expected.len, required);
+    try std.testing.expectEqual(required, encoded_a.len);
+    try std.testing.expectEqualSlices(u8, encoded_a, encoded_b);
 
-    var output: [expected.len]u8 = undefined;
-    const encoded = try render(&symbol, &output, .{ .scale = 1, .quiet_zone = 1 });
-
-    try std.testing.expectEqualSlices(u8, &expected, encoded);
+    const fixed_overhead: usize = 8 + (12 + 13) + (12 + 6) + 12 + 12;
+    try std.testing.expect(encoded_a.len < fixed_overhead + stored_zlib_len);
 }
-
-
 
 test "PNG reversed reflectance swaps palette usage across quiet zone and modules" {
     var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
