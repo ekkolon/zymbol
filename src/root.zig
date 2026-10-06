@@ -723,3 +723,162 @@ test "decoder handles random structurally valid symbols without trapping" {
         }
     }
 }
+
+
+test "high-level FNC1 first-position round trip preserves byte semantics" {
+    const payload = [_]u8{ '0', '1', 0x1D, 'A', '%' };
+
+    var cells: [requiredCells(4)]Cell = undefined;
+    var encode_scratch: [requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try encodeBytes(
+        &payload,
+        .{
+            .min_version = 4,
+            .max_version = 4,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .fnc1 = .first_position,
+        },
+        &cells,
+        &encode_scratch,
+    );
+
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    var bits: [requiredCells(4)]bool = undefined;
+    for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
+
+    var decode_cells: [requiredCells(4)]Cell = undefined;
+    var decode_scratch: [requiredDecodeScratch(4)]u8 = undefined;
+    var out: [32]u8 = undefined;
+    const result = try decode(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &decode_scratch,
+        &out,
+    );
+
+    try std.testing.expectEqualSlices(u8, &payload, out[0..result.len]);
+    try std.testing.expectEqual(@as(u3, 3), result.symbology_modifier);
+    try std.testing.expectEqualSlices(u8, "]Q3", &result.symbologyIdentifier());
+    try std.testing.expect(!result.fnc1.isNone());
+}
+
+test "FNC1 plus ECI selects the ECI symbology modifier" {
+    const text = "Grüße";
+
+    var cells: [requiredCells(4)]Cell = undefined;
+    var encode_scratch: [requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try encodeText(
+        text,
+        .{
+            .min_version = 4,
+            .max_version = 4,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .fnc1 = .first_position,
+        },
+        &cells,
+        &encode_scratch,
+    );
+
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    var bits: [requiredCells(4)]bool = undefined;
+    for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
+
+    var decode_cells: [requiredCells(4)]Cell = undefined;
+    var decode_scratch: [requiredDecodeScratch(4)]u8 = undefined;
+    var out: [32]u8 = undefined;
+    const result = try decode(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &decode_scratch,
+        &out,
+    );
+
+    try std.testing.expectEqualSlices(u8, text, out[0..result.len]);
+    try std.testing.expectEqual(@as(u3, 4), result.symbology_modifier);
+    try std.testing.expectEqualSlices(u8, "]Q4", &result.symbologyIdentifier());
+}
+
+test "structured append metadata survives a symbol round trip" {
+    const full_message = "ABCD";
+    const parity = structuredAppendParity(full_message);
+
+    var cells: [requiredCells(2)]Cell = undefined;
+    var encode_scratch: [requiredEncodeScratch(2)]u8 = undefined;
+    const symbol = try encodeBytes(
+        "AB",
+        .{
+            .min_version = 2,
+            .max_version = 2,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .structured_append = .{
+                .index = 0,
+                .count = 2,
+                .parity = parity,
+            },
+        },
+        &cells,
+        &encode_scratch,
+    );
+
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    var bits: [requiredCells(2)]bool = undefined;
+    for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
+
+    var decode_cells: [requiredCells(2)]Cell = undefined;
+    var decode_scratch: [requiredDecodeScratch(2)]u8 = undefined;
+    var out: [16]u8 = undefined;
+    const result = try decode(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &decode_scratch,
+        &out,
+    );
+
+    try std.testing.expectEqualSlices(u8, "AB", out[0..result.len]);
+    const structured = result.structured_append orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(u4, 0), structured.index);
+    try std.testing.expectEqual(@as(u5, 2), structured.count);
+    try std.testing.expectEqual(parity, structured.parity);
+}
+
+test "FNC1 second position reports AIM indicator and transmitted prefix" {
+    var cells: [requiredCells(2)]Cell = undefined;
+    var encode_scratch: [requiredEncodeScratch(2)]u8 = undefined;
+    const symbol = try encodeBytes(
+        "PAYLOAD",
+        .{
+            .min_version = 2,
+            .max_version = 2,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .fnc1 = .{ .second_position = .{ .letter = 'A' } },
+        },
+        &cells,
+        &encode_scratch,
+    );
+
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    var bits: [requiredCells(2)]bool = undefined;
+    for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
+
+    var decode_cells: [requiredCells(2)]Cell = undefined;
+    var decode_scratch: [requiredDecodeScratch(2)]u8 = undefined;
+    var out: [32]u8 = undefined;
+    const result = try decode(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &decode_scratch,
+        &out,
+    );
+
+    try std.testing.expectEqualSlices(u8, "APAYLOAD", out[0..result.len]);
+    try std.testing.expectEqual(@as(u3, 5), result.symbology_modifier);
+    try std.testing.expectEqualSlices(u8, "]Q5", &result.symbologyIdentifier());
+}
