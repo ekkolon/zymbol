@@ -23,7 +23,7 @@ QRz decodes already sampled module grids. Camera input, thresholding, finder det
 
 ## Requirements
 
-Zig 0.16.0 and 0.17.0 are tested. Release fuzzing uses Zig 0.17.0.
+Zig 0.17.0 is required. Release qualification and fuzzing use Zig 0.17.0.
 
 ## Installation
 
