@@ -26,14 +26,14 @@ Status meanings:
 ### Symbol families and geometry
 
 - QR Code versions 1–40: **verify**
-- Micro QR versions M1–M4: **missing**
+- Micro QR versions M1–M4: **implemented**
 - finder, separator, timing, alignment patterns: **verify**
 - quiet-zone geometry: **verify**
 - version information: **verify**
 - format information: **verify**
 - normal reflectance: **verify**
-- reversed reflectance handling: **implemented**
-- mirror-image decoding/orientation handling: **implemented**
+- reversed reflectance handling: **verify**
+- mirror-image decoding/orientation handling: **verify**
 
 ### Data modes
 
@@ -49,7 +49,7 @@ Status meanings:
 - Structured Append sequence indicator: **verify**
 - Structured Append parity: **verify**
 - ECI interaction with Structured Append: **verify**
-- Micro QR mode restrictions and mode indicators: **missing**
+- Micro QR mode restrictions and mode indicators: **implemented**
 - default byte character-set semantics and alternative character-set rules: **verify**
 
 ### Data encoding and message construction
@@ -65,7 +65,7 @@ Status meanings:
 - codeword placement: **verify**
 - all QR data masks: **verify**
 - mask evaluation and automatic selection: **verify**
-- Micro QR masking and evaluation: **missing**
+- Micro QR masking and evaluation: **implemented**
 
 ### Error detection and correction
 
@@ -73,7 +73,7 @@ Status meanings:
 - generator polynomials: **verify**
 - correction through the advertised RS radius: **verify**
 - malformed/unrecoverable block handling: **verify**
-- Micro QR block/ECC layouts: **missing**
+- Micro QR block/ECC layouts: **implemented**
 - exhaustive normative Annex A/B cross-checks: **missing**
 
 ### Decoding and transmitted data
@@ -86,17 +86,17 @@ Status meanings:
 - FNC1 transmitted-data semantics: **verify**
 - symbology identifier generation/reporting: **verify**
 - Structured Append metadata reporting: **verify**
-- Micro QR decoding: **missing**
-- mirror/reversed symbol normalization: **implemented**
+- Micro QR decoding: **implemented**
+- mirror/reversed symbol normalization: **verify**
 - reference-decoder behavioral differential tests: **missing**
-- autodiscrimination behavior applicable to QR/Micro QR: **missing**
+- autodiscrimination behavior applicable to QR/Micro QR: **implemented**
 
 ### Rendering and symbol production
 
 - square QR module projection: **verify**
 - integer raster scaling: **verify**
 - four-module QR quiet-zone default: **verify**
-- Micro QR quiet-zone rules: **missing**
+- Micro QR quiet-zone rules: **implemented**
 - black/white and configurable reflectance rendering: **verify**
 - reversed-reflectance output: **missing**
 - PNG structural correctness: **verify**
@@ -140,8 +140,11 @@ QRz keeps Zig 0.16.0 as its minimum supported compiler, while sustained release 
 
 Current coverage-guided targets:
 
-- arbitrary module grids into the decoder
-- arbitrary binary encode/decode round trips
+- arbitrary QR module grids into the decoder
+- arbitrary QR binary encode/decode round trips, including mirror and polarity transforms
+- FNC1 and Structured Append encode/decode semantics
+- arbitrary Micro QR module grids
+- Micro QR encode/decode round trips, mirror/polarity transforms and PNG rendering
 - PNG encoding options and payloads
 
 Before v1 the fuzz surface expands to:
@@ -151,7 +154,7 @@ Before v1 the fuzz surface expands to:
 - Reed–Solomon block correction
 - segment parsing, including malformed and truncated headers
 - ECI/FNC1/Structured Append parsing
-- Micro QR decoding
+- direct Micro QR mode/format/ECC boundaries
 - PNG and SVG serializers
 - buffer-size boundaries and caller mistakes that remain inside the API contract
 
