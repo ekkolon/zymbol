@@ -116,6 +116,28 @@ pub fn build(b: *std.Build) void {
     );
     png_validation_step.dependOn(&run_png_validation.step);
 
+    const svg_validation_module = b.createModule(.{
+        .root_source_file = b.path("tests/svg_driver.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
+    });
+    const svg_validation_driver = b.addExecutable(.{
+        .name = "qrz-svg-validation-driver",
+        .root_module = svg_validation_module,
+    });
+    const run_svg_validation = b.addSystemCommand(&.{ python, "tests/svg_validate.py" });
+    run_svg_validation.addArtifactArg(svg_validation_driver);
+
+    const svg_validation_step = b.step(
+        "svg-validate",
+        "Validate SVG output independently with Python XML parsing",
+    );
+    svg_validation_step.dependOn(&run_svg_validation.step);
+
     const fuzz_module = b.createModule(.{
         .root_source_file = b.path("tests/fuzz.zig"),
         .target = target,

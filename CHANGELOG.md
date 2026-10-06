@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added independent SVG structural validation for QR and Micro QR geometry, colors, transparency, sizing, and reversed reflectance.
+
 - Added an opt-in QEMU runtime portability gate covering 32-bit little-endian x86 and 64-bit big-endian PowerPC64 execution.
 
 - Expanded coverage-guided fuzzing to raw segment parsing, Reed-Solomon correction, BCH damage, decodeAny/buffer boundaries, Micro QR legal modes, SVG, and renderer boundary cases.

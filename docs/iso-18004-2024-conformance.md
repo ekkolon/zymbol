@@ -100,7 +100,7 @@ Status meanings:
 - black/white and configurable reflectance rendering: **implemented**
 - reversed-reflectance output: **implemented** — raster, SVG and PNG invert the complete symbol including quiet zone; rendered QR/Micro grids are regression-decoded with reversed-reflectance metadata.
 - PNG structural correctness: **implemented** — independent Python validation parses chunks, verifies CRC/Adler, inflates IDAT, and checks indexed scanlines/geometry.
-- SVG structural correctness: **verify**
+- SVG structural correctness: **implemented** — `zig build svg-validate` independently parses representative QR/Micro SVGs, verifies namespace/viewBox/intrinsic sizing, quiet-zone geometry, path grammar/bounds, colors, transparency, and reversed reflectance; the six-case gate passed locally on 2026-10-06.
 - physical print/mark quality grading: **external**
 - camera thresholding/finder detection/perspective correction: **external**
 
@@ -108,7 +108,7 @@ Status meanings:
 
 `zig build conformance` is the executable external-reference gate. The evidence set now also includes the ISO-derived four-symbol Structured Append sequence and ZXing-cpp ECI/FNC1 decoder streams. For the Structured Append sequence, symbols 1-2 are exact encode/decode goldens; symbols 3-4 remain decode/interoperability fixtures because the pinned Segno encoder has a documented byte-aligned padding defect. QRz separately asserts the standards-correct `0xEC` pad codeword for those aligned streams. The corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices, independent M1/M3/M4 regression matrices, the full QR 1–40 × L/M/Q/H external data-capacity table, all 32 QR format-information codewords, all 34 QR version-information codewords, and the Annex A Reed–Solomon generator exponents for every degree used by QR Code, converted independently to GF(256) coefficients before comparison. Matrix fixtures are checked in both directions available without linking an external runtime. Capacity, alignment-position, raw/remainder-module, block-layout, BCH, generator-polynomial, and version-band boundaries are executable conformance evidence. Fixture provenance is recorded in `tests/reference/README.md`.
 
-The independent conformance set now covers QR geometry and block-layout tables, all QR mode capacity edges, BCH/RS evidence, special headers, static external matrices, and a recorded bidirectional ZXing-cpp differential campaign. Remaining release blockers are tracked below in rendering/output, portability runtime evidence, fuzz closure, and the final clause-by-clause audit.
+The independent conformance set now covers QR geometry and block-layout tables, all QR mode capacity edges, BCH/RS evidence, special headers, static external matrices, and a recorded bidirectional ZXing-cpp differential campaign. Remaining release blockers are sustained fuzz qualification, performance closure, and the final clause-by-clause/API audit.
 
 `zig build interop` runs the test-only bidirectional differential gate against pinned ZXing-cpp 3.1.1 after installing `tests/interop-requirements.txt`; it is intentionally excluded from the dependency-free default gates. Self-round-trips are regression evidence, not sufficient conformance evidence. v1 requires all of the following:
 
