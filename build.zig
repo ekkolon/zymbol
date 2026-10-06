@@ -330,6 +330,54 @@ pub fn build(b: *std.Build) void {
         portability_step.dependOn(&portability_render.step);
     }
 
+    const runtime_portability_step = b.step(
+        "runtime-portability",
+        "Run representative 32-bit little-endian and 64-bit big-endian targets via QEMU",
+    );
+
+    const runtime_targets = [_]struct {
+        name: []const u8,
+        query: std.Target.Query,
+    }{
+        .{
+            .name = "x86-linux-musl",
+            .query = .{ .cpu_arch = .x86, .os_tag = .linux, .abi = .musl },
+        },
+        .{
+            .name = "powerpc64-linux-musl",
+            .query = .{ .cpu_arch = .powerpc64, .os_tag = .linux, .abi = .musl },
+        },
+    };
+
+    for (runtime_targets) |entry| {
+        const runtime_target = b.resolveTargetQuery(entry.query);
+        const runtime_core_module = b.createModule(.{
+            .root_source_file = b.path("src/root.zig"),
+            .target = runtime_target,
+            .optimize = .ReleaseSafe,
+        });
+        const runtime_render_module = b.createModule(.{
+            .root_source_file = b.path("src/render/root.zig"),
+            .target = runtime_target,
+            .optimize = .ReleaseSafe,
+            .imports = &.{.{ .name = "qrz", .module = runtime_core_module }},
+        });
+        const runtime_test_module = b.createModule(.{
+            .root_source_file = b.path("tests/runtime_portability.zig"),
+            .target = runtime_target,
+            .optimize = .ReleaseSafe,
+            .imports = &.{
+                .{ .name = "qrz", .module = runtime_core_module },
+                .{ .name = "qrz_render", .module = runtime_render_module },
+            },
+        });
+        const runtime_exe = b.addExecutable(.{
+            .name = b.fmt("qrz-runtime-{s}", .{entry.name}),
+            .root_module = runtime_test_module,
+        });
+        runtime_portability_step.dependOn(&b.addRunArtifact(runtime_exe).step);
+    }
+
     const qualify_step = b.step("qualify", "Run release qualification");
     qualify_step.dependOn(&run_conformance_tests.step);
     qualify_step.dependOn(&run_bch_conformance_tests.step);
