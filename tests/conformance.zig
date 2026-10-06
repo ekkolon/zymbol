@@ -1,5 +1,6 @@
 const std = @import("std");
 const qrz = @import("qrz");
+const qr_tables = @import("reference/qr_tables.zig");
 
 fn fillBits(rows: []const []const u8, out: []bool) !void {
     const side = rows.len;
@@ -289,4 +290,121 @@ test "Segno independent M4-M boosted-level reference matrix" {
     };
 
     try verifyMicroReference("123456789012345678901234", .m4, .m, null, 2, &rows);
+}
+
+
+test "external QR data capacities match all versions and EC levels" {
+    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+
+    var version: qrz.Version = 1;
+    while (version <= qrz.max_version) : (version += 1) {
+        for (levels, 0..) |level, level_index| {
+            const expected = qr_tables.qr_data_codewords[version - 1][level_index];
+            try std.testing.expectEqual(expected, qrz.dataCodewords(version, level));
+        }
+    }
+}
+
+test "external QR byte capacity boundaries fit exactly" {
+    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+    var payload: [qrz.dataCodewords(qrz.max_version, .l)]u8 = @splat(0x80);
+    var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
+
+    var version: qrz.Version = 1;
+    while (version <= qrz.max_version) : (version += 1) {
+        const count_bits: usize = if (version <= 9) 8 else 16;
+
+        for (levels, 0..) |level, level_index| {
+            const data_codewords: usize = qr_tables.qr_data_codewords[version - 1][level_index];
+            const max_payload = (data_codewords * 8 - 4 - count_bits) / 8;
+            const options: qrz.EncodeOptions = .{
+                .min_version = version,
+                .max_version = version,
+                .ec_level = level,
+                .boost_ec_level = false,
+                .mask = 0,
+            };
+
+            const symbol = try qrz.encodeBytes(
+                payload[0..max_payload],
+                options,
+                cells[0..qrz.requiredCells(version)],
+                scratch[0..qrz.requiredEncodeScratch(version)],
+            );
+            try std.testing.expectEqual(version, symbol.version);
+            try std.testing.expectEqual(level, symbol.ec_level);
+
+            try std.testing.expectError(
+                error.DataTooLong,
+                qrz.encodeBytes(
+                    payload[0 .. max_payload + 1],
+                    options,
+                    cells[0..qrz.requiredCells(version)],
+                    scratch[0..qrz.requiredEncodeScratch(version)],
+                ),
+            );
+        }
+    }
+}
+
+test "QR character-count widths transition at version bands" {
+    var writer_storage: [8192]u8 = undefined;
+
+    var byte_payload: [256]u8 = @splat(0x80);
+    var writer = qrz.BitWriter.init(&writer_storage);
+    try qrz.appendByte(&writer, 9, byte_payload[0..255]);
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try std.testing.expectError(
+        error.TooManyCharacters,
+        qrz.appendByte(&writer, 9, &byte_payload),
+    );
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try qrz.appendByte(&writer, 10, &byte_payload);
+
+    var numeric_payload: [4096]u8 = @splat('7');
+    writer = qrz.BitWriter.init(&writer_storage);
+    try qrz.appendNumeric(&writer, 9, numeric_payload[0..1023]);
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try std.testing.expectError(
+        error.TooManyCharacters,
+        qrz.appendNumeric(&writer, 9, numeric_payload[0..1024]),
+    );
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try qrz.appendNumeric(&writer, 26, numeric_payload[0..4095]);
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try std.testing.expectError(
+        error.TooManyCharacters,
+        qrz.appendNumeric(&writer, 26, &numeric_payload),
+    );
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try qrz.appendNumeric(&writer, 27, &numeric_payload);
+
+    var alphanumeric_payload: [2048]u8 = @splat('A');
+    writer = qrz.BitWriter.init(&writer_storage);
+    try qrz.appendAlphanumeric(&writer, 9, alphanumeric_payload[0..511]);
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try std.testing.expectError(
+        error.TooManyCharacters,
+        qrz.appendAlphanumeric(&writer, 9, alphanumeric_payload[0..512]),
+    );
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try qrz.appendAlphanumeric(&writer, 26, alphanumeric_payload[0..2047]);
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try std.testing.expectError(
+        error.TooManyCharacters,
+        qrz.appendAlphanumeric(&writer, 26, &alphanumeric_payload),
+    );
+
+    writer = qrz.BitWriter.init(&writer_storage);
+    try qrz.appendAlphanumeric(&writer, 27, &alphanumeric_payload);
 }
