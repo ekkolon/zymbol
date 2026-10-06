@@ -257,6 +257,7 @@ microSize
 requiredMicroCells
 isValidSymbol
 defaultQuietZone
+render
 ```
 <!-- zymbol-api:end -->
 
