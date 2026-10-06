@@ -28,8 +28,8 @@ pub const Rgb = svg.Rgb;
 pub const OwnedBytes = owned.OwnedBytes;
 pub const PngEncodeOptions = owned.PngEncodeOptions;
 pub const SvgEncodeOptions = owned.SvgEncodeOptions;
-pub const MicroPngEncodeOptions = owned.MicroPngEncodeOptions;
-pub const MicroSvgEncodeOptions = owned.MicroSvgEncodeOptions;
+pub const PngMicroEncodeOptions = owned.PngMicroEncodeOptions;
+pub const SvgMicroEncodeOptions = owned.SvgMicroEncodeOptions;
 pub const BufferRequirements = owned.BufferRequirements;
 
 pub const rasterDimensions = raster.dimensions;
