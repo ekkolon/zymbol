@@ -179,24 +179,11 @@ The PNG encoder no longer uses stored-DEFLATE. Symbol-specific sizing dry-runs t
 
 ## Performance closure
 
-There is no meaningful finite claim of “all optimizations.” v1 instead uses benchmark closure:
+There is no meaningful finite claim of “all optimizations.” v1 instead uses benchmark closure.
 
-- profile before changing algorithms
-- retain representative Debug/ReleaseSafe/ReleaseFast/ReleaseSmall measurements
-- record throughput, latency, output size and working memory
-- investigate every material hot path
-- ship every optimization that produces a meaningful gain without weakening correctness, portability or maintainability
-- document consciously rejected trade-offs
+`zig build benchmark` is now wired in ReleaseFast and measures automatic versus fixed-mask QR encoding, QR decode, direct Reed-Solomon correction, PNG/SVG rendering, combined encode+PNG work, caller-owned working-set bytes, and QRz PNG IDAT size against Python zlib levels 6 and 9 on identical raw scanlines. The methodology and acceptance rule are defined in `docs/v1-performance.md`.
 
-Known areas requiring measurement before v1:
-
-- mixed-mode planner worst-case complexity
-- mask scoring
-- Reed–Solomon encode/decode
-- PNG CRC32
-- PNG DEFLATE strategy
-- SVG run emission
-- repeated encode/render workloads with caller-owned buffers
+The benchmark harness is implemented; a recorded release-environment run and hotspot review are still required before performance closure can be marked complete. Any accepted optimization must re-run the correctness and portability gates.
 
 ## Release rule
 
