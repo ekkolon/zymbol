@@ -3,6 +3,7 @@ const qrz = @import("qrz");
 
 pub const Error = error{
     InvalidSymbol,
+    InvalidVersion,
     OutputTooSmall,
     SizeOverflow,
 };
@@ -144,6 +145,37 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
     }
 
     try sink.write("\"/></svg>");
+}
+
+fn decimalDigits(value: usize) usize {
+    var digits: usize = 1;
+    var remaining = value;
+    while (remaining >= 10) : (remaining /= 10) digits += 1;
+    return digits;
+}
+
+pub fn maxBytesForVersion(version: qrz.Version, options: Options) Error!usize {
+    if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
+
+    const modules: usize = qrz.size(version);
+    const quiet = @as(usize, options.quiet_zone) * 2;
+    if (quiet > std.math.maxInt(usize) - modules) return Error.SizeOverflow;
+    const side = modules + quiet;
+    const digits = decimalDigits(side);
+
+    const runs_per_row = (modules + 1) / 2;
+    if (runs_per_row != 0 and modules > std.math.maxInt(usize) / runs_per_row) {
+        return Error.SizeOverflow;
+    }
+    const runs = modules * runs_per_row;
+    const per_run = 5 * digits + 6;
+    if (runs != 0 and per_run > std.math.maxInt(usize) / runs) {
+        return Error.SizeOverflow;
+    }
+
+    const paths = runs * per_run;
+    if (paths > std.math.maxInt(usize) - 256) return Error.SizeOverflow;
+    return paths + 256;
 }
 
 pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
