@@ -122,10 +122,14 @@ const expected_render_api = [_][]const u8{
     "svgMicroBytesInto",
 };
 
-fn declarationName(comptime decl: anytype) []const u8 {
-    const Decl = @TypeOf(decl);
-    if (Decl == []const u8 or Decl == [:0]const u8) return decl;
-    return decl.name;
+fn declarationNames(comptime T: type) []const [:0]const u8 {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |info| info.decl_names,
+        .@"enum" => |info| info.decl_names,
+        .@"union" => |info| info.decl_names,
+        .@"opaque" => |info| info.decl_names,
+        else => @compileError("expected declaration container: " ++ @typeName(T)),
+    };
 }
 
 fn isExpected(comptime name: []const u8, comptime expected: []const []const u8) bool {
@@ -136,14 +140,13 @@ fn isExpected(comptime name: []const u8, comptime expected: []const []const u8) 
 }
 
 fn expectExactPublicSurface(comptime T: type, comptime expected: []const []const u8) !void {
-    const declarations = comptime std.meta.declarations(T);
+    const declarations = comptime declarationNames(T);
 
     inline for (expected) |name| {
         try std.testing.expect(@hasDecl(T, name));
     }
 
-    inline for (declarations) |decl| {
-        const name = comptime declarationName(decl);
+    inline for (declarations) |name| {
         try std.testing.expect(isExpected(name, expected));
     }
 
@@ -159,34 +162,34 @@ test "v1 render public API snapshot" {
 }
 
 fn expectOrderedNames(
-    comptime fields: anytype,
+    comptime names: anytype,
     comptime expected: []const []const u8,
 ) !void {
-    try std.testing.expectEqual(expected.len, fields.len);
+    try std.testing.expectEqual(expected.len, names.len);
     inline for (expected, 0..) |name, index| {
-        try std.testing.expectEqualStrings(name, fields[index].name);
+        try std.testing.expectEqualStrings(name, names[index]);
     }
 }
 
 fn expectNameSet(
-    comptime fields: anytype,
+    comptime names: anytype,
     comptime expected: []const []const u8,
 ) !void {
     @setEvalBranchQuota(20_000);
-    try std.testing.expectEqual(expected.len, fields.len);
+    try std.testing.expectEqual(expected.len, names.len);
 
-    inline for (expected) |name| {
+    inline for (expected) |expected_name| {
         var found = false;
-        inline for (fields) |field| {
-            if (comptime std.mem.eql(u8, name, field.name)) found = true;
+        inline for (names) |actual_name| {
+            if (comptime std.mem.eql(u8, expected_name, actual_name)) found = true;
         }
         try std.testing.expect(found);
     }
 
-    inline for (fields) |field| {
+    inline for (names) |actual_name| {
         var found = false;
-        inline for (expected) |name| {
-            if (comptime std.mem.eql(u8, name, field.name)) found = true;
+        inline for (expected) |expected_name| {
+            if (comptime std.mem.eql(u8, expected_name, actual_name)) found = true;
         }
         try std.testing.expect(found);
     }
@@ -197,9 +200,9 @@ fn expectExactFields(
     comptime expected: []const []const u8,
 ) !void {
     switch (@typeInfo(T)) {
-        .@"struct" => |info| try expectOrderedNames(info.fields, expected),
-        .@"enum" => |info| try expectOrderedNames(info.fields, expected),
-        .@"union" => |info| try expectOrderedNames(info.fields, expected),
+        .@"struct" => |info| try expectOrderedNames(info.field_names, expected),
+        .@"enum" => |info| try expectOrderedNames(info.field_names, expected),
+        .@"union" => |info| try expectOrderedNames(info.field_names, expected),
         else => @compileError("expected struct, enum, or union: " ++ @typeName(T)),
     }
 }
@@ -209,13 +212,13 @@ fn expectExactFieldSet(
     comptime expected: []const []const u8,
 ) !void {
     switch (@typeInfo(T)) {
-        .@"struct" => |info| try expectNameSet(info.fields, expected),
-        .@"enum" => |info| try expectNameSet(info.fields, expected),
-        .@"union" => |info| try expectNameSet(info.fields, expected),
-        .error_set => |errors| {
-            const fields = errors orelse
+        .@"struct" => |info| try expectNameSet(info.field_names, expected),
+        .@"enum" => |info| try expectNameSet(info.field_names, expected),
+        .@"union" => |info| try expectNameSet(info.field_names, expected),
+        .error_set => |info| {
+            const names = info.error_names orelse
                 @compileError("cannot snapshot the global error set");
-            try expectNameSet(fields, expected);
+            try expectNameSet(names, expected);
         },
         else => @compileError("expected container or error set: " ++ @typeName(T)),
     }
@@ -225,14 +228,13 @@ fn expectExactTypeDecls(
     comptime T: type,
     comptime expected: []const []const u8,
 ) !void {
-    const declarations = comptime std.meta.declarations(T);
+    const declarations = comptime declarationNames(T);
     try std.testing.expectEqual(expected.len, declarations.len);
 
     inline for (expected) |name| {
         try std.testing.expect(@hasDecl(T, name));
     }
-    inline for (declarations) |decl| {
-        const name = comptime declarationName(decl);
+    inline for (declarations) |name| {
         try std.testing.expect(isExpected(name, expected));
     }
 }
