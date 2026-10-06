@@ -212,7 +212,7 @@ test "ISO-derived Figure 1 QR reference matrix with pinned mask" {
     // This Segno fixture is derived from the informative ISO/IEC 18004:2015
     // Figure 1 example. Its mask is part of the external fixture, not a
     // normative oracle for QR automatic-mask selection.
-    try verifyQrReference("QR Code Symbol", 1, .m, 5, 5, &rows, true);
+    try verifyQrReference("QR Code Symbol", 1, .m, 5, 5, &rows);
 }
 
 test "ISO Annex I.2 QR reference matrix" {
@@ -240,7 +240,7 @@ test "ISO Annex I.2 QR reference matrix" {
         "111111101111010010100",
     };
 
-    try verifyQrReference("01234567", 1, .m, 2, 2, &rows, true);
+    try verifyQrReference("01234567", 1, .m, 2, 2, &rows);
 }
 
 test "ISO Annex I.3 Micro QR reference matrix" {
@@ -260,7 +260,7 @@ test "ISO Annex I.3 Micro QR reference matrix" {
         "1110100110111",
     };
 
-    try verifyMicroReference("01234567", .m2, .l, null, 1, &rows, true);
+    try verifyMicroReference("01234567", .m2, .l, null, 1, &rows);
 }
 
 test "Segno independent M1 reference matrix" {
@@ -278,7 +278,7 @@ test "Segno independent M1 reference matrix" {
         "11110000011",
     };
 
-    try verifyMicroReference("12345", .m1, .l, null, 2, &rows, true);
+    try verifyMicroReference("12345", .m1, .l, null, 2, &rows);
 }
 
 test "Segno independent M3-L maximum numeric reference matrix" {
@@ -300,7 +300,7 @@ test "Segno independent M3-L maximum numeric reference matrix" {
         "100111010001111",
     };
 
-    try verifyMicroReference("12345678901234567890123", .m3, .l, null, 0, &rows, true);
+    try verifyMicroReference("12345678901234567890123", .m3, .l, null, 0, &rows);
 }
 
 test "Segno independent M4-L capacity transition reference matrix" {
@@ -324,7 +324,7 @@ test "Segno independent M4-L capacity transition reference matrix" {
         "10011101111110111",
     };
 
-    try verifyMicroReference("123456789012345678901234", .m4, .l, null, 0, &rows, true);
+    try verifyMicroReference("123456789012345678901234", .m4, .l, null, 0, &rows);
 }
 
 test "Segno independent M4-M boosted-level reference matrix" {
@@ -348,7 +348,7 @@ test "Segno independent M4-M boosted-level reference matrix" {
         "11111001101111110",
     };
 
-    try verifyMicroReference("123456789012345678901234", .m4, .m, null, 2, &rows, true);
+    try verifyMicroReference("123456789012345678901234", .m4, .m, null, 2, &rows);
 }
 
 
