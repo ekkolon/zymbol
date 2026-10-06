@@ -3,6 +3,12 @@ const qrz = @import("qrz");
 const png = @import("png.zig");
 const svg = @import("svg.zig");
 
+const QrPngError = qrz.EncodeError || png.Error;
+const QrSvgError = qrz.EncodeError || svg.Error;
+const QrSvgWriteError = qrz.EncodeError || svg.WriteError;
+const MicroPngError = qrz.MicroError || png.Error;
+const MicroSvgError = qrz.MicroError || svg.Error;
+
 pub const OwnedBytes = struct {
     bytes: []u8,
     allocator: std.mem.Allocator,
@@ -39,7 +45,7 @@ pub const BufferRequirements = struct {
     output: usize,
 };
 
-fn validateEncodeOptions(options: qrz.EncodeOptions) !void {
+fn validateEncodeOptions(options: qrz.EncodeOptions) qrz.EncodeError!void {
     if (!qrz.isValidVersion(options.min_version) or
         !qrz.isValidVersion(options.max_version) or
         options.min_version > options.max_version)
@@ -48,7 +54,7 @@ fn validateEncodeOptions(options: qrz.EncodeOptions) !void {
     }
 }
 
-pub fn pngRequirements(options: PngEncodeOptions) !BufferRequirements {
+pub fn pngRequirements(options: PngEncodeOptions) QrPngError!BufferRequirements {
     try validateEncodeOptions(options.encode);
     return .{
         .cells = qrz.requiredCells(options.encode.max_version),
@@ -57,7 +63,7 @@ pub fn pngRequirements(options: PngEncodeOptions) !BufferRequirements {
     };
 }
 
-pub fn svgRequirements(options: SvgEncodeOptions) !BufferRequirements {
+pub fn svgRequirements(options: SvgEncodeOptions) QrSvgError!BufferRequirements {
     try validateEncodeOptions(options.encode);
     return .{
         .cells = qrz.requiredCells(options.encode.max_version),
@@ -66,7 +72,7 @@ pub fn svgRequirements(options: SvgEncodeOptions) !BufferRequirements {
     };
 }
 
-fn validateMicroEncodeOptions(options: qrz.MicroEncodeOptions) !void {
+fn validateMicroEncodeOptions(options: qrz.MicroEncodeOptions) qrz.MicroError!void {
     if (options.min_version.number() > options.max_version.number()) {
         return error.InvalidVersionRange;
     }
@@ -79,7 +85,7 @@ fn validateMicroEncodeOptions(options: qrz.MicroEncodeOptions) !void {
     }
 }
 
-pub fn pngMicroRequirements(options: PngMicroEncodeOptions) !BufferRequirements {
+pub fn pngMicroRequirements(options: PngMicroEncodeOptions) MicroPngError!BufferRequirements {
     try validateMicroEncodeOptions(options.encode);
     return .{
         .cells = qrz.requiredMicroCells(options.encode.max_version),
@@ -91,7 +97,7 @@ pub fn pngMicroRequirements(options: PngMicroEncodeOptions) !BufferRequirements 
     };
 }
 
-pub fn svgMicroRequirements(options: SvgMicroEncodeOptions) !BufferRequirements {
+pub fn svgMicroRequirements(options: SvgMicroEncodeOptions) MicroSvgError!BufferRequirements {
     try validateMicroEncodeOptions(options.encode);
     return .{
         .cells = qrz.requiredMicroCells(options.encode.max_version),
@@ -118,7 +124,7 @@ const Encoded = struct {
         allocator: std.mem.Allocator,
         payload: Payload,
         options: qrz.EncodeOptions,
-    ) !Encoded {
+    ) (qrz.EncodeError || std.mem.Allocator.Error)!Encoded {
         try validateEncodeOptions(options);
 
         const cells = try allocator.alloc(qrz.Cell, qrz.requiredCells(options.max_version));
@@ -156,7 +162,7 @@ const MicroEncoded = struct {
         allocator: std.mem.Allocator,
         payload: Payload,
         options: qrz.MicroEncodeOptions,
-    ) !MicroEncoded {
+    ) (qrz.MicroError || std.mem.Allocator.Error)!MicroEncoded {
         try validateMicroEncodeOptions(options);
 
         const cells = try allocator.alloc(
@@ -187,7 +193,7 @@ fn renderOwnedPng(
     allocator: std.mem.Allocator,
     symbol: *const qrz.Symbol,
     options: png.Options,
-) !OwnedBytes {
+) (png.Error || std.mem.Allocator.Error)!OwnedBytes {
     const required = try png.requiredBytes(symbol, options);
     const output = try allocator.alloc(u8, required);
     errdefer allocator.free(output);
@@ -201,7 +207,7 @@ fn renderOwnedSvg(
     allocator: std.mem.Allocator,
     symbol: *const qrz.Symbol,
     options: svg.Options,
-) !OwnedBytes {
+) (svg.Error || std.mem.Allocator.Error)!OwnedBytes {
     const required = try svg.requiredBytes(symbol, options);
     const output = try allocator.alloc(u8, required);
     errdefer allocator.free(output);
@@ -215,7 +221,7 @@ pub fn pngText(
     allocator: std.mem.Allocator,
     text: []const u8,
     options: PngEncodeOptions,
-) !OwnedBytes {
+) (QrPngError || std.mem.Allocator.Error)!OwnedBytes {
     var encoded = try Encoded.init(allocator, .{ .text = text }, options.encode);
     defer encoded.deinit();
     return renderOwnedPng(allocator, &encoded.symbol, options.render);
@@ -225,7 +231,7 @@ pub fn pngBytes(
     allocator: std.mem.Allocator,
     bytes: []const u8,
     options: PngEncodeOptions,
-) !OwnedBytes {
+) (QrPngError || std.mem.Allocator.Error)!OwnedBytes {
     var encoded = try Encoded.init(allocator, .{ .bytes = bytes }, options.encode);
     defer encoded.deinit();
     return renderOwnedPng(allocator, &encoded.symbol, options.render);
@@ -235,7 +241,7 @@ pub fn svgText(
     allocator: std.mem.Allocator,
     text: []const u8,
     options: SvgEncodeOptions,
-) !OwnedBytes {
+) (QrSvgError || std.mem.Allocator.Error)!OwnedBytes {
     var encoded = try Encoded.init(allocator, .{ .text = text }, options.encode);
     defer encoded.deinit();
     return renderOwnedSvg(allocator, &encoded.symbol, options.render);
@@ -245,7 +251,7 @@ pub fn svgBytes(
     allocator: std.mem.Allocator,
     bytes: []const u8,
     options: SvgEncodeOptions,
-) !OwnedBytes {
+) (QrSvgError || std.mem.Allocator.Error)!OwnedBytes {
     var encoded = try Encoded.init(allocator, .{ .bytes = bytes }, options.encode);
     defer encoded.deinit();
     return renderOwnedSvg(allocator, &encoded.symbol, options.render);
@@ -255,7 +261,7 @@ pub fn pngMicroText(
     allocator: std.mem.Allocator,
     text: []const u8,
     options: PngMicroEncodeOptions,
-) !OwnedBytes {
+) (MicroPngError || std.mem.Allocator.Error)!OwnedBytes {
     var encoded = try MicroEncoded.init(allocator, .{ .text = text }, options.encode);
     defer encoded.deinit();
     return renderOwnedPng(allocator, &encoded.symbol, options.render);
@@ -265,7 +271,7 @@ pub fn pngMicroBytes(
     allocator: std.mem.Allocator,
     bytes: []const u8,
     options: PngMicroEncodeOptions,
-) !OwnedBytes {
+) (MicroPngError || std.mem.Allocator.Error)!OwnedBytes {
     var encoded = try MicroEncoded.init(allocator, .{ .bytes = bytes }, options.encode);
     defer encoded.deinit();
     return renderOwnedPng(allocator, &encoded.symbol, options.render);
@@ -275,7 +281,7 @@ pub fn svgMicroText(
     allocator: std.mem.Allocator,
     text: []const u8,
     options: SvgMicroEncodeOptions,
-) !OwnedBytes {
+) (MicroSvgError || std.mem.Allocator.Error)!OwnedBytes {
     var encoded = try MicroEncoded.init(allocator, .{ .text = text }, options.encode);
     defer encoded.deinit();
     return renderOwnedSvg(allocator, &encoded.symbol, options.render);
@@ -285,7 +291,7 @@ pub fn svgMicroBytes(
     allocator: std.mem.Allocator,
     bytes: []const u8,
     options: SvgMicroEncodeOptions,
-) !OwnedBytes {
+) (MicroSvgError || std.mem.Allocator.Error)!OwnedBytes {
     var encoded = try MicroEncoded.init(allocator, .{ .bytes = bytes }, options.encode);
     defer encoded.deinit();
     return renderOwnedSvg(allocator, &encoded.symbol, options.render);
@@ -296,7 +302,7 @@ pub fn writeSvgText(
     writer: *std.Io.Writer,
     text: []const u8,
     options: SvgEncodeOptions,
-) !void {
+) (QrSvgWriteError || std.mem.Allocator.Error)!void {
     var encoded = try Encoded.init(allocator, .{ .text = text }, options.encode);
     defer encoded.deinit();
     try svg.write(&encoded.symbol, writer, options.render);
@@ -307,7 +313,7 @@ pub fn writeSvgBytes(
     writer: *std.Io.Writer,
     bytes: []const u8,
     options: SvgEncodeOptions,
-) !void {
+) (QrSvgWriteError || std.mem.Allocator.Error)!void {
     var encoded = try Encoded.init(allocator, .{ .bytes = bytes }, options.encode);
     defer encoded.deinit();
     try svg.write(&encoded.symbol, writer, options.render);
@@ -319,7 +325,7 @@ pub fn writeSvgTextInto(
     options: SvgEncodeOptions,
     cells: []qrz.Cell,
     scratch: []u8,
-) !void {
+) QrSvgWriteError!void {
     const symbol = try qrz.encodeText(text, options.encode, cells, scratch);
     try svg.write(&symbol, writer, options.render);
 }
@@ -330,7 +336,7 @@ pub fn writeSvgBytesInto(
     options: SvgEncodeOptions,
     cells: []qrz.Cell,
     scratch: []u8,
-) !void {
+) QrSvgWriteError!void {
     const symbol = try qrz.encodeBytes(bytes, options.encode, cells, scratch);
     try svg.write(&symbol, writer, options.render);
 }
@@ -341,7 +347,7 @@ pub fn pngTextInto(
     cells: []qrz.Cell,
     scratch: []u8,
     output: []u8,
-) ![]const u8 {
+) QrPngError![]const u8 {
     const symbol = try qrz.encodeText(text, options.encode, cells, scratch);
     return png.render(&symbol, output, options.render);
 }
@@ -352,7 +358,7 @@ pub fn pngBytesInto(
     cells: []qrz.Cell,
     scratch: []u8,
     output: []u8,
-) ![]const u8 {
+) QrPngError![]const u8 {
     const symbol = try qrz.encodeBytes(bytes, options.encode, cells, scratch);
     return png.render(&symbol, output, options.render);
 }
@@ -363,7 +369,7 @@ pub fn svgTextInto(
     cells: []qrz.Cell,
     scratch: []u8,
     output: []u8,
-) ![]const u8 {
+) QrSvgError![]const u8 {
     const symbol = try qrz.encodeText(text, options.encode, cells, scratch);
     return svg.render(&symbol, output, options.render);
 }
@@ -374,7 +380,7 @@ pub fn svgBytesInto(
     cells: []qrz.Cell,
     scratch: []u8,
     output: []u8,
-) ![]const u8 {
+) QrSvgError![]const u8 {
     const symbol = try qrz.encodeBytes(bytes, options.encode, cells, scratch);
     return svg.render(&symbol, output, options.render);
 }
@@ -384,7 +390,7 @@ pub fn pngMicroTextInto(
     options: PngMicroEncodeOptions,
     cells: []qrz.Cell,
     output: []u8,
-) ![]const u8 {
+) MicroPngError![]const u8 {
     const symbol = try qrz.encodeMicroText(text, options.encode, cells);
     return png.render(&symbol, output, options.render);
 }
@@ -394,7 +400,7 @@ pub fn pngMicroBytesInto(
     options: PngMicroEncodeOptions,
     cells: []qrz.Cell,
     output: []u8,
-) ![]const u8 {
+) MicroPngError![]const u8 {
     const symbol = try qrz.encodeMicroBytes(bytes, options.encode, cells);
     return png.render(&symbol, output, options.render);
 }
@@ -404,7 +410,7 @@ pub fn svgMicroTextInto(
     options: SvgMicroEncodeOptions,
     cells: []qrz.Cell,
     output: []u8,
-) ![]const u8 {
+) MicroSvgError![]const u8 {
     const symbol = try qrz.encodeMicroText(text, options.encode, cells);
     return svg.render(&symbol, output, options.render);
 }
@@ -414,7 +420,7 @@ pub fn svgMicroBytesInto(
     options: SvgMicroEncodeOptions,
     cells: []qrz.Cell,
     output: []u8,
-) ![]const u8 {
+) MicroSvgError![]const u8 {
     const symbol = try qrz.encodeMicroBytes(bytes, options.encode, cells);
     return svg.render(&symbol, output, options.render);
 }
