@@ -1,8 +1,16 @@
 const std = @import("std");
 const decoder = @import("qrz_decoder");
 
+const release_corpus = [_][]const u8{
+    "\x00",
+    "\xff",
+    "QRZ",
+    "\xaa\x55\xaa\x55\xaa\x55\xaa\x55",
+    "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f",
+};
+
 test "fuzz raw QR data-stream parser" {
-    try std.testing.fuzz({}, fuzzParser, .{});
+    try std.testing.fuzz({}, fuzzParser, .{ .corpus = &release_corpus });
 }
 
 fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
