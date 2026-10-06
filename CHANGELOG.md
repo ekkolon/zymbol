@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added Micro QR M1-M4 encoding, decoding, legal EC/mode handling, all four masks, independent vectors, autodiscrimination, and two-module rendering defaults.
+- Added Micro QR PNG/SVG owned and caller-buffer helpers.
+- Added FNC1 first/second position, Structured Append, transmitted metadata, and AIM QR symbology modifiers.
+- Added mirror and reversed-reflectance normalization for QR and Micro QR decoding.
+
 - Added automatic mirrored and reversed-reflectance QR normalization with decode metadata.
 
 - Added an ISO/IEC 18004:2024 conformance ledger and made unresolved normative coverage a v1 blocker.
