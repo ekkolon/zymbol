@@ -319,7 +319,6 @@ test "base64 encoder matches RFC vectors" {
     try std.testing.expectEqualStrings("Zm9v", output[0..encodeBase64("foo", &output)]);
 }
 
-
 test "SIXEL output is framed" {
     var output: [64 * 1024]u8 = undefined;
     var writer: std.Io.Writer = .fixed(&output);

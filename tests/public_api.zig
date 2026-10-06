@@ -122,7 +122,6 @@ const expected_render_api = [_][]const u8{
     "svgMicroBytesInto",
 };
 
-
 fn declarationName(comptime decl: anytype) []const u8 {
     const Decl = @TypeOf(decl);
     if (Decl == []const u8 or Decl == [:0]const u8) return decl;
@@ -158,7 +157,6 @@ test "v1 core public API snapshot" {
 test "v1 render public API snapshot" {
     try expectExactPublicSurface(render, &expected_render_api);
 }
-
 
 fn expectOrderedNames(
     comptime fields: anytype,
@@ -241,10 +239,10 @@ fn expectExactTypeDecls(
 
 test "v1 core public type shapes" {
     try expectExactFields(qrz.EcLevel, &.{ "m", "l", "h", "q" });
-    try std.testing.expectEqual(@as(u2, 0b00), @intFromEnum(qrz.EcLevel.m));
-    try std.testing.expectEqual(@as(u2, 0b01), @intFromEnum(qrz.EcLevel.l));
-    try std.testing.expectEqual(@as(u2, 0b10), @intFromEnum(qrz.EcLevel.h));
-    try std.testing.expectEqual(@as(u2, 0b11), @intFromEnum(qrz.EcLevel.q));
+    try std.testing.expectEqual(@as(u2, 0b00), @backingInt(qrz.EcLevel.m));
+    try std.testing.expectEqual(@as(u2, 0b01), @backingInt(qrz.EcLevel.l));
+    try std.testing.expectEqual(@as(u2, 0b10), @backingInt(qrz.EcLevel.h));
+    try std.testing.expectEqual(@as(u2, 0b11), @backingInt(qrz.EcLevel.q));
 
     try expectExactFields(qrz.Mode, &.{
         "numeric",

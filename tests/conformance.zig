@@ -351,7 +351,6 @@ test "Segno independent M4-M boosted-level reference matrix" {
     try verifyMicroReference("123456789012345678901234", .m4, .m, null, 2, &rows);
 }
 
-
 test "external QR data capacities match all versions and EC levels" {
     const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
 
@@ -467,7 +466,6 @@ test "QR character-count widths transition at version bands" {
     writer = qrz.BitWriter.init(&writer_storage);
     try qrz.appendAlphanumeric(&writer, 27, &alphanumeric_payload);
 }
-
 
 fn numericSegmentBits(version: qrz.Version, count: usize) usize {
     const count_bits: usize = if (version <= 9) 10 else if (version <= 26) 12 else 14;
@@ -703,7 +701,6 @@ test "Segno Structured Append parity vectors" {
     try std.testing.expectEqual(@as(u8, 0x31), qrz.structuredAppendParity("123456789"));
     try std.testing.expectEqual(@as(u8, 0xA0), qrz.structuredAppendParity("M\xFCrrisch"));
 }
-
 
 test "Structured Append aligned streams use standard pad codeword" {
     const cases = [_]struct {

@@ -299,7 +299,6 @@ test "format BCH recovers every corruption within distance three" {
     }
 }
 
-
 test "format BCH never returns the original candidate beyond distance three" {
     const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
 
@@ -812,14 +811,14 @@ test "truncated segment data is rejected" {
     var out: [16]u8 = undefined;
     try std.testing.expectError(
         Error.MalformedDataStream,
-        parseDataStream(&.{ 0b0100_0000 }, 1, &out),
+        parseDataStream(&.{0b0100_0000}, 1, &out),
     );
 }
 
 test "invalid alphanumeric values are rejected" {
     var bytes: [3]u8 = undefined;
     var writer = bitstream.Writer.init(&bytes);
-    try writer.append(@intFromEnum(spec.Mode.alphanumeric), 4);
+    try writer.append(@backingInt(spec.Mode.alphanumeric), 4);
     try writer.append(2, 9);
     try writer.append(2047, 11);
 
@@ -829,7 +828,6 @@ test "invalid alphanumeric values are rejected" {
         parseDataStream(writer.filled(), 1, &out),
     );
 }
-
 
 test "FNC1 first position applies alphanumeric percent semantics" {
     var bytes: [16]u8 = undefined;
@@ -913,7 +911,6 @@ test "FNC1 must precede ECI and payload modes" {
         parseDataStream(&bytes, 1, &out),
     );
 }
-
 
 test "symbology modifiers cover all QR FNC1 and ECI combinations" {
     const cases = [_]struct {

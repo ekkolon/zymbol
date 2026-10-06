@@ -446,7 +446,6 @@ test "owned helpers encode PNG and SVG from text" {
     try std.testing.expect(std.mem.startsWith(u8, svg_image.bytes, "<svg "));
 }
 
-
 test "buffer requirements cover allocation-free helpers" {
     const png_options = PngEncodeOptions{
         .encode = .{
@@ -498,7 +497,6 @@ test "buffer requirements cover allocation-free helpers" {
     );
     try std.testing.expect(svg_bytes.len <= svg_required.output);
 }
-
 
 test "owned byte helpers preserve arbitrary payloads" {
     const allocator = std.testing.allocator;
@@ -557,7 +555,6 @@ test "SVG writer facades match buffered output" {
 
     try std.testing.expectEqualStrings(buffered.bytes, writer_storage_into[0..writer_into.end]);
 }
-
 
 test "owned and allocation-free Micro QR helpers render PNG and SVG" {
     const allocator = std.testing.allocator;

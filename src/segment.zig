@@ -57,7 +57,7 @@ fn maxCharacterCount(mode: spec.Mode, version: u6) usize {
 fn writeHeader(writer: *bitstream.Writer, mode: spec.Mode, version: u6, char_count: usize) Error!void {
     if (!validVersion(version)) return Error.InvalidVersion;
     if (char_count > maxCharacterCount(mode, version)) return Error.TooManyCharacters;
-    try writer.append(@intFromEnum(mode), 4);
+    try writer.append(@backingInt(mode), 4);
     try writer.append(@intCast(char_count), @intCast(spec.charCountBits(mode, version)));
 }
 
@@ -130,7 +130,7 @@ pub fn appendKanji(writer: *bitstream.Writer, version: u6, sjis: []const u8) Err
 pub fn appendEci(writer: *bitstream.Writer, assignment: u21) Error!void {
     if (assignment > 999_999) return Error.InvalidEciAssignment;
 
-    try writer.append(@intFromEnum(spec.Mode.eci), 4);
+    try writer.append(@backingInt(spec.Mode.eci), 4);
     if (assignment < (1 << 7)) {
         try writer.append(assignment, 8);
     } else if (assignment < (1 << 14)) {
@@ -148,7 +148,7 @@ pub fn appendStructuredAppend(
 ) Error!void {
     if (!value.isValid()) return Error.InvalidStructuredAppend;
 
-    try writer.append(@intFromEnum(spec.Mode.structured_append), 4);
+    try writer.append(@backingInt(spec.Mode.structured_append), 4);
     try writer.append(value.index, 4);
     try writer.append(@as(u4, @intCast(value.count - 1)), 4);
     try writer.append(value.parity, 8);
@@ -157,10 +157,10 @@ pub fn appendStructuredAppend(
 pub fn appendFnc1(writer: *bitstream.Writer, value: spec.Fnc1) Error!void {
     switch (value) {
         .none => {},
-        .first_position => try writer.append(@intFromEnum(spec.Mode.fnc1_first_position), 4),
+        .first_position => try writer.append(@backingInt(spec.Mode.fnc1_first_position), 4),
         .second_position => |indicator| {
             const encoded = indicator.encoded() orelse return Error.InvalidApplicationIndicator;
-            try writer.append(@intFromEnum(spec.Mode.fnc1_second_position), 4);
+            try writer.append(@backingInt(spec.Mode.fnc1_second_position), 4);
             try writer.append(encoded, 8);
         },
     }
@@ -268,7 +268,7 @@ fn runPlanner(
             if (trace) |storage| {
                 const predecessor: u16 =
                     (@as(u16, @intCast(start)) << 2) |
-                    @as(u16, @intFromEnum(Class.numeric));
+                    @as(u16, @backingInt(Class.numeric));
                 writeU16(storage, end, predecessor);
             }
             start = end;
@@ -305,7 +305,7 @@ fn runPlanner(
                     if (trace) |storage| {
                         const predecessor: u16 =
                             (@as(u16, @intCast(start)) << 2) |
-                            @as(u16, @intFromEnum(class));
+                            @as(u16, @backingInt(class));
                         writeU16(storage, end, predecessor);
                     }
                 }
@@ -351,7 +351,7 @@ pub fn writeOptimal(
         index -= 1;
         end = readU16(costs, index);
         const predecessor = readU16(trace, end);
-        const class: Class = @enumFromInt(predecessor & 0b11);
+        const class: Class = @fromBackingInt(@intCast(predecessor & 0b11));
 
         try appendClass(writer, version, class, text[start..end]);
         start = end;
@@ -488,9 +488,6 @@ test "ECI supports all standard assignment widths" {
         try testing.expect(writer.bitLength() == 12 or writer.bitLength() == 20 or writer.bitLength() == 28);
     }
 }
-
-
-
 
 test "structured append header encodes index count and parity" {
     var buf: [3]u8 = undefined;

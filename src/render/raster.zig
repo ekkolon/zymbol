@@ -226,7 +226,6 @@ test "raster rejects malformed symbols, invalid scale and undersized output" {
     );
 }
 
-
 test "raster reversed reflectance inverts symbol and quiet zone" {
     var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
     var symbol = testSymbol(&cells);

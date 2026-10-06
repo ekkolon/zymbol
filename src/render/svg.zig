@@ -381,7 +381,6 @@ test "SVG rejects malformed symbols and undersized output" {
     );
 }
 
-
 test "SVG reversed reflectance swaps full symbol polarity" {
     var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
     var symbol = testSymbol(&cells);

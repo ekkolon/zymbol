@@ -409,7 +409,6 @@ test "decode corrects the maximum guaranteed number of random byte errors" {
     }
 }
 
-
 test "decode rejects selected corruptions beyond the guaranteed RS radius" {
     const degrees = [_]usize{ 7, 10, 13, 15, 16, 17, 18, 20, 22, 24, 26, 28, 30 };
 

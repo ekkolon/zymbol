@@ -44,7 +44,7 @@ pub fn main(init: std.process.Init) !void {
 
 fn corrupt(block: *[data_len + ec_len]u8) void {
     const positions = [_]usize{
-        0, 7, 19, 28, 39, 51, 62, 73,
+        0,  7,  19,  28,  39,  51,  62,  73,
         84, 95, 106, 117, 128, 139, 149,
     };
     for (positions, 0..) |position, index| {

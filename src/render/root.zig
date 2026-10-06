@@ -129,7 +129,6 @@ test "encoded symbol renders consistently to raster and SVG" {
     try std.testing.expect(std.mem.endsWith(u8, rendered_svg, "</svg>"));
 }
 
-
 test "raster projection is exact across representative versions" {
     const versions = [_]qrz.Version{ 1, 7, 20, 40 };
 
@@ -175,7 +174,6 @@ test "raster projection is exact across representative versions" {
         }
     }
 }
-
 
 test "Micro QR rendering uses the two-module default quiet zone" {
     var cells: [qrz.requiredMicroCells(.m2)]qrz.Cell = undefined;
@@ -235,7 +233,6 @@ test "Micro QR rendering uses the two-module default quiet zone" {
         rendered_png[20..24],
     );
 }
-
 
 test "reversed raster QR decodes with reflectance metadata" {
     var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;

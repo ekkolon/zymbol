@@ -181,7 +181,6 @@ fn fuzzPng(_: void, smith: *std.testing.Smith) !void {
     );
 }
 
-
 test "fuzz ISO control modes" {
     try std.testing.fuzz({}, fuzzControlModes, .{ .corpus = &release_corpus });
 }
@@ -265,7 +264,6 @@ fn fuzzControlModes(_: void, smith: *std.testing.Smith) !void {
         try std.testing.expect(result.structured_append == null);
     }
 }
-
 
 test "fuzz Micro QR arbitrary module grids" {
     try std.testing.fuzz({}, fuzzMicroDecoder, .{ .corpus = &release_corpus });
@@ -366,7 +364,6 @@ fn fuzzMicroRoundTrip(_: void, smith: *std.testing.Smith) !void {
         png[0..8],
     );
 }
-
 
 test "fuzz legal Micro QR mode and ECC combinations" {
     try std.testing.fuzz({}, fuzzMicroModes, .{ .corpus = &release_corpus });

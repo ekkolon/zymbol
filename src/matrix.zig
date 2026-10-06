@@ -567,7 +567,6 @@ test "setData refuses to touch a function module but allows a data module" {
     try testing.expectError(Symbol.SetError.OutOfBounds, symbol.setData(21, 0, true));
 }
 
-
 test "data iterator matches codeword placement order" {
     const testing = std.testing;
     var buf: [21 * 21]Cell = undefined;
