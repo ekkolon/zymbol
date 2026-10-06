@@ -359,8 +359,8 @@ fn appendKanji(writer: *bitstream.Writer, version: Version, sjis: []const u8) !v
             return Error.InvalidKanjiByte;
         }
 
-        const packed = (value >> 8) * 0xC0 + (value & 0xFF);
-        try writer.append(packed, 13);
+        const encoded = (value >> 8) * 0xC0 + (value & 0xFF);
+        try writer.append(encoded, 13);
     }
 }
 
