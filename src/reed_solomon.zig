@@ -54,7 +54,7 @@ inline fn gfMulComptime(a: u8, b: u8) u8 {
     return gf.mul(a, b);
 }
 
-fn generatorPolynomial(degree: usize) []const u8 {
+pub fn generatorPolynomial(degree: usize) []const u8 {
     return generators[degree][0..degree];
 }
 
