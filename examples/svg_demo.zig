@@ -2,13 +2,15 @@ const std = @import("std");
 const render = @import("qrz_render");
 
 pub fn main(init: std.process.Init) !void {
-    var stdout_buffer: [4096]u8 = undefined;
-    var stdout_writer = std.Io.File.stdout().writer(init.io, &stdout_buffer);
-    const stdout = &stdout_writer.interface;
+    var file = try std.Io.Dir.cwd().createFile(init.io, "qrz.svg", .{});
+    defer file.close(init.io);
+
+    var write_buffer: [4096]u8 = undefined;
+    var file_writer = file.writer(init.io, &write_buffer);
 
     try render.writeSvgText(
         init.gpa,
-        stdout,
+        &file_writer.interface,
         "https://example.com/qrz",
         .{
             .encode = .{
@@ -18,6 +20,7 @@ pub fn main(init: std.process.Init) !void {
             },
         },
     );
-    try stdout.writeAll("\n");
-    try stdout.flush();
+    try file_writer.interface.flush();
+
+    std.log.info("wrote qrz.svg", .{});
 }
