@@ -13,6 +13,7 @@ const segment = @import("segment.zig");
 const matrix = @import("matrix.zig");
 const encoder = @import("encoder.zig");
 const decoder = @import("decoder.zig");
+const micro = @import("micro.zig");
 
 pub const Version = u6;
 pub const EcLevel = spec.EcLevel;
@@ -22,7 +23,12 @@ pub const ApplicationIndicator = spec.ApplicationIndicator;
 pub const Fnc1 = spec.Fnc1;
 pub const Cell = matrix.Cell;
 pub const ModuleKind = matrix.ModuleKind;
+pub const SymbolFamily = matrix.SymbolFamily;
 pub const Symbol = matrix.Symbol;
+pub const MicroVersion = micro.Version;
+pub const MicroEncodeOptions = micro.Options;
+pub const MicroError = micro.Error;
+pub const MicroDecodeResult = micro.DecodeResult;
 pub const EncodeOptions = encoder.Options;
 pub const EncodeError = encoder.Error;
 pub const DecodeError = decoder.Error;
@@ -46,6 +52,47 @@ pub const encodeText = encoder.encodeText;
 pub const encodeBytes = encoder.encodeBytes;
 pub const encodeRaw = encoder.encodeRaw;
 pub const decode = decoder.decode;
+
+pub const encodeMicroText = micro.encodeText;
+pub const encodeMicroBytes = micro.encodeBytes;
+pub const encodeMicroKanji = micro.encodeKanji;
+pub const decodeMicro = micro.decode;
+
+pub const AnyDecodeResult = union(SymbolFamily) {
+    qr: DecodeResult,
+    micro_qr: MicroDecodeResult,
+};
+
+pub const DecodeAnyError = DecodeError || MicroError;
+
+pub fn decodeAny(
+    bits: []const bool,
+    symbol_size: u16,
+    cells_scratch: []Cell,
+    codeword_scratch: []u8,
+    data_out: []u8,
+) DecodeAnyError!AnyDecodeResult {
+    if (symbol_size >= 11 and symbol_size <= 17 and (symbol_size & 1) != 0) {
+        return .{
+            .micro_qr = try decodeMicro(
+                bits,
+                symbol_size,
+                cells_scratch,
+                data_out,
+            ),
+        };
+    }
+
+    return .{
+        .qr = try decode(
+            bits,
+            symbol_size,
+            cells_scratch,
+            codeword_scratch,
+            data_out,
+        ),
+    };
+}
 
 pub const min_version = spec.min_version;
 pub const max_version = spec.max_version;
@@ -79,10 +126,46 @@ pub fn dataCodewords(version: Version, level: EcLevel) usize {
     return spec.dataCodewords(version, level);
 }
 
+pub fn microSize(version: MicroVersion) u16 {
+    return micro.size(version);
+}
+
+pub fn requiredMicroCells(version: MicroVersion) usize {
+    return micro.requiredCells(version);
+}
+
+pub fn isValidSymbol(symbol: *const Symbol) bool {
+    const expected_size: u16 = switch (symbol.family) {
+        .qr => if (isValidVersion(symbol.version))
+            size(symbol.version)
+        else
+            return false,
+        .micro_qr => switch (symbol.version) {
+            1 => microSize(.m1),
+            2 => microSize(.m2),
+            3 => microSize(.m3),
+            4 => microSize(.m4),
+            else => return false,
+        },
+    };
+
+    if (symbol.size != expected_size) return false;
+    const required = @as(usize, expected_size) * expected_size;
+    return symbol.cells.len >= required;
+}
+
+pub fn defaultQuietZone(family: SymbolFamily) u16 {
+    return switch (family) {
+        .qr => 4,
+        .micro_qr => 2,
+    };
+}
+
 test {
     std.testing.refAllDecls(@This());
     _ = gf256;
     _ = reed_solomon;
+    _ = micro;
 }
 
 test "public sizing helpers reject invalid versions" {
