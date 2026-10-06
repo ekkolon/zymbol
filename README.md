@@ -234,8 +234,11 @@ zig build example-svg
 zig build example-png
 zig build qualify
 
-# long-running coverage-guided fuzzing
+# long-running coverage-guided fuzzing (uses all available jobs)
 zig build fuzz --fuzz
+
+# or cap fuzzing at 8 concurrent jobs
+zig build fuzz -j8 --fuzz
 ```
 
 The package currently supports Zig 0.16.0 as its minimum version. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall, compiles the examples without executing them, and compiles the core/render modules for `wasm32-freestanding` in ReleaseFast.
