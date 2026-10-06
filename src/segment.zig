@@ -8,6 +8,8 @@ pub const Error = bitstream.Error || error{
     OddKanjiLength,
     InvalidKanjiByte,
     InvalidEciAssignment,
+    InvalidStructuredAppend,
+    InvalidApplicationIndicator,
     InvalidVersion,
     ScratchTooSmall,
 };
@@ -138,6 +140,36 @@ pub fn appendEci(writer: *bitstream.Writer, assignment: u21) Error!void {
         try writer.append(0b110, 3);
         try writer.append(assignment, 21);
     }
+}
+
+pub fn appendStructuredAppend(
+    writer: *bitstream.Writer,
+    value: spec.StructuredAppend,
+) Error!void {
+    if (!value.isValid()) return Error.InvalidStructuredAppend;
+
+    try writer.append(@intFromEnum(spec.Mode.structured_append), 4);
+    try writer.append(value.index, 4);
+    try writer.append(@as(u4, @intCast(value.count - 1)), 4);
+    try writer.append(value.parity, 8);
+}
+
+pub fn appendFnc1(writer: *bitstream.Writer, value: spec.Fnc1) Error!void {
+    switch (value) {
+        .none => {},
+        .first_position => try writer.append(@intFromEnum(spec.Mode.fnc1_first_position), 4),
+        .second_position => |indicator| {
+            const encoded = indicator.encoded() orelse return Error.InvalidApplicationIndicator;
+            try writer.append(@intFromEnum(spec.Mode.fnc1_second_position), 4);
+            try writer.append(encoded, 8);
+        },
+    }
+}
+
+pub fn structuredAppendParity(data: []const u8) u8 {
+    var parity: u8 = 0;
+    for (data) |byte| parity ^= byte;
+    return parity;
 }
 
 const Class = enum(u2) {
