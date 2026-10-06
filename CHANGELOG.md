@@ -4,7 +4,7 @@
 
 - Added an ISO/IEC 18004:2024 conformance ledger and made unresolved normative coverage a v1 blocker.
 - Added a cross-architecture ReleaseSafe portability matrix for core and rendering modules.
-- Added Zig 0.16 coverage-guided fuzz targets for decoding, binary round trips, and PNG encoding.
+- Added coverage-guided `std.testing.Smith` fuzz targets for decoding, binary round trips, and PNG encoding.
 
 - Added isolated `qrz_render` raster rendering and built-in PNG/SVG codecs.
 - Added one-call owned PNG/SVG helpers plus allocation-free buffer APIs for WASM and freestanding targets.
