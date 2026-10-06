@@ -266,8 +266,8 @@ default and omits intrinsic width/height.
 
 ```zig
 qrz_render.requiredPngBytes
-qrz_render.requiredPngBytesForVersion
-qrz_render.requiredPngBytesForMicroVersion
+qrz_render.maxPngBytesForVersion
+qrz_render.maxPngBytesForMicroVersion
 qrz_render.renderPng
 ```
 
@@ -355,8 +355,8 @@ maxSvgBytesForMicroVersion
 renderSvg
 writeSvg
 requiredPngBytes
-requiredPngBytesForVersion
-requiredPngBytesForMicroVersion
+maxPngBytesForVersion
+maxPngBytesForMicroVersion
 renderPng
 pngRequirements
 svgRequirements
