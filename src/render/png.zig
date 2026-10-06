@@ -581,6 +581,28 @@ test "PNG required size exactly matches rendered size" {
     try std.testing.expectEqualStrings("IEND", encoded[encoded.len - 8 .. encoded.len - 4]);
 }
 
+test "PNG version requirement bounds exact compressed size" {
+    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try qrz.encodeText(
+        "QRZ BUFFER BOUND",
+        .{
+            .min_version = 4,
+            .max_version = 4,
+            .ec_level = .q,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+        &scratch,
+    );
+
+    const options = Options{ .scale = 4 };
+    const bound = try requiredBytesForVersion(4, options);
+    const exact = try requiredBytes(&symbol, options);
+    try std.testing.expect(bound >= exact);
+}
+
 test "PNG transparent background emits tRNS" {
     var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
     var scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
