@@ -2,7 +2,7 @@
 
 QR Code Model 2 encoding and decoding for Zig with no runtime dependencies and no mandatory heap allocation.
 
-QRz operates on caller-owned buffers. QR semantics live in `qrz`; rendering lives in the separate `qrz_render` module. Neither module performs file I/O or depends on image codecs.
+QRz separates QR semantics from output formats. `qrz` encodes and decodes symbols; `qrz_render` turns those symbols into raster pixels, SVG, or PNG. Neither module performs file I/O.
 
 ## Status
 
@@ -17,7 +17,7 @@ The current implementation covers the Model 2 symbol mechanics used by QR versio
 - UTF-8 text through ECI assignment 26 when required
 - arbitrary binary payloads
 - caller-owned module and codeword buffers
-- allocation-free raster and SVG rendering through `qrz_render`
+- allocation-free raster rendering plus built-in SVG and PNG encoding through `qrz_render`
 - `wasm32-freestanding` compilation
 
 The implementation targets the QR Code Model 2 rules in ISO/IEC 18004:2024. Structured Append and FNC1 application semantics are not part of the current high-level API.
@@ -62,61 +62,84 @@ const symbol = try qrz.encodeBytes(
 
 ## Rendering
 
-Rendering is a separate module from the QR core:
+For normal applications, PNG and SVG are one call:
 
 ```zig
-const qrz = @import("qrz");
 const render = @import("qrz_render");
 
-const version = 6;
-var cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
-var scratch: [qrz.requiredEncodeScratch(version)]u8 = undefined;
+var png = try render.pngText(init.gpa, "https://example.com", .{});
+defer png.deinit();
 
-const symbol = try qrz.encodeText(
-    "https://example.com",
-    .{ .max_version = version, .ec_level = .m },
-    &cells,
-    &scratch,
-);
+var svg = try render.svgText(init.gpa, "https://example.com", .{});
+defer svg.deinit();
 ```
 
-For raster output, the caller chooses the pixel type and owns the buffer:
+`pngText` and `svgText` encode the QR symbol, allocate exactly-sized output, and return owned bytes. Binary payloads use `pngBytes` and `svgBytes`.
+
+Format and QR options stay explicit when needed:
 
 ```zig
-const options = render.RasterOptions{
-    .scale = 4,
-    .quiet_zone = 4,
+var png = try render.pngText(
+    init.gpa,
+    "https://example.com",
+    .{
+        .encode = .{
+            .ec_level = .q,
+            .max_version = 10,
+        },
+        .render = .{
+            .scale = 6,
+            .quiet_zone = 4,
+            .foreground = .{ .r = 20, .g = 20, .b = 20 },
+            .background = .{ .r = 255, .g = 255, .b = 255 },
+        },
+    },
+);
+defer png.deinit();
+```
+
+PNG is encoded directly from the QR symbol as a 1-bit indexed image. It does not materialize an intermediate raster buffer. A transparent PNG background is selected with `.background = null`.
+
+The low-level APIs remain allocation-free:
+
+```zig
+const required = try render.requiredPngBytes(&symbol, .{});
+const png = try render.renderPng(&symbol, output, .{});
+
+const svg_required = try render.requiredSvgBytes(&symbol, .{});
+const svg = try render.renderSvg(&symbol, svg_output, .{});
+```
+
+Raw raster output is available through `renderRaster` and `renderRasterStrided` when an application already owns a pixel surface or wants to feed another image codec.
+
+### WASM and freestanding
+
+The same codecs compile for `wasm32-freestanding`. No filesystem or platform I/O is required.
+
+For hosts that own WebAssembly linear memory, `pngRequirements` and `svgRequirements` return the cell, encoder-scratch, and output capacities for the configured maximum QR version. The matching `pngTextInto`, `pngBytesInto`, `svgTextInto`, and `svgBytesInto` functions encode directly into those caller-provided buffers:
+
+```zig
+const options = render.PngEncodeOptions{
+    .encode = .{ .max_version = 10 },
 };
 
-const pixel_count = try render.requiredRasterPixels(&symbol, options);
-_ = pixel_count;
+const required = try render.pngRequirements(options);
 
-var pixels: [512 * 512]u8 = undefined;
-const image = try render.renderRaster(
-    u8,
-    &symbol,
-    &pixels,
-    0,
-    255,
+// Host/WASM integration provides these slices from linear memory.
+const png = try render.pngTextInto(
+    text,
     options,
+    cells[0..required.cells],
+    scratch[0..required.scratch],
+    output[0..required.output],
 );
 ```
 
-`renderRasterStrided` supports caller-owned images whose rows contain padding. The renderer writes only the active image width and leaves stride padding untouched.
+This keeps the WebAssembly ABI and allocator policy outside QRz while using exactly the same QR and PNG implementation as native code. An application that already has a Zig allocator in WASM can use `pngText`/`svgText` directly instead.
 
-SVG output uses the same ownership model:
+The default quiet zone is four modules. Raster output uses integer module scaling; SVG uses integer coordinates and `shape-rendering="crispEdges"`.
 
-```zig
-const required = try render.requiredSvgBytes(&symbol, .{});
-_ = required;
-
-var output: [64 * 1024]u8 = undefined;
-const svg = try render.renderSvg(&symbol, &output, .{});
-```
-
-The default quiet zone is four modules. Raster output uses integer module scaling, so module edges stay aligned to pixels. SVG output uses integer coordinates and `shape-rendering="crispEdges"`.
-
-QRz does not write files and does not encode PNG, JPEG, WebP, AVIF, or other raster file formats. Applications can pass the rendered raster buffer to the image codec or UI surface they already use. `examples/png_demo.zig` demonstrates this boundary by encoding the raster output as an 8-bit grayscale PNG and writing `qrz.png` without adding a codec dependency to `qrz_render`.
+QRz produces PNG/SVG bytes but deliberately does not open files, write sockets, or own browser/DOM integration. Those are application concerns.
 
 ## Decoding
 
@@ -184,7 +207,7 @@ The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
 - `src/matrix.zig` — function patterns, data traversal, masks, penalty scoring
 - `src/encoder.zig` — version selection, interleaving, symbol construction
 - `src/decoder.zig` — format recovery, deinterleaving, correction, parsing
-- `src/render/` — allocation-free raster and SVG rendering
+- `src/render/` — raster rendering, PNG/SVG codecs, and owned-output conveniences
 - `src/root.zig` — public API and integration tests
 
 ## License
