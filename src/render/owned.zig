@@ -53,7 +53,7 @@ pub fn pngRequirements(options: PngEncodeOptions) !BufferRequirements {
     return .{
         .cells = qrz.requiredCells(options.encode.max_version),
         .scratch = qrz.requiredEncodeScratch(options.encode.max_version),
-        .output = try png.requiredBytesForVersion(options.encode.max_version, options.render),
+        .output = try png.maxBytesForVersion(options.encode.max_version, options.render),
     };
 }
 
@@ -84,7 +84,7 @@ pub fn pngMicroRequirements(options: PngMicroEncodeOptions) !BufferRequirements 
     return .{
         .cells = qrz.requiredMicroCells(options.encode.max_version),
         .scratch = 0,
-        .output = try png.requiredBytesForMicroVersion(
+        .output = try png.maxBytesForMicroVersion(
             options.encode.max_version,
             options.render,
         ),
