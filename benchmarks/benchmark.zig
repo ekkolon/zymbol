@@ -110,7 +110,7 @@ fn benchEncodeAuto(io: std.Io) !void {
             );
             std.mem.doNotOptimizeAway(symbol.mask);
         }
-                const stopped = try std.Io.Clock.awake.now(io);
+        const stopped = try std.Io.Clock.awake.now(io);
         elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
     }
 
@@ -145,7 +145,7 @@ fn benchEncodeFixed(io: std.Io) !void {
             );
             std.mem.doNotOptimizeAway(symbol.mask);
         }
-                const stopped = try std.Io.Clock.awake.now(io);
+        const stopped = try std.Io.Clock.awake.now(io);
         elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
     }
 
@@ -176,7 +176,7 @@ fn benchDecode(io: std.Io) !void {
             std.mem.doNotOptimizeAway(result.errors_corrected);
             std.mem.doNotOptimizeAway(decoded[0]);
         }
-                const stopped = try std.Io.Clock.awake.now(io);
+        const stopped = try std.Io.Clock.awake.now(io);
         elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
     }
 
@@ -211,7 +211,7 @@ fn benchPng(
             );
             std.mem.doNotOptimizeAway(result[result.len - 1]);
         }
-                const stopped = try std.Io.Clock.awake.now(io);
+        const stopped = try std.Io.Clock.awake.now(io);
         elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
     }
 
@@ -243,7 +243,7 @@ fn benchSvg(
             );
             std.mem.doNotOptimizeAway(result[result.len - 1]);
         }
-                const stopped = try std.Io.Clock.awake.now(io);
+        const stopped = try std.Io.Clock.awake.now(io);
         elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
     }
 
@@ -286,7 +286,7 @@ fn benchEncodePng(io: std.Io) !void {
             last_len = result.len;
             std.mem.doNotOptimizeAway(result[result.len - 1]);
         }
-                const stopped = try std.Io.Clock.awake.now(io);
+        const stopped = try std.Io.Clock.awake.now(io);
         elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
     }
 
