@@ -21,6 +21,7 @@ pub const RasterError = raster.Error;
 
 pub const SvgOptions = svg.Options;
 pub const SvgError = svg.Error;
+pub const SvgWriteError = svg.WriteError;
 pub const PngOptions = png.Options;
 pub const PngError = png.Error;
 pub const Rgb = svg.Rgb;
@@ -30,6 +31,10 @@ pub const PngEncodeOptions = owned.PngEncodeOptions;
 pub const SvgEncodeOptions = owned.SvgEncodeOptions;
 pub const PngMicroEncodeOptions = owned.PngMicroEncodeOptions;
 pub const SvgMicroEncodeOptions = owned.SvgMicroEncodeOptions;
+pub const PngEncodeError = owned.PngEncodeError;
+pub const SvgEncodeError = owned.SvgEncodeError;
+pub const PngMicroEncodeError = owned.PngMicroEncodeError;
+pub const SvgMicroEncodeError = owned.SvgMicroEncodeError;
 pub const BufferRequirements = owned.BufferRequirements;
 
 pub const rasterDimensions = raster.dimensions;
