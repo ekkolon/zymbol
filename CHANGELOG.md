@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Froze the v1 exported root declaration surface with a release qualification test and completed the repository evidence audit with no remaining `missing` or `verify` ledger entries.
+- Fixed package contents so every declared build step, including benchmarks, is present in published source packages.
+
 - Added a reproducible ReleaseFast v1 benchmark suite covering encode/mask selection, decode, Reed-Solomon correction, PNG/SVG rendering, working-set size, and PNG compression baselines.
 - Reduced direct PNG render latency by eliminating redundant compression passes and per-byte Adler divisions; a measured PNG Up-filter alternative was rejected because it regressed both speed and size.
 
