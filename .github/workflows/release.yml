@@ -35,6 +35,9 @@ jobs:
       - name: Format
         run: zig fmt --check build.zig src tests examples benchmarks
 
+      - name: Check API docs
+        run: python3 tools/check_api_docs.py
+
       - name: Qualify
         run: zig build qualify
 
