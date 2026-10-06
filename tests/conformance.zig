@@ -78,6 +78,65 @@ fn verifyQrReference(
     try std.testing.expectEqualSlices(u8, payload, output[0..decoded.len]);
 }
 
+fn verifyStructuredAppendReference(
+    payload: []const u8,
+    index: u4,
+    count: u5,
+    parity: u8,
+    rows: []const []const u8,
+    exact_encode: bool,
+) !void {
+    const version: qrz.Version = 1;
+    const level: qrz.EcLevel = .m;
+    const mask: u3 = 4;
+    const cell_count = qrz.requiredCells(version);
+
+    var data: [qrz.dataCodewords(version, level)]u8 = undefined;
+    var writer = qrz.BitWriter.init(&data);
+    try qrz.appendStructuredAppend(&writer, .{
+        .index = index,
+        .count = count,
+        .parity = parity,
+    });
+    try qrz.appendAlphanumeric(&writer, version, payload);
+    try qrz.finalizeSegments(&writer);
+
+    var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
+    var encode_scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
+    if (exact_encode) {
+        const symbol = try qrz.encodeRaw(
+            &data,
+            version,
+            level,
+            mask,
+            cells[0..cell_count],
+            encode_scratch[0..qrz.requiredEncodeScratch(version)],
+        );
+        try expectSymbolRows(symbol, rows);
+    }
+
+    var bits: [qrz.requiredCells(qrz.max_version)]bool = undefined;
+    try fillBits(rows, bits[0..cell_count]);
+
+    var decode_cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
+    var decode_scratch: [qrz.requiredDecodeScratch(qrz.max_version)]u8 = undefined;
+    var output: [64]u8 = undefined;
+    const decoded = try qrz.decode(
+        bits[0..cell_count],
+        qrz.size(version),
+        decode_cells[0..cell_count],
+        decode_scratch[0..qrz.requiredDecodeScratch(version)],
+        &output,
+    );
+
+    try std.testing.expectEqualSlices(u8, payload, output[0..decoded.len]);
+    try std.testing.expectEqual(mask, decoded.mask);
+    const sa = decoded.structured_append orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(index, sa.index);
+    try std.testing.expectEqual(count, sa.count);
+    try std.testing.expectEqual(parity, sa.parity);
+}
+
 fn verifyMicroReference(
     payload: []const u8,
     version: qrz.MicroVersion,
@@ -407,4 +466,157 @@ test "QR character-count widths transition at version bands" {
 
     writer = qrz.BitWriter.init(&writer_storage);
     try qrz.appendAlphanumeric(&writer, 27, &alphanumeric_payload);
+}
+
+
+test "ISO Structured Append symbol 1 reference matrix" {
+    const rows = [_][]const u8{
+        "111111101010001111111",
+        "100000100111101000001",
+        "101110100001101011101",
+        "101110101101101011101",
+        "101110101110101011101",
+        "100000101000101000001",
+        "111111101010101111111",
+        "000000001101000000000",
+        "100010111010011111001",
+        "100001010000111110110",
+        "111000101011100011000",
+        "100000000101101011110",
+        "000000101100100100111",
+        "000000001110011100111",
+        "111111101110011110000",
+        "100000100010011100111",
+        "101110101111001010111",
+        "101110100101001011011",
+        "101110100110111110000",
+        "100000100111100010011",
+        "111111101010100100111",
+    };
+    try verifyStructuredAppendReference("ABCDEFGHIJKLMNOP", 0, 4, 0x01, &rows, true);
+}
+
+test "ISO Structured Append symbol 2 reference matrix" {
+    const rows = [_][]const u8{
+        "111111101000001111111",
+        "100000100110001000001",
+        "101110100011101011101",
+        "101110101101101011101",
+        "101110101010101011101",
+        "100000101000101000001",
+        "111111101010101111111",
+        "000000001011000000000",
+        "100010111100011111001",
+        "000111001100111010110",
+        "110101100000100001000",
+        "100101011110011101110",
+        "001010101111110100111",
+        "000000001100111101111",
+        "111111101100010101000",
+        "100000100110111011111",
+        "101110101111101100011",
+        "101110100101111111001",
+        "101110100101000110000",
+        "100000100001100011111",
+        "111111101000111000011",
+    };
+    try verifyStructuredAppendReference("QRSTUVWXYZ012345", 1, 4, 0x01, &rows, true);
+}
+
+test "ISO Structured Append symbol 3 reference matrix" {
+    const rows = [_][]const u8{
+        "111111101101001111111",
+        "100000100010001000001",
+        "101110100111101011101",
+        "101110101100001011101",
+        "101110101010101011101",
+        "100000101010101000001",
+        "111111101010101111111",
+        "000000001111000000000",
+        "100010111110111111001",
+        "100100011000101100110",
+        "101101111001000111000",
+        "010110011101001010010",
+        "100110100011110101011",
+        "000000001011110110011",
+        "111111101110000110000",
+        "100000100110110001011",
+        "101110101111001101111",
+        "101110100010101011110",
+        "101110100000110110000",
+        "100000100011111101011",
+        "111111101100111110011",
+    };
+    try verifyStructuredAppendReference("6789ABCDEFGHIJK", 2, 4, 0x01, &rows, false);
+}
+
+test "ISO Structured Append symbol 4 reference matrix" {
+    const rows = [_][]const u8{
+        "111111101011101111111",
+        "100000100111101000001",
+        "101110100000001011101",
+        "101110101111101011101",
+        "101110101110101011101",
+        "100000101010101000001",
+        "111111101010101111111",
+        "000000001011000000000",
+        "100010111100111111001",
+        "110100010110100010110",
+        "001101100001010011000",
+        "111110001110111100010",
+        "011111100100101111011",
+        "000000001100011110011",
+        "111111101100111000100",
+        "100000100110110010111",
+        "101110101110000000111",
+        "101110100111010111100",
+        "101110100000011010100",
+        "100000100110100111111",
+        "111111101001110100111",
+    };
+    try verifyStructuredAppendReference("LMNOPQRSTUVWXYZ", 3, 4, 0x01, &rows, false);
+}
+
+test "Segno Structured Append parity vectors" {
+    try std.testing.expectEqual(@as(u8, 0x31), qrz.structuredAppendParity("123456789"));
+    try std.testing.expectEqual(@as(u8, 0xA0), qrz.structuredAppendParity("M\xFCrrisch"));
+}
+
+
+test "Structured Append aligned streams use standard pad codeword" {
+    const cases = [_]struct {
+        payload: []const u8,
+        index: u4,
+        expected: [16]u8,
+    }{
+        .{
+            .payload = "6789ABCDEFGHIJK",
+            .index = 2,
+            .expected = .{
+                0x32, 0x30, 0x12, 0x07, 0x91, 0x52, 0xE2, 0x73,
+                0x51, 0x4A, 0x85, 0x5C, 0x2C, 0xF5, 0x40, 0xEC,
+            },
+        },
+        .{
+            .payload = "LMNOPQRSTUVWXYZ",
+            .index = 3,
+            .expected = .{
+                0x33, 0x30, 0x12, 0x07, 0xBC, 0x78, 0x47, 0x1F,
+                0xE6, 0xDD, 0x37, 0xB2, 0x77, 0xBE, 0x30, 0xEC,
+            },
+        },
+    };
+
+    for (cases) |case| {
+        var data: [16]u8 = undefined;
+        var writer = qrz.BitWriter.init(&data);
+        try qrz.appendStructuredAppend(&writer, .{
+            .index = case.index,
+            .count = 4,
+            .parity = 0x01,
+        });
+        try qrz.appendAlphanumeric(&writer, 1, case.payload);
+        try qrz.finalizeSegments(&writer);
+        try std.testing.expectEqualSlices(u8, &case.expected, &data);
+    }
 }
