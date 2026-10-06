@@ -36,6 +36,7 @@ pub const renderRasterStrided = raster.renderStrided;
 pub const requiredSvgBytes = svg.requiredBytes;
 pub const maxSvgBytesForVersion = svg.maxBytesForVersion;
 pub const renderSvg = svg.render;
+pub const writeSvg = svg.write;
 
 pub const requiredPngBytes = png.requiredBytes;
 pub const requiredPngBytesForVersion = png.requiredBytesForVersion;
@@ -48,6 +49,11 @@ pub const pngText = owned.pngText;
 pub const pngBytes = owned.pngBytes;
 pub const svgText = owned.svgText;
 pub const svgBytes = owned.svgBytes;
+
+pub const writeSvgText = owned.writeSvgText;
+pub const writeSvgBytes = owned.writeSvgBytes;
+pub const writeSvgTextInto = owned.writeSvgTextInto;
+pub const writeSvgBytesInto = owned.writeSvgBytesInto;
 
 pub const pngTextInto = owned.pngTextInto;
 pub const pngBytesInto = owned.pngBytesInto;
