@@ -726,6 +726,63 @@ fn decodeKanji(
     }
 }
 
+test "ZXing ECI reference stream preserves assignment and bytes" {
+    const bytes = [_]u8{ 0x70, 0x24, 0x03, 0xA1, 0xA2, 0xA3 };
+    var out: [8]u8 = undefined;
+    const parsed = try parseDataStream(&bytes, 1, &out);
+
+    try std.testing.expectEqualSlices(u8, &.{ 0xA1, 0xA2, 0xA3 }, out[0..parsed.len]);
+    switch (parsed.eci) {
+        .assignment => |value| try std.testing.expectEqual(@as(u21, 2), value),
+        else => return error.TestUnexpectedResult,
+    }
+}
+
+test "ZXing FNC1 first-position reference stream applies percent semantics" {
+    const bytes = [_]u8{
+        0x52, 0x05, 0x99, 0x60, 0x5F, 0xB5, 0x35,
+        0x80, 0x01, 0x08, 0x00, 0xEC, 0x11,
+    };
+    var out: [32]u8 = undefined;
+    const parsed = try parseDataStream(&bytes, 1, &out);
+
+    try std.testing.expectEqualSlices(u8, "9112%\x1D2012", out[0..parsed.len]);
+    try std.testing.expect(switch (parsed.fnc1) {
+        .first_position => true,
+        else => false,
+    });
+}
+
+test "ZXing FNC1 second-position numeric indicator reference stream" {
+    const bytes = [_]u8{ 0x96, 0x32, 0x00, 0x94, 0x00 };
+    var out: [8]u8 = undefined;
+    const parsed = try parseDataStream(&bytes, 1, &out);
+
+    try std.testing.expectEqualSlices(u8, "99A", out[0..parsed.len]);
+    switch (parsed.fnc1) {
+        .second_position => |indicator| switch (indicator) {
+            .numeric => |value| try std.testing.expectEqual(@as(u7, 99), value),
+            else => return error.TestUnexpectedResult,
+        },
+        else => return error.TestUnexpectedResult,
+    }
+}
+
+test "ZXing FNC1 second-position letter indicator reference stream" {
+    const bytes = [_]u8{ 0x9A, 0x52, 0x00, 0x96, 0x00 };
+    var out: [8]u8 = undefined;
+    const parsed = try parseDataStream(&bytes, 1, &out);
+
+    try std.testing.expectEqualSlices(u8, "AB", out[0..parsed.len]);
+    switch (parsed.fnc1) {
+        .second_position => |indicator| switch (indicator) {
+            .letter => |value| try std.testing.expectEqual(@as(u8, 'A'), value),
+            else => return error.TestUnexpectedResult,
+        },
+        else => return error.TestUnexpectedResult,
+    }
+}
+
 test "multiple ECI assignments are preserved as mixed state" {
     var bytes: [16]u8 = undefined;
     var writer = bitstream.Writer.init(&bytes);
