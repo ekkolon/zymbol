@@ -341,8 +341,8 @@ Rgb
 OwnedBytes
 PngEncodeOptions
 SvgEncodeOptions
-MicroPngEncodeOptions
-MicroSvgEncodeOptions
+PngMicroEncodeOptions
+SvgMicroEncodeOptions
 BufferRequirements
 rasterDimensions
 requiredRasterPixels
