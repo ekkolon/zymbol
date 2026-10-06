@@ -74,7 +74,7 @@ var svg = try render.svgText(init.gpa, "https://example.com", .{});
 defer svg.deinit();
 ```
 
-`pngText` and `svgText` encode the QR symbol, allocate exactly-sized output, and return owned bytes. Binary payloads use `pngBytes` and `svgBytes`.
+`pngText` and `svgText` encode the QR symbol, allocate exactly-sized output, and return owned bytes. Binary payloads use `pngBytes` and `svgBytes`; the same arbitrary byte sequence is preserved by the QR encoder.
 
 Format and QR options stay explicit when needed:
 
@@ -99,6 +99,41 @@ defer png.deinit();
 ```
 
 PNG is encoded directly from the QR symbol as a 1-bit indexed image. It does not materialize an intermediate raster buffer. A transparent PNG background is selected with `.background = null`.
+
+SVG is responsive by default: QRz emits a square `viewBox`, symmetric quiet zone, integer module coordinates, and `preserveAspectRatio="xMidYMid meet"`. It omits intrinsic `width`/`height`, allowing the embedding layout to choose the rendered size without distorting or off-centering the QR.
+
+Set an explicit square intrinsic size when required:
+
+```zig
+var svg = try render.svgText(
+    init.gpa,
+    "https://example.com",
+    .{
+        .render = .{ .explicit_size = 256 },
+    },
+);
+defer svg.deinit();
+```
+
+SVG can also stream directly to any Zig 0.16 `std.Io.Writer`, avoiding the SVG output allocation:
+
+```zig
+var file = try std.Io.Dir.cwd().createFile(init.io, "qrz.svg", .{});
+defer file.close(init.io);
+
+var write_buffer: [4096]u8 = undefined;
+var file_writer = file.writer(init.io, &write_buffer);
+
+try render.writeSvgText(
+    init.gpa,
+    &file_writer.interface,
+    "https://example.com",
+    .{},
+);
+try file_writer.interface.flush();
+```
+
+`writeSvgBytes` is the binary-payload equivalent. `writeSvg` streams an already encoded `qrz.Symbol`; `writeSvgTextInto` and `writeSvgBytesInto` additionally keep the QR workspace caller-owned for WASM/freestanding or reusable hot paths.
 
 The low-level APIs remain allocation-free:
 
@@ -137,7 +172,7 @@ const png = try render.pngTextInto(
 
 This keeps the WebAssembly ABI and allocator policy outside QRz while using exactly the same QR and PNG implementation as native code. An application that already has a Zig allocator in WASM can use `pngText`/`svgText` directly instead.
 
-The default quiet zone is four modules. Raster output uses integer module scaling; SVG uses integer coordinates and `shape-rendering="crispEdges"`.
+The default quiet zone is four modules. Raster output uses integer module scaling. SVG uses integer coordinates, `shape-rendering="crispEdges"`, and centered aspect-ratio preservation.
 
 QRz produces PNG/SVG bytes but deliberately does not open files, write sockets, or own browser/DOM integration. Those are application concerns.
 
