@@ -5,6 +5,7 @@ const render = @import("qrz_render");
 const Protocol = enum {
     kitty,
     iterm2,
+    sixel,
     none,
 };
 
@@ -50,6 +51,7 @@ pub fn main(init: std.process.Init) !void {
 
             try writeIterm2(stdout, image.bytes);
         },
+        .sixel => try writeSixel(stdout),
         .none => {
             try writeBlockFallback(stdout);
             std.log.warn("terminal has no supported inline-image protocol; used block fallback", .{});
@@ -70,8 +72,15 @@ fn detectProtocol(allocator: std.mem.Allocator) !Protocol {
     }
 
     if (env.get("TERM_PROGRAM")) |program| {
-        if (std.mem.eql(u8, program, "iTerm.app")) return .iterm2;
+        if (std.mem.eql(u8, program, "iTerm.app") or
+            std.mem.eql(u8, program, "vscode") or
+            std.mem.eql(u8, program, "WezTerm"))
+        {
+            return .iterm2;
+        }
     }
+
+    if (env.get("WT_SESSION") != null) return .sixel;
 
     return .none;
 }
@@ -110,6 +119,65 @@ fn writeIterm2(writer: *std.Io.Writer, png: []const u8) !void {
     );
     try writeBase64(writer, png);
     try writer.writeAll("\x07\n");
+}
+
+fn writeSixel(writer: *std.Io.Writer) !void {
+    const version: qrz.Version = 6;
+    const scale: usize = 4;
+    const quiet_zone: usize = 4;
+    const module_side: usize = 17 + 4 * @as(usize, version);
+    const image_side: usize = (module_side + quiet_zone * 2) * scale;
+
+    var cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(version)]u8 = undefined;
+    const symbol = try qrz.encodeText(
+        "https://example.com/qrz",
+        .{ .min_version = version, .max_version = version, .ec_level = .q },
+        &cells,
+        &scratch,
+    );
+
+    var pixels: [image_side * image_side]u8 = undefined;
+    _ = try render.renderRaster(
+        u8,
+        &symbol,
+        &pixels,
+        0,
+        255,
+        .{ .scale = scale, .quiet_zone = quiet_zone },
+    );
+
+    try writer.writeAll("\x1bPq");
+    try writer.print("\"1;1;{d};{d}", .{ image_side, image_side });
+    try writer.writeAll("#0;2;100;100;100#1;2;0;0;0");
+
+    var sixel_row: [image_side]u8 = undefined;
+    var y: usize = 0;
+    while (y < image_side) : (y += 6) {
+        const rows = @min(@as(usize, 6), image_side - y);
+        const white_mask: u8 = (@as(u8, 1) << @intCast(rows)) - 1;
+
+        @memset(&sixel_row, 63 + white_mask);
+        try writer.writeAll("#0");
+        try writer.writeAll(&sixel_row);
+
+        for (0..image_side) |x| {
+            var bits: u8 = 0;
+            var dy: usize = 0;
+            while (dy < rows) : (dy += 1) {
+                if (pixels[(y + dy) * image_side + x] == 0) {
+                    bits |= @as(u8, 1) << @intCast(dy);
+                }
+            }
+            sixel_row[x] = 63 + bits;
+        }
+
+        try writer.writeAll("$#1");
+        try writer.writeAll(&sixel_row);
+        if (y + 6 < image_side) try writer.writeAll("-");
+    }
+
+    try writer.writeAll("\x1b\\\n");
 }
 
 fn writeBase64(writer: *std.Io.Writer, input: []const u8) !void {
