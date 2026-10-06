@@ -1,12 +1,12 @@
 # v1 contract
 
-QRz core encoding, decoding, and low-level rendering are allocation-free and operate on caller-owned storage. Optional convenience rendering APIs allocate only through an allocator supplied by the caller. The v1 public surface is the declarations exported by `src/root.zig` and `src/render/root.zig`.
+Zymbol core encoding, decoding, and low-level rendering are allocation-free and operate on caller-owned storage. Optional convenience rendering APIs allocate only through an allocator supplied by the caller. The v1 public surface is the `zymbol` facade in `src/zymbol.zig`, including its `render` namespace.
 
 ## Scope
 
-QRz supports QR Code Model 2 versions 1-40 and Micro QR M1-M4. QR supports L/M/Q/H, numeric, alphanumeric, byte, Kanji, ECI, FNC1 and Structured Append. Micro QR supports its legal L/M/Q combinations and numeric, alphanumeric, byte and Kanji modes. Both families use caller-owned core storage.
+Zymbol supports QR Code Model 2 versions 1-40 and Micro QR M1-M4. QR supports L/M/Q/H, numeric, alphanumeric, byte, Kanji, ECI, FNC1 and Structured Append. Micro QR supports its legal L/M/Q combinations and numeric, alphanumeric, byte and Kanji modes. Both families use caller-owned core storage.
 
-QRz core accepts and returns module grids. Image acquisition, finder detection, perspective correction and thresholding are outside the package. Rendering and PNG/SVG encoding are provided by the separate `qrz_render` module. File I/O remains application-owned.
+Zymbol core accepts and returns module grids. Image acquisition, finder detection, perspective correction and thresholding are outside the package. Rendering and PNG/SVG encoding are provided through the `zymbol.render` namespace. File I/O remains application-owned.
 
 ## Encoding
 
@@ -20,7 +20,7 @@ Encoding never requests an allocator. QR callers supply the module buffer and in
 
 ## Rendering
 
-`qrz_render` depends on `qrz`; `qrz` does not depend on `qrz_render`.
+Internally, rendering depends on the core module; the public `zymbol` facade exposes both without a dependency cycle.
 
 Raster rendering writes caller-selected pixel values into caller-owned buffers. Tightly packed and strided output are supported. Scaling is integral. The family default quiet zone is four modules for QR and two modules for Micro QR; callers may override it explicitly.
 
@@ -30,7 +30,7 @@ SVG output has a square viewBox, symmetric quiet zone and `preserveAspectRatio="
 
 The owned convenience APIs accept a caller-provided allocator and combine QR or Micro QR encoding with PNG or SVG output in one call. Binary and text payload variants are part of the public surface. Writer-based SVG text/byte variants are also part of the QR surface.
 
-WASM/freestanding callers can query buffer requirements and use the `*Into` APIs with host-owned linear memory. QRz does not prescribe a WebAssembly allocator or JavaScript ABI.
+WASM/freestanding callers can query buffer requirements and use the `*Into` APIs with host-owned linear memory. Zymbol does not prescribe a WebAssembly allocator or JavaScript ABI.
 
 No renderer performs file I/O. JPEG, WebP, AVIF and other codecs are outside the v1 compatibility contract.
 

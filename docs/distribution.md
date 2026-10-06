@@ -1,6 +1,6 @@
 # Distribution
 
-QRz is distributed as a Zig source package.
+Zymbol is distributed as a Zig source package.
 
 ## Source of truth
 
@@ -11,16 +11,16 @@ A release is identified by all of the following:
 - the source archive generated from that tag;
 - a GitHub Release whose notes come from the matching changelog section.
 
-There is no QRz-specific binary artifact. Consumers compile the package with
+There is no Zymbol-specific binary artifact. Consumers compile the package with
 their Zig target and optimization settings.
 
 ## Installing a release
 
 ```sh
-zig fetch --save https://github.com/ekkolon/qrz/archive/refs/tags/v1.0.0.tar.gz
+zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.0.tar.gz
 ```
 
-Zig records the dependency URL and content hash in the consumer's `build.zig.zon`. The package name `qrz` becomes the default dependency key. The application then imports the `qrz` and/or `qrz_render` modules from the dependency.
+Zig records the dependency URL and content hash in the consumer's `build.zig.zon`. The package name `zymbol` becomes the default dependency key. The application imports the single `zymbol` module; rendering is available as `zymbol.render`.
 
 The exact build wiring is shown in the repository README and exercised by
 `tests/consumer`. `tools/package_smoke.py` reuses that consumer fixture in a
@@ -45,4 +45,4 @@ created. They are intentionally not hidden inside the tag workflow.
 
 ## Discovery
 
-GitHub is the canonical package location; QRz does not require a separate registry publication. Community indexes are discovery layers only. Before the repository is made public, set an accurate description and add the `zig-package` topic so services such as Zigistry and zig.pm can index it.
+GitHub is the canonical package location; Zymbol does not require a separate registry publication. Community indexes are discovery layers only. Before the repository is made public, set an accurate description and add the `zig-package` topic so services such as Zigistry and zig.pm can index it.

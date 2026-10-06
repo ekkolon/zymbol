@@ -2,7 +2,7 @@
 
 QR Code Model 2 and Micro QR for Zig.
 
-QRz encodes and decodes QR module grids and renders them as raster pixels, SVG, or PNG. Core encoding, decoding, and low-level rendering use caller-owned memory and do not require an allocator.
+Zymbol encodes and decodes QR module grids and renders them as raster pixels, SVG, or PNG. Core encoding, decoding, and low-level rendering use caller-owned memory and do not require an allocator.
 
 > **Status:** pre-1.0 release candidate. Compatibility is not guaranteed until `v1.0.0`.
 
@@ -19,7 +19,7 @@ QRz encodes and decodes QR module grids and renders them as raster pixels, SVG, 
 - no file I/O or image-acquisition dependency
 - `wasm32-freestanding` support
 
-QRz decodes already sampled module grids. Camera input, thresholding, finder detection, perspective correction, and image scanning are outside the library.
+Zymbol decodes already sampled module grids. Camera input, thresholding, finder detection, perspective correction, and image scanning are outside the library.
 
 ## Requirements
 
@@ -30,7 +30,7 @@ Zig 0.17.0 is required. Release qualification and fuzzing use Zig 0.17.0.
 After `v1.0.0` is published:
 
 ```sh
-zig fetch --save https://github.com/ekkolon/qrz/archive/refs/tags/v1.0.0.tar.gz
+zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.0.tar.gz
 ```
 
 Add the modules to your application in `build.zig`:
@@ -39,7 +39,7 @@ Add the modules to your application in `build.zig`:
 const target = b.standardTargetOptions(.{});
 const optimize = b.standardOptimizeOption(.{});
 
-const qrz_dep = b.dependency("qrz", .{
+const zymbol_dep = b.dependency("zymbol", .{
     .target = target,
     .optimize = optimize,
 });
@@ -49,8 +49,7 @@ const app = b.createModule(.{
     .target = target,
     .optimize = optimize,
     .imports = &.{
-        .{ .name = "qrz", .module = qrz_dep.module("qrz") },
-        .{ .name = "qrz_render", .module = qrz_dep.module("qrz_render") },
+        .{ .name = "zymbol", .module = zymbol_dep.module("zymbol") },
     },
 });
 
@@ -61,21 +60,19 @@ const exe = b.addExecutable(.{
 b.installArtifact(exe);
 ```
 
-The package exports two modules:
-
-- `qrz` — encoding, decoding, QR/Micro QR types, and sizing helpers
-- `qrz_render` — raster, SVG, PNG, and convenience rendering APIs
+The package exports one module, `zymbol`. Core encoding and decoding live at
+the module root; rendering is available through `zymbol.render`.
 
 ## Encoding
 
 ```zig
-const qrz = @import("qrz");
+const zymbol = @import("zymbol");
 
-const max_version: qrz.Version = 10;
-var cells: [qrz.requiredCells(max_version)]qrz.Cell = undefined;
-var scratch: [qrz.requiredEncodeScratch(max_version)]u8 = undefined;
+const max_version: zymbol.Version = 10;
+var cells: [zymbol.requiredCells(max_version)]zymbol.Cell = undefined;
+var scratch: [zymbol.requiredEncodeScratch(max_version)]u8 = undefined;
 
-const symbol = try qrz.encodeText(
+const symbol = try zymbol.encodeText(
     "https://example.com",
     .{
         .max_version = max_version,
@@ -91,11 +88,11 @@ const symbol = try qrz.encodeText(
 ## Decoding
 
 ```zig
-var cells: [qrz.requiredCells(10)]qrz.Cell = undefined;
-var scratch: [qrz.requiredDecodeScratch(10)]u8 = undefined;
+var cells: [zymbol.requiredCells(10)]zymbol.Cell = undefined;
+var scratch: [zymbol.requiredDecodeScratch(10)]u8 = undefined;
 var output: [512]u8 = undefined;
 
-const decoded = try qrz.decode(
+const decoded = try zymbol.decode(
     modules,
     side,
     &cells,
@@ -113,9 +110,9 @@ Use `decodeAny` when the input may be either QR Code or Micro QR.
 ## Micro QR
 
 ```zig
-var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+var cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
 
-const symbol = try qrz.encodeMicroText(
+const symbol = try zymbol.encodeMicroText(
     "12345",
     .{
         .max_version = .m4,
@@ -132,7 +129,8 @@ For explicit mixed Micro QR content, use `encodeMicroSegments`. Kanji input is a
 For application code that already has an allocator:
 
 ```zig
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
 var png = try render.pngText(
     allocator,
@@ -172,13 +170,13 @@ Manual QR segment construction is available through `BitWriter` and the `append*
 
 The `qrz` module does not allocate. Callers provide module storage and scratch buffers.
 
-Low-level `qrz_render` functions also use caller-owned output buffers. Convenience functions such as `pngText` and `svgText` allocate only through the allocator supplied by the caller.
+Low-level `zymbol.render` functions also use caller-owned output buffers. Convenience functions such as `pngText` and `svgText` allocate only through the allocator supplied by the caller.
 
 Neither module opens files, sockets, cameras, or platform graphics APIs.
 
 ## Conformance
 
-QRz targets the software-applicable requirements of ISO/IEC 18004:2024 for QR Code Model 2 and Micro QR.
+Zymbol targets the software-applicable requirements of ISO/IEC 18004:2024 for QR Code Model 2 and Micro QR.
 
 Conformance evidence, interoperability coverage, and the exact claim boundary are tracked in [docs/iso-18004-2024-conformance.md](docs/iso-18004-2024-conformance.md). The final public compliance statement will be made only after the release-candidate review against the normative standard text.
 

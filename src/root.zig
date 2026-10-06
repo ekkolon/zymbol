@@ -1,6 +1,6 @@
 //! Allocation-free QR Code encoding and decoding for Zig.
 //!
-//! QRz operates on caller-owned buffers and module grids. It performs no
+//! Zymbol operates on caller-owned buffers and module grids. It performs no
 //! file I/O, image processing, or heap allocation.
 
 const std = @import("std");

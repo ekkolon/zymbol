@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 CONSUMER = ROOT / "tests" / "consumer"
 
 MANIFEST = """.{
-    .name = .qrz_remote_smoke,
+    .name = .zymbol_remote_smoke,
     .version = "0.0.0",
     .fingerprint = 0xe8d435b331415927,
     .minimum_zig_version = "0.17.0",
@@ -31,11 +31,11 @@ def run(command: list[str], cwd: pathlib.Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("url", help="versioned QRz source archive URL")
+    parser.add_argument("url", help="versioned Zymbol source archive URL")
     parser.add_argument("--zig", default="zig")
     args = parser.parse_args()
 
-    with tempfile.TemporaryDirectory(prefix="qrz-package-smoke-") as temp:
+    with tempfile.TemporaryDirectory(prefix="zymbol-package-smoke-") as temp:
         root = pathlib.Path(temp)
         (root / "src").mkdir()
         shutil.copy2(CONSUMER / "build.zig", root / "build.zig")

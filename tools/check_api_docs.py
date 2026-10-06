@@ -53,14 +53,14 @@ def main() -> None:
     docs = DOCS.read_text(encoding="utf-8")
 
     check(
-        "qrz",
+        "zymbol",
         snapshot_names(snapshot, "expected_core_api"),
-        documented_names(docs, "qrz-api"),
+        documented_names(docs, "zymbol-api"),
     )
     check(
-        "qrz_render",
+        "zymbol.render",
         snapshot_names(snapshot, "expected_render_api"),
-        documented_names(docs, "qrz-render-api"),
+        documented_names(docs, "zymbol-render-api"),
     )
 
     print("API documentation matches the v1 export snapshot")
