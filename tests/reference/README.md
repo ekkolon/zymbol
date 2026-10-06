@@ -16,4 +16,6 @@ Current fixtures:
 
 Segno identifies the first three matrices as examples derived from ISO/IEC 18004:2015. They are retained here as independent interoperability evidence, not as the final ISO/IEC 18004:2024 clause audit.
 
+For the QR Figure 1 fixture, mask 5 is pinned as part of the external matrix. Annex I / worked symbol examples are informative, and external implementations differ on whether the surrounding quiet zone participates in QR N3 mask scoring. QRz automatic mask selection is therefore tested against the normative Step 6 / Table 11 rules over the QR symbol itself; the quiet zone is not part of the symbol size. The fixture still independently verifies data construction, masking, format information, exact matrix output, and decoding for the specified mask.
+
 The release gate must continue to expand beyond these fixtures. In particular, QRz still needs exhaustive Annex A/B cross-checks, QR version-band and capacity-edge vectors, special-header vectors, BCH/RS corruption vectors, and behavioral differential tests against independent decoders.
