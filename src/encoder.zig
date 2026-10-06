@@ -23,6 +23,8 @@ pub const Options = struct {
     ec_level: spec.EcLevel = .m,
     boost_ec_level: bool = true,
     mask: ?u3 = null,
+    fnc1: spec.Fnc1 = .none,
+    structured_append: ?spec.StructuredAppend = null,
 };
 
 pub fn maxCodewords(version: u6) usize {
@@ -39,6 +41,10 @@ fn validateOptions(options: Options) Error!void {
         options.min_version > options.max_version)
     {
         return Error.InvalidVersionRange;
+    }
+    if (!options.fnc1.isValid()) return Error.InvalidApplicationIndicator;
+    if (options.structured_append) |value| {
+        if (!value.isValid()) return Error.InvalidStructuredAppend;
     }
 }
 
@@ -121,6 +127,17 @@ fn eciBitLength(utf8_eci: bool) usize {
     return bits;
 }
 
+fn structuredAppendBitLength(value: ?spec.StructuredAppend) usize {
+    return if (value == null) 0 else 20;
+}
+
+fn bytePayloadBitLength(version: u6, payload_len: usize) ?usize {
+    const count_bits = spec.charCountBits(.byte, version);
+    const max_count = (@as(usize, 1) << @intCast(count_bits)) - 1;
+    if (payload_len > max_count) return null;
+    return 4 + @as(usize, count_bits) + payload_len * 8;
+}
+
 pub fn encodeText(
     text: []const u8,
     options: Options,
@@ -157,22 +174,27 @@ fn encodePayload(
 
     const costs = cell_bytes[0..planner_bytes];
     const trace = cell_bytes[planner_bytes..total_planner_bytes];
-    const eci_bits = eciBitLength(utf8_eci);
+    const control_bits =
+        structuredAppendBitLength(options.structured_append) +
+        options.fnc1.overheadBits() +
+        eciBitLength(utf8_eci);
 
     var cached_payload_bits: [3]?usize = .{ null, null, null };
     var selected_payload_bits: usize = 0;
     var version = options.min_version;
 
     while (true) : (version += 1) {
-        const band = versionBand(version);
-        const payload_bits = cached_payload_bits[band] orelse blk: {
-            const bits = try segment.optimalBitLength(version, payload, costs);
-            cached_payload_bits[band] = bits;
-            break :blk bits;
-        };
+        const payload_bits = if (options.fnc1.isNone()) blk: {
+            const band = versionBand(version);
+            break :blk cached_payload_bits[band] orelse cached: {
+                const bits = try segment.optimalBitLength(version, payload, costs);
+                cached_payload_bits[band] = bits;
+                break :cached bits;
+            };
+        } else bytePayloadBitLength(version, payload.len) orelse std.math.maxInt(usize);
 
         const capacity_bits = @as(usize, spec.dataCodewords(version, options.ec_level)) * 8;
-        if (payload_bits + eci_bits <= capacity_bits) {
+        if (payload_bits != std.math.maxInt(usize) and payload_bits + control_bits <= capacity_bits) {
             selected_payload_bits = payload_bits;
             break;
         }
@@ -181,7 +203,7 @@ fn encodePayload(
 
     var level = options.ec_level;
     if (options.boost_ec_level) {
-        const used_bits = selected_payload_bits + eci_bits;
+        const used_bits = selected_payload_bits + control_bits;
         const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
         for (levels) |candidate| {
             const capacity_bits = @as(usize, spec.dataCodewords(version, candidate)) * 8;
@@ -200,8 +222,14 @@ fn encodePayload(
     const data_len = spec.dataCodewords(version, level);
     var data_buf: [max_data_codewords]u8 = undefined;
     var writer = bitstream.Writer.init(data_buf[0..data_len]);
+    if (options.structured_append) |value| try segment.appendStructuredAppend(&writer, value);
+    try segment.appendFnc1(&writer, options.fnc1);
     if (utf8_eci) try segment.appendEci(&writer, 26);
-    try segment.writeOptimal(&writer, version, payload, costs, trace);
+    if (options.fnc1.isNone()) {
+        try segment.writeOptimal(&writer, version, payload, costs, trace);
+    } else {
+        try segment.appendByte(&writer, version, payload);
+    }
     try segment.finalize(&writer);
 
     return encodeRaw(

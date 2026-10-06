@@ -156,3 +156,88 @@ fn fuzzPng(_: void, smith: *std.testing.Smith) !void {
         png[0..8],
     );
 }
+
+
+test "fuzz ISO control modes" {
+    try std.testing.fuzz({}, fuzzControlModes, .{});
+}
+
+fn fuzzControlModes(_: void, smith: *std.testing.Smith) !void {
+    var payload: [256]u8 = undefined;
+    const len = @as(usize, smith.value(u8));
+    for (payload[0..len]) |*byte| byte.* = smith.value(u8);
+
+    const control = smith.value(u8);
+    const fnc1: qrz.Fnc1 = switch (control % 3) {
+        0 => .none,
+        1 => .first_position,
+        else => .{ .second_position = .{
+            .numeric = @intCast(smith.value(u8) % 100),
+        } },
+    };
+
+    const structured: ?qrz.StructuredAppend = if (smith.value(bool)) blk: {
+        const count: u5 = @intCast(1 + smith.value(u8) % 16);
+        const index: u4 = @intCast(smith.value(u8) % @as(u8, count));
+        break :blk .{
+            .index = index,
+            .count = count,
+            .parity = qrz.structuredAppendParity(payload[0..len]),
+        };
+    } else null;
+
+    var cells: [max_cells]qrz.Cell = undefined;
+    var encode_scratch: [max_encode_scratch]u8 = undefined;
+    const symbol = qrz.encodeBytes(
+        payload[0..len],
+        .{
+            .max_version = 20,
+            .ec_level = .m,
+            .boost_ec_level = smith.value(bool),
+            .fnc1 = fnc1,
+            .structured_append = structured,
+        },
+        &cells,
+        &encode_scratch,
+    ) catch return;
+
+    var bits: [max_cells]bool = undefined;
+    const cell_count = @as(usize, symbol.size) * symbol.size;
+    for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
+
+    var decode_cells: [max_cells]qrz.Cell = undefined;
+    var decode_scratch: [max_decode_scratch]u8 = undefined;
+    var output: [512]u8 = undefined;
+    const result = try qrz.decode(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &decode_scratch,
+        &output,
+    );
+
+    switch (fnc1) {
+        .none, .first_position => {
+            try std.testing.expectEqual(len, result.len);
+            try std.testing.expectEqualSlices(u8, payload[0..len], output[0..result.len]);
+        },
+        .second_position => |indicator| switch (indicator) {
+            .numeric => |value| {
+                try std.testing.expectEqual(len + 2, result.len);
+                try std.testing.expectEqual('0' + @as(u8, @intCast(value / 10)), output[0]);
+                try std.testing.expectEqual('0' + @as(u8, @intCast(value % 10)), output[1]);
+                try std.testing.expectEqualSlices(u8, payload[0..len], output[2..result.len]);
+            },
+            .letter => unreachable,
+        },
+    }
+
+    if (structured) |expected| {
+        const actual = result.structured_append orelse return error.TestUnexpectedResult;
+        try std.testing.expectEqual(expected.index, actual.index);
+        try std.testing.expectEqual(expected.count, actual.count);
+        try std.testing.expectEqual(expected.parity, actual.parity);
+    } else {
+        try std.testing.expect(result.structured_append == null);
+    }
+}
