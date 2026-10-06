@@ -118,6 +118,12 @@ const expected_render_api = [_][]const u8{
 };
 
 
+fn declarationName(comptime decl: anytype) []const u8 {
+    const Decl = @TypeOf(decl);
+    if (Decl == []const u8 or Decl == [:0]const u8) return decl;
+    return decl.name;
+}
+
 fn isExpected(comptime name: []const u8, comptime expected: []const []const u8) bool {
     inline for (expected) |candidate| {
         if (std.mem.eql(u8, name, candidate)) return true;
@@ -133,7 +139,8 @@ fn expectExactPublicSurface(comptime T: type, comptime expected: []const []const
     }
 
     inline for (declarations) |decl| {
-        try std.testing.expect(isExpected(decl.name, expected));
+        const name = comptime declarationName(decl);
+        try std.testing.expect(isExpected(name, expected));
     }
 
     try std.testing.expectEqual(expected.len, declarations.len);
