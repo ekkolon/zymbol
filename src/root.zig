@@ -121,6 +121,8 @@ fn roundTrip(text: []const u8, options: EncodeOptions) !void {
     try testing.expectEqual(symbol.version, result.version);
     try testing.expectEqual(symbol.ec_level, result.ec_level);
     try testing.expectEqual(symbol.mask, result.mask);
+    try testing.expect(!result.mirrored);
+    try testing.expect(!result.reflectance_reversed);
     try testing.expectEqual(@as(u32, 0), result.errors_corrected);
 
     var non_ascii = false;
@@ -166,6 +168,8 @@ fn roundTripBytes(data: []const u8, options: EncodeOptions) !void {
     try testing.expectEqual(symbol.version, result.version);
     try testing.expectEqual(symbol.ec_level, result.ec_level);
     try testing.expectEqual(symbol.mask, result.mask);
+    try testing.expect(!result.mirrored);
+    try testing.expect(!result.reflectance_reversed);
     try testing.expectEqual(@as(u32, 0), result.errors_corrected);
     try testing.expect(switch (result.eci) {
         .none => true,
