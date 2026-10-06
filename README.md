@@ -261,11 +261,14 @@ zig build example-svg
 zig build example-png
 zig build qualify
 
-# long-running coverage-guided fuzzing (Zig 0.17.0)
-zig build fuzz --fuzz
+# deterministic replay of the checked-in fuzz corpus
+zig build fuzz
 
-# or cap fuzzing at 8 concurrent jobs
-zig build fuzz -j8 --fuzz
+# finite v1 release campaign: 100M iterations per fuzz target
+zig build fuzz --fuzz=100M --summary all
+
+# optional unbounded exploratory campaign
+zig build fuzz --fuzz
 ```
 
 The package currently supports Zig 0.16.0 as its minimum version. Release fuzzing uses Zig 0.17.0 because Zig 0.16.0's built-in `-ffuzz` test runner has an upstream stack-trace type mismatch; ordinary builds, tests and portability qualification remain supported on 0.16.0. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall, compiles the examples without executing them, and compiles the core/render modules for `wasm32-freestanding` in ReleaseFast. `zig build runtime-portability -fqemu` executes representative x86 Linux-musl (32-bit little-endian) and PowerPC64 Linux-musl (64-bit big-endian) smoke binaries through Zig's QEMU runner; it requires `qemu-i386` and `qemu-ppc64` on `PATH`.
@@ -274,7 +277,7 @@ The package currently supports Zig 0.16.0 as its minimum version. Release fuzzin
 
 > **VS Code terminal:** enable `terminal.integrated.enableImages` in Settings to display the actual inline PNG. VS Code does not expose that setting to child processes, so QRz cannot detect when it is disabled.
 
-The intended v1 compatibility contract is documented in `docs/v1-contract.md`. ISO/IEC 18004:2024 release blockers and evidence requirements are tracked in `docs/iso-18004-2024-conformance.md`.
+The intended v1 compatibility contract is documented in `docs/v1-contract.md`. Fuzz release qualification is defined in `docs/v1-fuzz.md`. ISO/IEC 18004:2024 release blockers and evidence requirements are tracked in `docs/iso-18004-2024-conformance.md`.
 
 ## Source layout
 
