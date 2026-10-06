@@ -168,7 +168,8 @@ fn pixelIsDark(
 
     const module_x = (pixel_x - quiet_pixels) / scale;
     const module_y = (pixel_y - quiet_pixels) / scale;
-    return symbol.cells[module_y * symbol.size + module_x].dark;
+    const modules: usize = symbol.size;
+    return symbol.cells[module_y * modules + module_x].dark;
 }
 
 fn scanlineByte(
