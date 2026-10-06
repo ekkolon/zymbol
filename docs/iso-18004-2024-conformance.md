@@ -32,8 +32,8 @@ Status meanings:
 - version information: **verify**
 - format information: **verify**
 - normal reflectance: **verify**
-- reversed reflectance handling: **missing**
-- mirror-image decoding/orientation handling: **missing**
+- reversed reflectance handling: **implemented**
+- mirror-image decoding/orientation handling: **implemented**
 
 ### Data modes
 
@@ -43,12 +43,12 @@ Status meanings:
 - Kanji: **verify**
 - ECI: **verify**
 - mixed-mode streams: **verify**
-- FNC1 first position: **missing**
-- FNC1 second position: **missing**
-- Structured Append: **missing**
-- Structured Append sequence indicator: **missing**
-- Structured Append parity: **missing**
-- ECI interaction with Structured Append: **missing**
+- FNC1 first position: **verify**
+- FNC1 second position: **verify**
+- Structured Append: **verify**
+- Structured Append sequence indicator: **verify**
+- Structured Append parity: **verify**
+- ECI interaction with Structured Append: **verify**
 - Micro QR mode restrictions and mode indicators: **missing**
 - default byte character-set semantics and alternative character-set rules: **verify**
 
@@ -83,11 +83,11 @@ Status meanings:
 - version-information recovery: **verify**
 - Reed–Solomon correction: **verify**
 - ECI reporting: **verify**
-- FNC1 transmitted-data semantics: **missing**
-- symbology identifier generation/reporting: **missing**
-- Structured Append metadata reporting: **missing**
+- FNC1 transmitted-data semantics: **verify**
+- symbology identifier generation/reporting: **verify**
+- Structured Append metadata reporting: **verify**
 - Micro QR decoding: **missing**
-- mirror/reversed symbol normalization: **missing**
+- mirror/reversed symbol normalization: **implemented**
 - reference-decoder behavioral differential tests: **missing**
 - autodiscrimination behavior applicable to QR/Micro QR: **missing**
 
