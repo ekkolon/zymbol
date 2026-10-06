@@ -72,11 +72,9 @@ const Sink = struct {
 };
 
 fn validateSymbol(symbol: *const qrz.Symbol) Error!void {
-    const side: usize = symbol.size;
-    if (side != 0 and side > std.math.maxInt(usize) / side) {
-        return Error.SizeOverflow;
-    }
-    if (symbol.cells.len < side * side) return Error.InvalidSymbol;
+    if (!qrz.isValidVersion(symbol.version)) return Error.InvalidSymbol;
+    if (symbol.size != qrz.size(symbol.version)) return Error.InvalidSymbol;
+    if (symbol.cells.len < qrz.requiredCells(symbol.version)) return Error.InvalidSymbol;
 }
 
 fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
@@ -160,47 +158,44 @@ pub fn render(
     return output[0..sink.position];
 }
 
-fn testSymbol() struct { cells: [4]qrz.Cell, symbol: qrz.Symbol } {
-    var cells = [4]qrz.Cell{
-        .{ .dark = true },
-        .{ .dark = false },
-        .{ .dark = false },
-        .{ .dark = true },
-    };
-    const symbol = qrz.Symbol{
-        .cells = &cells,
-        .size = 2,
+fn testSymbol(cells: *[qrz.requiredCells(1)]qrz.Cell) qrz.Symbol {
+    @memset(cells, qrz.Cell{});
+    cells[0].dark = true;
+    cells[1 * qrz.size(1) + 1].dark = true;
+
+    return .{
+        .cells = cells,
+        .size = qrz.size(1),
         .version = 1,
         .ec_level = .m,
         .mask = 0,
     };
-    return .{ .cells = cells, .symbol = symbol };
 }
 
 test "SVG size query exactly matches rendered bytes" {
-    var fixture = testSymbol();
-    fixture.symbol.cells = &fixture.cells;
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
 
     const expected =
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 4 4\" shape-rendering=\"crispEdges\">" ++
-        "<path fill=\"#FFFFFF\" d=\"M0 0H4V4H0Z\"/>" ++
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 23 23\" shape-rendering=\"crispEdges\">" ++
+        "<path fill=\"#FFFFFF\" d=\"M0 0H23V23H0Z\"/>" ++
         "<path fill=\"#000000\" d=\"M1 1H2V2H1ZM2 2H3V3H2Z\"/></svg>";
 
-    const required = try requiredBytes(&fixture.symbol, .{ .quiet_zone = 1 });
+    const required = try requiredBytes(&symbol, .{ .quiet_zone = 1 });
     try std.testing.expectEqual(expected.len, required);
 
     var output: [expected.len]u8 = undefined;
-    const rendered = try render(&fixture.symbol, &output, .{ .quiet_zone = 1 });
+    const rendered = try render(&symbol, &output, .{ .quiet_zone = 1 });
     try std.testing.expectEqualStrings(expected, rendered);
 }
 
 test "SVG can render with transparent background" {
-    var fixture = testSymbol();
-    fixture.symbol.cells = &fixture.cells;
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
 
-    var output: [256]u8 = undefined;
+    var output: [512]u8 = undefined;
     const rendered = try render(
-        &fixture.symbol,
+        &symbol,
         &output,
         .{ .quiet_zone = 0, .background = null },
     );
@@ -209,13 +204,19 @@ test "SVG can render with transparent background" {
     try std.testing.expect(std.mem.indexOf(u8, rendered, "#000000") != null);
 }
 
-test "SVG rejects undersized output" {
-    var fixture = testSymbol();
-    fixture.symbol.cells = &fixture.cells;
+test "SVG rejects malformed symbols and undersized output" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
 
-    var output: [1]u8 = undefined;
+    const original_size = symbol.size;
+    symbol.size = 20;
+    var output: [512]u8 = undefined;
+    try std.testing.expectError(Error.InvalidSymbol, render(&symbol, &output, .{}));
+    symbol.size = original_size;
+
+    var tiny: [1]u8 = undefined;
     try std.testing.expectError(
         Error.OutputTooSmall,
-        render(&fixture.symbol, &output, .{}),
+        render(&symbol, &tiny, .{}),
     );
 }
