@@ -6,6 +6,7 @@ Pinned source: `heuer/segno@b11dc2913c22b22b3bc0a6efaa989904c44977bf`.
 
 Current fixtures:
 
+- `qr_tables.zig`: QR versions 1-40 data-codeword capacities for L/M/Q/H, transcribed from Segno `SYMBOL_CAPACITY` at the pinned commit.
 - `tests/ref_matrix/iso-fig-1.txt`: QR Code Symbol, QR version 1-M.
 - `tests/ref_matrix/iso-i2.txt`: 01234567, QR version 1-M, mask 2.
 - `tests/ref_matrix/iso-i3.txt`: 01234567, Micro QR M2-L.

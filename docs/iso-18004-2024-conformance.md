@@ -106,7 +106,7 @@ Status meanings:
 
 ## Independent conformance evidence required
 
-`zig build conformance` is the executable external-reference gate. The current seed corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices plus independent M1/M3/M4 regression matrices. Each fixture is checked in both directions available without linking an external runtime: QRz must reproduce the exact external matrix, and QRz must decode that external matrix back to the expected payload and metadata. Fixture provenance is recorded in `tests/reference/README.md`.
+`zig build conformance` is the executable external-reference gate. The corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices, independent M1/M3/M4 regression matrices, and the full QR 1–40 × L/M/Q/H external data-capacity table. Matrix fixtures are checked in both directions available without linking an external runtime. The capacity table is checked exhaustively against QRz, and byte-mode fit/overflow boundaries are exercised for all 160 QR version/EC combinations. QR character-count transitions at versions 9/10 and 26/27 are also exercised directly. Fixture provenance is recorded in `tests/reference/README.md`.
 
 This is only the foundation of the v1 evidence set. The missing Annex A/B sweep and independent decoder differential campaign remain release blockers.
 
@@ -116,7 +116,7 @@ Self-round-trips are regression evidence, not sufficient conformance evidence. v
 2. Independent encoder -> QRz decoder interoperability.
 3. QRz encoder -> independent decoder interoperability.
 4. Exact matrix comparison where the standard fixes all relevant choices.
-5. Boundary vectors at every character-count-width transition and capacity edge.
+5. Boundary vectors at every character-count-width transition and capacity edge. **QR capacity and count-width coverage present; non-byte mode capacity edges still pending.**
 6. BCH tests through and beyond the correction radius.
 7. Reed–Solomon tests at zero, maximum-correctable and uncorrectable corruption.
 8. Micro QR M1–M4 vectors for every legal EC/mode combination.
