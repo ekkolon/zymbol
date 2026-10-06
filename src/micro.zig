@@ -37,7 +37,7 @@ pub const Options = struct {
     mask: ?u2 = null,
 };
 
-pub const Error = error{
+pub const Error = bitstream.Error || error{
     DataTooLong,
     InvalidVersionRange,
     UnsupportedEcLevel,
@@ -134,7 +134,7 @@ fn versionFromNumber(number: u3) ?Version {
 }
 
 fn versionFromSize(side: u16) ?Version {
-    if (side < 11 or side > 17 or side & 1 == 0) return null;
+    if (side < 11 or side > 17 or (side & 1) == 0) return null;
     return versionFromNumber(@intCast((side - 9) / 2));
 }
 
@@ -502,7 +502,7 @@ fn setCell(
     dark: bool,
     kind: matrix.ModuleKind,
 ) void {
-    cells[y * side + x] = .{ .dark = dark, .kind = kind };
+    cells[y * @as(usize, side) + x] = .{ .dark = dark, .kind = kind };
 }
 
 fn layout(
@@ -511,11 +511,12 @@ fn layout(
     level: spec.EcLevel,
 ) matrix.Symbol {
     const side = size(version);
-    const count = @as(usize, side) * side;
+    const side_usize: usize = side;
+    const count = side_usize * side_usize;
     @memset(cells[0..count], matrix.Cell{});
 
     var i: usize = 0;
-    while (i < side) : (i += 1) {
+    while (i < side_usize) : (i += 1) {
         const dark = i & 1 == 0;
         setCell(cells, side, i, 0, dark, .timing);
         setCell(cells, side, 0, i, dark, .timing);
@@ -602,7 +603,7 @@ fn maskCondition(mask: u2, x: usize, y: usize) bool {
     return switch (mask) {
         0 => y % 2 == 0,
         1 => ((y / 2) + (x / 3)) % 2 == 0,
-        2 => ((x * y) % 2 + (x * y) % 3) == 0,
+        2 => (((x * y) % 2 + (x * y) % 3) % 2) == 0,
         3 => (((x + y) % 2) + ((x * y) % 3)) % 2 == 0,
     };
 }
@@ -800,7 +801,6 @@ pub fn encodeText(
     options: Options,
     cells: []matrix.Cell,
 ) Error!matrix.Symbol {
-    if (!std.unicode.utf8ValidateSlice(text)) return Error.InvalidCharacter;
     for (text) |byte| {
         if (byte >= 0x80) return Error.InvalidCharacter;
     }
@@ -979,7 +979,7 @@ fn decodeKanji(reader: *DataReader, count: usize, out: []u8, written: *usize) Er
             return Error.MalformedDataStream;
         }
         try push(out, written, @intCast(value >> 8));
-        try push(out, written, @intCast(value));
+        try push(out, written, @intCast(value & 0xFF));
     }
 }
 
@@ -1073,15 +1073,16 @@ fn decodeTransformed(
         }
     }
 
-    const total_codewords = @as(usize, cap.data_codewords) + cap.ec_codewords;
+    const total_codewords =
+        @as(usize, cap.data_codewords) + @as(usize, cap.ec_codewords);
     const corrected = reed_solomon.decode(
         block[0..total_codewords],
         cap.ec_codewords,
     ) catch return Error.UnrecoverableBlock;
 
     const len = try parseData(
-        block[0..cap.data_codewords],
-        cap.data_bits,
+        block[0..@as(usize, cap.data_codewords)],
+        @as(usize, cap.data_bits),
         version,
         out,
     );
@@ -1178,7 +1179,7 @@ test "Micro QR format codewords match Annex C.1" {
         var mask: u3 = 0;
         while (mask < 4) : (mask += 1) {
             try std.testing.expectEqual(
-                expected[class * 4 + mask],
+                expected[class * 4 + @as(usize, mask)],
                 formatBits(combination.version, combination.level, @intCast(mask)),
             );
         }
@@ -1223,7 +1224,7 @@ test "ISO Figure 38 Micro QR matrix matches reference" {
         for (row, 0..) |character, x| {
             try std.testing.expectEqual(
                 character == '1',
-                symbol.cells[y * symbol.size + x].dark,
+                symbol.cells[y * @as(usize, symbol.size) + x].dark,
             );
         }
     }
