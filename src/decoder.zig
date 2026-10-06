@@ -382,12 +382,12 @@ fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream 
                 saw_any_mode = true;
             },
             .fnc1_first_position => {
-                if (data_or_eci_started or fnc1 != .none) return Error.MalformedDataStream;
+                if (data_or_eci_started or !fnc1.isNone()) return Error.MalformedDataStream;
                 fnc1 = .first_position;
                 saw_any_mode = true;
             },
             .fnc1_second_position => {
-                if (data_or_eci_started or fnc1 != .none) return Error.MalformedDataStream;
+                if (data_or_eci_started or !fnc1.isNone()) return Error.MalformedDataStream;
                 const encoded: u8 = @intCast(try readBits(&reader, 8));
                 const indicator = spec.ApplicationIndicator.fromEncoded(encoded) orelse
                     return Error.MalformedDataStream;
@@ -411,7 +411,7 @@ fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream 
             .numeric, .alphanumeric, .byte, .kanji => {
                 const count_bits: u6 = @intCast(spec.charCountBits(mode, version));
                 const character_count: usize = try readBits(&reader, count_bits);
-                const fnc1_active = fnc1 != .none;
+                const fnc1_active = !fnc1.isNone();
 
                 switch (mode) {
                     .numeric => try decodeNumeric(&reader, character_count, out, &written),
