@@ -332,18 +332,67 @@ const penalty_n2: i32 = 3;
 const penalty_n3: i32 = 40;
 const penalty_n4: i32 = 10;
 
+fn finderPenaltyLine(symbol: *const Symbol, line: usize, horizontal: bool) i32 {
+    const side: usize = symbol.size;
+    if (side < 7) return 0;
+
+    const core = [_]bool{ true, false, true, true, true, false, true };
+    var result: i32 = 0;
+    var start: usize = 0;
+
+    while (start + core.len <= side) : (start += 1) {
+        var matches = true;
+        for (core, 0..) |expected, offset| {
+            const x = if (horizontal) start + offset else line;
+            const y = if (horizontal) line else start + offset;
+            if (isDarkUnchecked(symbol, x, y) != expected) {
+                matches = false;
+                break;
+            }
+        }
+        if (!matches) continue;
+
+        var before_light = true;
+        const before_start = start -| 4;
+        var index = before_start;
+        while (index < start) : (index += 1) {
+            const x = if (horizontal) index else line;
+            const y = if (horizontal) line else index;
+            if (isDarkUnchecked(symbol, x, y)) {
+                before_light = false;
+                break;
+            }
+        }
+
+        var after_light = true;
+        const after_start = start + core.len;
+        const after_end = @min(side, after_start + 4);
+        index = after_start;
+        while (index < after_end) : (index += 1) {
+            const x = if (horizontal) index else line;
+            const y = if (horizontal) line else index;
+            if (isDarkUnchecked(symbol, x, y)) {
+                after_light = false;
+                break;
+            }
+        }
+
+        // Modules beyond the matrix are part of the required light quiet
+        // region, so a finder-like core touching an edge can still satisfy
+        // the four-light-module condition.
+        if (before_light or after_light) result += penalty_n3;
+    }
+
+    return result;
+}
+
 pub fn penaltyScore(symbol: *const Symbol) i32 {
     var result: i32 = 0;
     const size = symbol.size;
-    const finder_left: u11 = 0b10111010000;
-    const finder_right: u11 = 0b00001011101;
-    const finder_mask: u11 = 0x7FF;
-
     var y: usize = 0;
     while (y < size) : (y += 1) {
         var run_color = false;
         var run_len: i32 = 0;
-        var window: u11 = 0;
 
         var x: usize = 0;
         while (x < size) : (x += 1) {
@@ -356,19 +405,15 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
                 run_color = dark;
                 run_len = 1;
             }
-
-            window = ((window << 1) & finder_mask) | @as(u11, @intFromBool(dark));
-            if (x >= 10 and (window == finder_left or window == finder_right)) {
-                result += penalty_n3;
-            }
         }
+
+        result += finderPenaltyLine(symbol, y, true);
     }
 
     var x: usize = 0;
     while (x < size) : (x += 1) {
         var run_color = false;
         var run_len: i32 = 0;
-        var window: u11 = 0;
 
         y = 0;
         while (y < size) : (y += 1) {
@@ -381,12 +426,9 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
                 run_color = dark;
                 run_len = 1;
             }
-
-            window = ((window << 1) & finder_mask) | @as(u11, @intFromBool(dark));
-            if (y >= 10 and (window == finder_left or window == finder_right)) {
-                result += penalty_n3;
-            }
         }
+
+        result += finderPenaltyLine(symbol, x, false);
     }
 
     y = 0;
@@ -418,6 +460,28 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
     result += k * penalty_n4;
 
     return result;
+}
+
+test "N3 finder-like penalty recognizes symbol-edge quiet region" {
+    var cells: [21 * 21]Cell = @splat(.{});
+    var symbol = Symbol{
+        .cells = &cells,
+        .size = 21,
+        .version = 1,
+        .ec_level = .m,
+        .mask = 0,
+    };
+
+    const pattern = [_]bool{ true, false, true, true, true, false, true };
+    for (pattern, 0..) |dark, x| {
+        symbol.cells[x].dark = dark;
+    }
+
+    try std.testing.expectEqual(penalty_n3, finderPenaltyLine(&symbol, 0, true));
+
+    // A dark module inside the four-module light area invalidates the match.
+    symbol.cells[7].dark = true;
+    try std.testing.expectEqual(@as(i32, 0), finderPenaltyLine(&symbol, 0, true));
 }
 
 test "checked symbol access rejects inconsistent public state" {
