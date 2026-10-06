@@ -178,7 +178,7 @@ fn fuzzControlModes(_: void, smith: *std.testing.Smith) !void {
 
     const structured: ?qrz.StructuredAppend = if (smith.value(bool)) blk: {
         const count: u5 = @intCast(1 + smith.value(u8) % 16);
-        const index: u4 = @intCast(smith.value(u8) % count);
+        const index: u4 = @intCast(smith.value(u8) % @as(u8, count));
         break :blk .{
             .index = index,
             .count = count,
