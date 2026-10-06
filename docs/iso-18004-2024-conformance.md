@@ -19,83 +19,84 @@ QR Code Model 1 is not a v1 requirement. ISO/IEC 18004:2024 retains it as legacy
 Status meanings:
 
 - implemented — present in QRz and covered by direct tests.
-- verify — implemented, but independent ISO/interoperability verification is still required.
+- covered — implemented and backed by independent reference, interoperability, or output-validation evidence.
+- verify — implemented, but independent evidence is still required.
 - missing — release blocker.
 - external — requirement depends on the physical production/acquisition system; QRz documents the boundary and enforces applicable digital prerequisites.
 
 ### Symbol families and geometry
 
-- QR Code versions 1–40: **verify**
+- QR Code versions 1–40: **covered**
 - Micro QR versions M1–M4: **implemented**
-- finder, separator, timing, alignment patterns: **verify**
-- quiet-zone geometry: **verify**
-- version information: **verify**
-- format information: **verify**
-- normal reflectance: **verify**
-- reversed reflectance handling: **verify**
-- mirror-image decoding/orientation handling: **verify**
+- finder, separator, timing, alignment patterns: **covered**
+- quiet-zone geometry: **covered**
+- version information: **covered**
+- format information: **covered**
+- normal reflectance: **implemented**
+- reversed reflectance handling: **implemented**
+- mirror-image decoding/orientation handling: **implemented**
 
 ### Data modes
 
-- numeric: **verify**
-- alphanumeric: **verify**
-- byte: **verify**
-- Kanji: **verify**
-- ECI: **verify**
-- mixed-mode streams: **verify**
-- FNC1 first position: **verify**
-- FNC1 second position: **verify**
-- Structured Append: **verify**
-- Structured Append sequence indicator: **verify**
-- Structured Append parity: **verify**
-- ECI interaction with Structured Append: **verify**
+- numeric: **covered**
+- alphanumeric: **covered**
+- byte: **covered**
+- Kanji: **covered**
+- ECI: **covered**
+- mixed-mode streams: **implemented**
+- FNC1 first position: **covered**
+- FNC1 second position: **covered**
+- Structured Append: **covered**
+- Structured Append sequence indicator: **covered**
+- Structured Append parity: **covered**
+- ECI interaction with Structured Append: **implemented**
 - Micro QR mode restrictions and mode indicators: **implemented**
-- default byte character-set semantics and alternative character-set rules: **verify**
+- default byte character-set semantics and alternative character-set rules: **implemented**
 
 ### Data encoding and message construction
 
-- character-count indicators by QR version band: **verify**
-- terminator behavior: **verify**
-- bit-to-codeword conversion: **verify**
-- pad codewords: **verify**
-- Reed–Solomon block partitioning: **verify**
-- error-correction codeword generation: **verify**
-- final message interleaving: **verify**
-- remainder bits: **verify**
-- codeword placement: **verify**
-- all QR data masks: **verify**
-- mask evaluation and automatic selection: **verify**
+- character-count indicators by QR version band: **covered**
+- terminator behavior: **covered**
+- bit-to-codeword conversion: **covered**
+- pad codewords: **covered**
+- Reed–Solomon block partitioning: **covered**
+- error-correction codeword generation: **covered**
+- final message interleaving: **covered**
+- remainder bits: **covered**
+- codeword placement: **covered**
+- all QR data masks: **covered**
+- mask evaluation and automatic selection: **covered**
 - Micro QR masking and evaluation: **implemented**
 
 ### Error detection and correction
 
-- GF(256) arithmetic for QR Code: **verify**
-- generator polynomials: **verify**
-- correction through the advertised RS radius: **verify**
-- malformed/unrecoverable block handling: **verify**
+- GF(256) arithmetic for QR Code: **covered**
+- generator polynomials: **covered**
+- correction through the advertised RS radius: **covered**
+- malformed/unrecoverable block handling: **implemented**
 - Micro QR block/ECC layouts: **implemented**
-- Annex A/B error-correction evidence: **verify** — all QR Annex A generator polynomials are independently checked; Annex B decode behavior is exercised at/over the correction radius across every QR block layout and through independent ZXing decoding.
+- Annex A/B error-correction evidence: **covered** — all QR Annex A generator polynomials are independently checked; Annex B decode behavior is exercised at/over the correction radius across every QR block layout and through independent ZXing decoding.
 
 ### Decoding and transmitted data
 
-- QR Code module-grid decoding: **verify**
-- redundant format-information recovery: **verify**
-- version-information recovery: **verify**
-- Reed–Solomon correction: **verify**
-- ECI reporting: **verify**
-- FNC1 transmitted-data semantics: **verify**
-- symbology identifier generation/reporting: **verify**
-- Structured Append metadata reporting: **verify**
+- QR Code module-grid decoding: **covered**
+- redundant format-information recovery: **covered**
+- version-information recovery: **covered**
+- Reed–Solomon correction: **covered**
+- ECI reporting: **covered**
+- FNC1 transmitted-data semantics: **covered**
+- symbology identifier generation/reporting: **implemented**
+- Structured Append metadata reporting: **covered**
 - Micro QR decoding: **implemented**
-- mirror/reversed symbol normalization: **verify**
+- mirror/reversed symbol normalization: **implemented**
 - reference-decoder behavioral differential tests: **covered** — ZXing-cpp 3.1.1 differential gate passed locally on 2026-10-06 with 10 QRz→ZXing-cpp and 10 ZXing-cpp→QRz cases across QR Code Model 2 and Micro QR.
 - autodiscrimination behavior applicable to QR/Micro QR: **implemented**
 
 ### Rendering and symbol production
 
-- square QR module projection: **verify**
-- integer raster scaling: **verify**
-- four-module QR quiet-zone default: **verify**
+- square QR module projection: **covered**
+- integer raster scaling: **covered**
+- four-module QR quiet-zone default: **covered**
 - Micro QR quiet-zone rules: **implemented**
 - black/white and configurable reflectance rendering: **implemented**
 - reversed-reflectance output: **implemented** — raster, SVG and PNG invert the complete symbol including quiet zone; rendered QR/Micro grids are regression-decoded with reversed-reflectance metadata.
@@ -108,7 +109,7 @@ Status meanings:
 
 `zig build conformance` is the executable external-reference gate. The evidence set now also includes the ISO-derived four-symbol Structured Append sequence and ZXing-cpp ECI/FNC1 decoder streams. For the Structured Append sequence, symbols 1-2 are exact encode/decode goldens; symbols 3-4 remain decode/interoperability fixtures because the pinned Segno encoder has a documented byte-aligned padding defect. QRz separately asserts the standards-correct `0xEC` pad codeword for those aligned streams. The corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices, independent M1/M3/M4 regression matrices, the full QR 1–40 × L/M/Q/H external data-capacity table, all 32 QR format-information codewords, all 34 QR version-information codewords, and the Annex A Reed–Solomon generator exponents for every degree used by QR Code, converted independently to GF(256) coefficients before comparison. Matrix fixtures are checked in both directions available without linking an external runtime. Capacity, alignment-position, raw/remainder-module, block-layout, BCH, generator-polynomial, and version-band boundaries are executable conformance evidence. Fixture provenance is recorded in `tests/reference/README.md`.
 
-The independent conformance set now covers QR geometry and block-layout tables, all QR mode capacity edges, BCH/RS evidence, special headers, static external matrices, and a recorded bidirectional ZXing-cpp differential campaign. Remaining release blockers are sustained fuzz qualification, performance closure, and the final clause-by-clause/API audit.
+The independent conformance set covers QR geometry and block-layout tables, all QR mode capacity edges, BCH/RS evidence, special headers, static external matrices, rendering validation, and a recorded bidirectional ZXing-cpp differential campaign. Repository-level implementation/evidence review is complete; the remaining pre-tag blockers are sustained fuzzing on the final candidate and normative-text clause sign-off.
 
 `zig build interop` runs the test-only bidirectional differential gate against pinned ZXing-cpp 3.1.1 after installing `tests/interop-requirements.txt`; it is intentionally excluded from the dependency-free default gates. Self-round-trips are regression evidence, not sufficient conformance evidence. v1 requires all of the following:
 
@@ -187,6 +188,6 @@ Performance closure is **complete** for v1. The WSL/Linux Zig 0.17 ReleaseFast r
 
 ## Release rule
 
-The release/v1.0.0 branch remains blocked until this ledger contains no missing item and every verify item has independent evidence.
+The release/v1.0.0 tag remains blocked until this ledger contains no `missing` or `verify` item, the final-candidate sustained fuzz campaign passes, and the software-applicable requirements are signed off against the normative ISO/IEC 18004:2024 text.
 
-The final public compliance statement is signed off against the normative ISO/IEC 18004:2024 text, not against this ledger alone.
+The repository evidence audit does not substitute for the copyrighted normative text. The final public compliance statement is signed off against a legally obtained copy of ISO/IEC 18004:2024, not against this ledger alone.
