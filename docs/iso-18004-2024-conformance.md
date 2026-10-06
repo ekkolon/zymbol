@@ -74,7 +74,7 @@ Status meanings:
 - correction through the advertised RS radius: **verify**
 - malformed/unrecoverable block handling: **verify**
 - Micro QR block/ECC layouts: **implemented**
-- exhaustive normative Annex A/B cross-checks: **missing** (Annex A generator exponents/coefficients covered; remaining Annex audit still required)
+- Annex A/B error-correction evidence: **verify** — all QR Annex A generator polynomials are independently checked; Annex B decode behavior is exercised at/over the correction radius across every QR block layout and through independent ZXing decoding.
 
 ### Decoding and transmitted data
 
@@ -106,9 +106,9 @@ Status meanings:
 
 ## Independent conformance evidence required
 
-`zig build conformance` is the executable external-reference gate. The evidence set now also includes the ISO-derived four-symbol Structured Append sequence and ZXing-cpp ECI/FNC1 decoder streams. For the Structured Append sequence, symbols 1-2 are exact encode/decode goldens; symbols 3-4 remain decode/interoperability fixtures because the pinned Segno encoder has a documented byte-aligned padding defect. QRz separately asserts the standards-correct `0xEC` pad codeword for those aligned streams. The corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices, independent M1/M3/M4 regression matrices, the full QR 1–40 × L/M/Q/H external data-capacity table, all 32 QR format-information codewords, all 34 QR version-information codewords, and the Annex A Reed–Solomon generator exponents for every degree used by QR Code, converted independently to GF(256) coefficients before comparison. Matrix fixtures are checked in both directions available without linking an external runtime. Capacity, BCH, generator-polynomial, and version-band boundaries are executable conformance evidence. Fixture provenance is recorded in `tests/reference/README.md`.
+`zig build conformance` is the executable external-reference gate. The evidence set now also includes the ISO-derived four-symbol Structured Append sequence and ZXing-cpp ECI/FNC1 decoder streams. For the Structured Append sequence, symbols 1-2 are exact encode/decode goldens; symbols 3-4 remain decode/interoperability fixtures because the pinned Segno encoder has a documented byte-aligned padding defect. QRz separately asserts the standards-correct `0xEC` pad codeword for those aligned streams. The corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices, independent M1/M3/M4 regression matrices, the full QR 1–40 × L/M/Q/H external data-capacity table, all 32 QR format-information codewords, all 34 QR version-information codewords, and the Annex A Reed–Solomon generator exponents for every degree used by QR Code, converted independently to GF(256) coefficients before comparison. Matrix fixtures are checked in both directions available without linking an external runtime. Capacity, alignment-position, raw/remainder-module, block-layout, BCH, generator-polynomial, and version-band boundaries are executable conformance evidence. Fixture provenance is recorded in `tests/reference/README.md`.
 
-This is only the foundation of the v1 evidence set. The missing Annex A/B sweep and independent decoder differential campaign remain release blockers.
+The independent conformance set now covers QR geometry and block-layout tables, all QR mode capacity edges, BCH/RS evidence, special headers, static external matrices, and a recorded bidirectional ZXing-cpp differential campaign. Remaining release blockers are tracked below in rendering/output, portability runtime evidence, fuzz closure, and the final clause-by-clause audit.
 
 `zig build interop` runs the test-only bidirectional differential gate against pinned ZXing-cpp 3.1.1 after installing `tests/interop-requirements.txt`; it is intentionally excluded from the dependency-free default gates. Self-round-trips are regression evidence, not sufficient conformance evidence. v1 requires all of the following:
 
@@ -116,11 +116,11 @@ This is only the foundation of the v1 evidence set. The missing Annex A/B sweep 
 2. Independent encoder -> QRz decoder interoperability. **Covered by 10 successful ZXing-cpp 3.1.1 → QRz cases in the recorded local campaign.**
 3. QRz encoder -> independent decoder interoperability. **Covered by 10 successful QRz → ZXing-cpp 3.1.1 cases in the recorded local campaign.**
 4. Exact matrix comparison where the standard fixes all relevant choices.
-5. Boundary vectors at every character-count-width transition and capacity edge. **QR capacity and count-width coverage present; non-byte mode capacity edges still pending.**
+5. Boundary vectors at every character-count-width transition and capacity edge. **Covered for byte, numeric, alphanumeric and Kanji across all 160 QR version/EC pairs; count-width transitions 9/10 and 26/27 are explicit.**
 6. BCH tests through and beyond the correction radius. **Covered for QR format information; version BCH exact tables and four-bit rejection are covered.**
 7. Reed–Solomon tests at zero, maximum-correctable and uncorrectable corruption. **Covered across QR block layouts at the guaranteed radius, with explicit beyond-radius rejection cases and independent Annex A generator exponents converted to raw GF(256) coefficients.**
 8. Micro QR M1–M4 vectors for every legal EC/mode combination.
-9. FNC1, Structured Append, ECI and transmitted-data vectors. **Structured Append header/parity semantics, two exact external SA encoder matrices, two additional external SA decoder fixtures, and independent ECI/FNC1 decoder streams are covered; broader ECI assignment-width vectors remain pending.**
+9. FNC1, Structured Append, ECI and transmitted-data vectors. **Covered by Structured Append header/parity vectors, external SA matrices, ZXing-cpp ECI/FNC1 streams, and direct ISO Table 4 ECI width boundaries at 127/128, 16383/16384 and 999999.**
 10. Mirror and reflectance-reversal decode vectors.
 
 ## Portability gate

@@ -469,6 +469,128 @@ test "QR character-count widths transition at version bands" {
 }
 
 
+fn numericSegmentBits(version: qrz.Version, count: usize) usize {
+    const count_bits: usize = if (version <= 9) 10 else if (version <= 26) 12 else 14;
+    const groups = count / 3;
+    const tail_bits: usize = switch (count % 3) {
+        0 => 0,
+        1 => 4,
+        2 => 7,
+        else => unreachable,
+    };
+    return 4 + count_bits + groups * 10 + tail_bits;
+}
+
+fn alphanumericSegmentBits(version: qrz.Version, count: usize) usize {
+    const count_bits: usize = if (version <= 9) 9 else if (version <= 26) 11 else 13;
+    return 4 + count_bits + (count / 2) * 11 + (count % 2) * 6;
+}
+
+fn maxCharactersForCapacity(
+    version: qrz.Version,
+    capacity_bits: usize,
+    comptime bitLength: fn (qrz.Version, usize) usize,
+) usize {
+    var count: usize = 0;
+    while (bitLength(version, count + 1) <= capacity_bits) : (count += 1) {}
+    return count;
+}
+
+fn kanjiSegmentBits(version: qrz.Version, count: usize) usize {
+    const count_bits: usize = if (version <= 9) 8 else if (version <= 26) 10 else 12;
+    return 4 + count_bits + count * 13;
+}
+
+test "external QR numeric and alphanumeric capacity boundaries fit exactly" {
+    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+    var numeric_payload: [8192]u8 = @splat('7');
+    var alphanumeric_payload: [8192]u8 = @splat('A');
+    var storage: [qrz.dataCodewords(qrz.max_version, .l)]u8 = undefined;
+
+    var version: qrz.Version = 1;
+    while (version <= qrz.max_version) : (version += 1) {
+        for (levels, 0..) |_, level_index| {
+            const data_codewords: usize = qr_tables.qr_data_codewords[version - 1][level_index];
+            const capacity_bits = data_codewords * 8;
+
+            const numeric_max = maxCharactersForCapacity(
+                version,
+                capacity_bits,
+                numericSegmentBits,
+            );
+            var writer = qrz.BitWriter.init(storage[0..data_codewords]);
+            try qrz.appendNumeric(&writer, version, numeric_payload[0..numeric_max]);
+            try qrz.finalizeSegments(&writer);
+
+            writer = qrz.BitWriter.init(storage[0..data_codewords]);
+            try std.testing.expectError(
+                error.BufferFull,
+                qrz.appendNumeric(&writer, version, numeric_payload[0 .. numeric_max + 1]),
+            );
+
+            const alphanumeric_max = maxCharactersForCapacity(
+                version,
+                capacity_bits,
+                alphanumericSegmentBits,
+            );
+            writer = qrz.BitWriter.init(storage[0..data_codewords]);
+            try qrz.appendAlphanumeric(
+                &writer,
+                version,
+                alphanumeric_payload[0..alphanumeric_max],
+            );
+            try qrz.finalizeSegments(&writer);
+
+            writer = qrz.BitWriter.init(storage[0..data_codewords]);
+            try std.testing.expectError(
+                error.BufferFull,
+                qrz.appendAlphanumeric(
+                    &writer,
+                    version,
+                    alphanumeric_payload[0 .. alphanumeric_max + 1],
+                ),
+            );
+        }
+    }
+}
+
+test "external QR Kanji capacity boundaries fit exactly" {
+    const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
+    var payload: [8192]u8 = undefined;
+    for (0..payload.len / 2) |index| {
+        payload[index * 2] = 0x81;
+        payload[index * 2 + 1] = 0x40;
+    }
+    var storage: [qrz.dataCodewords(qrz.max_version, .l)]u8 = undefined;
+
+    var version: qrz.Version = 1;
+    while (version <= qrz.max_version) : (version += 1) {
+        for (levels, 0..) |_, level_index| {
+            const data_codewords: usize = qr_tables.qr_data_codewords[version - 1][level_index];
+            const capacity_bits = data_codewords * 8;
+            const max_chars = maxCharactersForCapacity(
+                version,
+                capacity_bits,
+                kanjiSegmentBits,
+            );
+
+            var writer = qrz.BitWriter.init(storage[0..data_codewords]);
+            try qrz.appendKanji(&writer, version, payload[0 .. max_chars * 2]);
+            try qrz.finalizeSegments(&writer);
+
+            writer = qrz.BitWriter.init(storage[0..data_codewords]);
+            try std.testing.expectError(
+                error.BufferFull,
+                qrz.appendKanji(
+                    &writer,
+                    version,
+                    payload[0 .. (max_chars + 1) * 2],
+                ),
+            );
+        }
+    }
+}
+
 test "ISO Structured Append symbol 1 reference matrix" {
     const rows = [_][]const u8{
         "111111101010001111111",
