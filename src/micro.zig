@@ -45,6 +45,7 @@ pub const Segment = union(enum) {
 };
 
 pub const Error = bitstream.Error || error{
+    EmptyInput,
     DataTooLong,
     InvalidVersionRange,
     UnsupportedEcLevel,
@@ -478,6 +479,7 @@ fn selectAuto(
     options: Options,
 ) Error!struct { version: Version, level: spec.EcLevel, bits: usize } {
     try validateOptions(options);
+    if (data.len == 0) return Error.EmptyInput;
     if (data.len > max_input_len) return Error.DataTooLong;
 
     switch (options.max_version) {
@@ -512,6 +514,7 @@ fn selectKanji(
     options: Options,
 ) Error!struct { version: Version, level: spec.EcLevel, bits: usize } {
     try validateOptions(options);
+    if (sjis.len == 0) return Error.EmptyInput;
     if ((sjis.len & 1) != 0) return Error.OddKanjiLength;
 
     const characters = sjis.len / 2;
@@ -542,8 +545,12 @@ fn selectSegments(
     options: Options,
 ) Error!struct { version: Version, level: spec.EcLevel, bits: usize } {
     try validateOptions(options);
+    if (segments.len == 0) return Error.EmptyInput;
 
-    for (segments) |segment_value| _ = try segmentInfo(segment_value);
+    for (segments) |segment_value| {
+        const info = try segmentInfo(segment_value);
+        if (info.count == 0) return Error.EmptyInput;
+    }
 
     var has_legal_level = false;
     var has_legal_mode_set = false;
@@ -1309,6 +1316,33 @@ test "Micro QR capacities and dimensions match M1-M4 tables" {
     try std.testing.expect(capacity(.m4, .h) == null);
 }
 
+test "Micro QR rejects empty input and empty explicit segments" {
+    var cells: [max_cells]matrix.Cell = undefined;
+
+    try std.testing.expectError(
+        Error.EmptyInput,
+        encodeBytes(&.{}, .{}, &cells),
+    );
+    try std.testing.expectError(
+        Error.EmptyInput,
+        encodeText("", .{}, &cells),
+    );
+    try std.testing.expectError(
+        Error.EmptyInput,
+        encodeKanji(&.{}, .{}, &cells),
+    );
+    try std.testing.expectError(
+        Error.EmptyInput,
+        encodeSegments(&.{}, .{}, &cells),
+    );
+
+    const segments = [_]Segment{.{ .byte = &.{} }};
+    try std.testing.expectError(
+        Error.EmptyInput,
+        encodeSegments(&segments, .{}, &cells),
+    );
+}
+
 test "Micro QR data padding matches independent codeword vectors" {
     const cases = [_]struct {
         version: Version,
@@ -1601,6 +1635,130 @@ test "Micro mask 10 matrix matches independent reference" {
             );
         }
     }
+}
+
+fn bitsFromRows(comptime rows: []const []const u8) [17 * 17]bool {
+    var bits: [17 * 17]bool = @splat(false);
+    var y: usize = 0;
+    while (y < rows.len) : (y += 1) {
+        var x: usize = 0;
+        while (x < rows[y].len) : (x += 1) {
+            bits[y * rows.len + x] = rows[y][x] == '1';
+        }
+    }
+    return bits;
+}
+
+test "independent M3-L matrix matches encoder and decodes" {
+    const rows = [_][]const u8{
+        "111111101010101",
+        "100000100110110",
+        "101110100011111",
+        "101110100100110",
+        "101110101101010",
+        "100000101010111",
+        "111111101111110",
+        "000000001000010",
+        "111101100000100",
+        "011110110100111",
+        "110111110001111",
+        "001111011000101",
+        "110000101011000",
+        "010011000101101",
+        "100111010001111",
+    };
+    const payload = "12345678901234567890123";
+
+    var cells: [15 * 15]matrix.Cell = undefined;
+    const symbol = try encodeText(
+        payload,
+        .{
+            .min_version = .m3,
+            .max_version = .m3,
+            .ec_level = .l,
+            .boost_ec_level = false,
+        },
+        &cells,
+    );
+
+    for (rows, 0..) |row, y| {
+        for (row, 0..) |character, x| {
+            try std.testing.expectEqual(
+                character == '1',
+                symbol.cells[y * 15 + x].dark,
+            );
+        }
+    }
+
+    const independent = bitsFromRows(&rows);
+    var decode_cells: [15 * 15]matrix.Cell = undefined;
+    var out: [32]u8 = undefined;
+    const result = try decode(
+        independent[0 .. 15 * 15],
+        15,
+        &decode_cells,
+        &out,
+    );
+    try std.testing.expectEqualSlices(u8, payload, out[0..result.len]);
+    try std.testing.expectEqual(Version.m3, result.version);
+    try std.testing.expectEqual(spec.EcLevel.l, result.ec_level);
+}
+
+test "independent M4-Q matrix matches encoder and decodes" {
+    const rows = [_][]const u8{
+        "11111110101010101",
+        "10000010010101101",
+        "10111010010010101",
+        "10111010100010111",
+        "10111010000101010",
+        "10000010110001101",
+        "11111110010010000",
+        "00000000101101010",
+        "10110001110101010",
+        "00000010001001111",
+        "10011101011110100",
+        "00001100000100111",
+        "11111001110010001",
+        "01110100011101101",
+        "11110001010001110",
+        "00000001110011011",
+        "11011110011010100",
+    };
+    const payload = "123456789012345678901";
+
+    var cells: [17 * 17]matrix.Cell = undefined;
+    const symbol = try encodeText(
+        payload,
+        .{
+            .min_version = .m4,
+            .max_version = .m4,
+            .ec_level = .q,
+            .boost_ec_level = false,
+        },
+        &cells,
+    );
+
+    for (rows, 0..) |row, y| {
+        for (row, 0..) |character, x| {
+            try std.testing.expectEqual(
+                character == '1',
+                symbol.cells[y * 17 + x].dark,
+            );
+        }
+    }
+
+    const independent = bitsFromRows(&rows);
+    var decode_cells: [17 * 17]matrix.Cell = undefined;
+    var out: [32]u8 = undefined;
+    const result = try decode(
+        &independent,
+        17,
+        &decode_cells,
+        &out,
+    );
+    try std.testing.expectEqualSlices(u8, payload, out[0..result.len]);
+    try std.testing.expectEqual(Version.m4, result.version);
+    try std.testing.expectEqual(spec.EcLevel.q, result.ec_level);
 }
 
 test "M1 through M4 round trip legal modes" {
