@@ -6,7 +6,7 @@ QRz separates QR semantics from output formats. `qrz` encodes and decodes symbol
 
 ## Status
 
-QRz is under v1 conformance stabilization. The public API is not frozen yet. The v1 release is blocked on full software-applicable ISO/IEC 18004:2024 conformance, independent interoperability evidence, portability qualification, fuzzing, and performance closure; see `docs/iso-18004-2024-conformance.md`.
+QRz is in final v1 release-candidate stabilization. The exported root surface is frozen by a compile-time API snapshot. Independent interoperability, portability, PNG/SVG validation, and performance qualification are complete. The remaining pre-tag gates are sustained fuzzing on the final candidate and normative-text ISO/IEC 18004:2024 sign-off; see `docs/iso-18004-2024-conformance.md`.
 
 The current implementation covers:
 
@@ -23,7 +23,7 @@ The current implementation covers:
 - allocation-free raster rendering plus built-in SVG and PNG encoding through `qrz_render`
 - `wasm32-freestanding` compilation
 
-The v1 conformance claim remains blocked until the independent evidence and release gates in `docs/iso-18004-2024-conformance.md` are complete.
+The v1 conformance claim remains blocked until the sustained fuzz campaign and final normative-text sign-off in `docs/iso-18004-2024-conformance.md` are complete.
 
 ## Encoding text
 
