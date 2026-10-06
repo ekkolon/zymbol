@@ -35,11 +35,13 @@ pub const renderRasterStrided = raster.renderStrided;
 
 pub const requiredSvgBytes = svg.requiredBytes;
 pub const maxSvgBytesForVersion = svg.maxBytesForVersion;
+pub const maxSvgBytesForMicroVersion = svg.maxBytesForMicroVersion;
 pub const renderSvg = svg.render;
 pub const writeSvg = svg.write;
 
 pub const requiredPngBytes = png.requiredBytes;
 pub const requiredPngBytesForVersion = png.requiredBytesForVersion;
+pub const requiredPngBytesForMicroVersion = png.requiredBytesForMicroVersion;
 pub const renderPng = png.render;
 
 pub const pngRequirements = owned.pngRequirements;
@@ -152,4 +154,64 @@ test "raster projection is exact across representative versions" {
             }
         }
     }
+}
+
+
+test "Micro QR rendering uses the two-module default quiet zone" {
+    var cells: [qrz.requiredMicroCells(.m2)]qrz.Cell = undefined;
+    const symbol = try qrz.encodeMicroText(
+        "12345",
+        .{
+            .min_version = .m2,
+            .max_version = .m2,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+    );
+
+    try std.testing.expectEqual(qrz.SymbolFamily.micro_qr, symbol.family);
+
+    const dims = try rasterDimensions(&symbol, .{ .scale = 1 });
+    try std.testing.expectEqual(@as(usize, 17), dims.width);
+    try std.testing.expectEqual(@as(usize, 17), dims.height);
+
+    var raster_pixels: [17 * 17]u8 = undefined;
+    _ = try renderRaster(
+        u8,
+        &symbol,
+        &raster_pixels,
+        0,
+        255,
+        .{ .scale = 1 },
+    );
+    for (0..2) |y| {
+        for (0..17) |x| {
+            try std.testing.expectEqual(@as(u8, 255), raster_pixels[y * 17 + x]);
+        }
+    }
+
+    var svg_output: [8192]u8 = undefined;
+    const rendered_svg = try renderSvg(&symbol, &svg_output, .{});
+    try std.testing.expect(
+        std.mem.indexOf(u8, rendered_svg, "viewBox=\"0 0 17 17\"") != null,
+    );
+
+    var png_output: [8192]u8 = undefined;
+    const rendered_png = try renderPng(
+        &symbol,
+        &png_output,
+        .{ .scale = 1 },
+    );
+    try std.testing.expectEqualSlices(
+        u8,
+        &.{ 0x00, 0x00, 0x00, 0x11 },
+        rendered_png[16..20],
+    );
+    try std.testing.expectEqualSlices(
+        u8,
+        &.{ 0x00, 0x00, 0x00, 0x11 },
+        rendered_png[20..24],
+    );
 }
