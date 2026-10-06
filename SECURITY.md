@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-Security fixes are made against the current stable 1.x release. Older release
-lines may receive fixes when the issue warrants it.
+Before 1.0.0, security fixes target `main`. After 1.0.0, fixes target the
+current stable 1.x release. Older release lines may receive fixes when the
+issue warrants it.
 
 ## Reporting a vulnerability
 
