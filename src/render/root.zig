@@ -50,8 +50,8 @@ pub const renderSvg = svg.render;
 pub const writeSvg = svg.write;
 
 pub const requiredPngBytes = png.requiredBytes;
-pub const maxPngBytesForVersion = png.requiredBytesForVersion;
-pub const maxPngBytesForMicroVersion = png.requiredBytesForMicroVersion;
+pub const maxPngBytesForVersion = png.maxBytesForVersion;
+pub const maxPngBytesForMicroVersion = png.maxBytesForMicroVersion;
 pub const renderPng = png.render;
 
 pub const pngRequirements = owned.pngRequirements;

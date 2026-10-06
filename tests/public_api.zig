@@ -176,6 +176,7 @@ fn expectExactFieldSet(
     comptime T: type,
     comptime expected: []const []const u8,
 ) !void {
+    @setEvalBranchQuota(20_000);
     const fields = comptime std.meta.fields(T);
     try std.testing.expectEqual(expected.len, fields.len);
 
