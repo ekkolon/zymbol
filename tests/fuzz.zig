@@ -60,9 +60,22 @@ fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
         &encode_scratch,
     ) catch return;
 
+    const mirrored = smith.value(bool);
+    const reflectance_reversed = smith.value(bool);
+
     var bits: [max_cells]bool = undefined;
-    const cell_count = @as(usize, symbol.size) * symbol.size;
-    for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
+    const side: usize = symbol.size;
+    const cell_count = side * side;
+    for (0..side) |y| {
+        for (0..side) |x| {
+            const source_index = if (mirrored)
+                x * side + y
+            else
+                y * side + x;
+            bits[y * side + x] =
+                symbol.cells[source_index].dark != reflectance_reversed;
+        }
+    }
 
     var decode_cells: [max_cells]qrz.Cell = undefined;
     var decode_scratch: [max_decode_scratch]u8 = undefined;
@@ -96,6 +109,8 @@ fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
     try std.testing.expectEqual(symbol.version, result.version);
     try std.testing.expectEqual(symbol.ec_level, result.ec_level);
     try std.testing.expectEqual(symbol.mask, result.mask);
+    try std.testing.expectEqual(mirrored, result.mirrored);
+    try std.testing.expectEqual(reflectance_reversed, result.reflectance_reversed);
 }
 
 test "fuzz PNG encoding invariants" {
