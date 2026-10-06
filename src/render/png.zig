@@ -53,6 +53,17 @@ const Sink = struct {
         });
     }
 
+    fn patchBe32(self: *Sink, position: usize, value: u32) Error!void {
+        const buffer = self.buffer orelse return Error.OutputTooSmall;
+        if (position > buffer.len or buffer.len - position < 4) {
+            return Error.OutputTooSmall;
+        }
+        buffer[position] = @truncate(value >> 24);
+        buffer[position + 1] = @truncate(value >> 16);
+        buffer[position + 2] = @truncate(value >> 8);
+        buffer[position + 3] = @truncate(value);
+    }
+
     fn writeLe16(self: *Sink, value: u16) Error!void {
         try self.write(&.{
             @truncate(value),
@@ -444,7 +455,6 @@ fn zlibLength(
 
 fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
     const dims = try dimensions(symbol, options);
-    const zlib_len = try zlibLength(symbol, options, dims);
 
     try sink.write(&.{ 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A });
 
@@ -477,17 +487,21 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
         try writeChunk(sink, "tRNS", &.{ 255, 0 });
     }
 
-    if (zlib_len > std.math.maxInt(u32)) return Error.SizeOverflow;
-    try sink.writeBe32(@intCast(zlib_len));
+    const length_position = sink.position;
+    try sink.writeBe32(0);
 
     const crc_start = sink.position;
     try sink.write("IDAT");
+    const zlib_start = sink.position;
     try emitZlib(symbol, options, dims, sink);
+    const zlib_len = sink.position - zlib_start;
+    if (zlib_len > std.math.maxInt(u32)) return Error.SizeOverflow;
+    try sink.patchBe32(length_position, @intCast(zlib_len));
 
     if (sink.buffer) |buffer| {
         try sink.writeBe32(crc32(buffer[crc_start..sink.position]));
     } else {
-        try sink.writeBe32(0);
+        return Error.OutputTooSmall;
     }
 
     try writeChunk(sink, "IEND", &.{});
@@ -542,9 +556,6 @@ pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
 }
 
 pub fn render(symbol: *const qrz.Symbol, output: []u8, options: Options) Error![]const u8 {
-    const required = try requiredBytes(symbol, options);
-    if (output.len < required) return Error.OutputTooSmall;
-
     var sink = Sink{ .buffer = output };
     try emit(symbol, options, &sink);
     return output[0..sink.position];
@@ -579,6 +590,37 @@ test "PNG required size exactly matches rendered size" {
     try std.testing.expectEqualStrings("IHDR", encoded[12..16]);
     try std.testing.expect(std.mem.indexOf(u8, encoded, "PLTE") != null);
     try std.testing.expectEqualStrings("IEND", encoded[encoded.len - 8 .. encoded.len - 4]);
+}
+
+test "PNG render accepts exact buffer without an internal sizing pass" {
+    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try qrz.encodeText(
+        "QRZ SINGLE PASS PNG",
+        .{
+            .min_version = 4,
+            .max_version = 4,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+        &scratch,
+    );
+
+    const options = Options{ .scale = 4 };
+    const required = try requiredBytes(&symbol, options);
+    var output: [32 * 1024]u8 = undefined;
+
+    const encoded = try render(&symbol, output[0..required], options);
+    try std.testing.expectEqual(required, encoded.len);
+
+    if (required > 0) {
+        try std.testing.expectError(
+            Error.OutputTooSmall,
+            render(&symbol, output[0 .. required - 1], options),
+        );
+    }
 }
 
 test "PNG version requirement bounds exact compressed size" {
