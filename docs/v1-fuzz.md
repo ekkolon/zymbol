@@ -1,6 +1,6 @@
 # v1 fuzz qualification
 
-QRz uses Zig 0.17's coverage-guided test fuzzer for release qualification. Zig
+Zymbol uses Zig 0.17's coverage-guided test fuzzer for release qualification. Zig
 0.16 remains the minimum supported compiler for ordinary builds, tests, and
 portability checks; sustained fuzzing is a release-tooling exception.
 
@@ -42,7 +42,7 @@ Zig's coverage fuzzer additionally persists discovered inputs and the current
 crashing input in its build cache. Preserve `.zig-cache` during a campaign so
 coverage and discovered inputs accumulate across runs. Cache state is useful
 campaign evidence, but it is not the durable regression mechanism: every input
-that exposes a QRz bug must be reduced as practical and promoted into the
+that exposes a Zymbol bug must be reduced as practical and promoted into the
 checked-in corpus or a dedicated regression test.
 
 ## Sustained v1 campaign
@@ -53,7 +53,7 @@ The release campaign is finite and reproducible:
 zig build fuzz --fuzz=100M --summary all
 ```
 
-Zig applies the limit to each fuzz test independently. With 14 QRz targets,
+Zig applies the limit to each fuzz test independently. With 14 Zymbol targets,
 this requests 100 million executions per target, approximately 1.4 billion
 fuzz executions across the suite.
 
@@ -73,7 +73,7 @@ release candidate:
 1. `zig build fuzz` passes the complete checked-in corpus.
 2. `zig build fuzz --fuzz=100M --summary all` completes without crash,
    panic, invariant failure, memory-safety failure, or unexpected error.
-3. The final fuzzing report contains every QRz fuzz target.
+3. The final fuzzing report contains every Zymbol fuzz target.
 4. Any failure found during the campaign is fixed and its reproducer is made
    durable in the corpus or a dedicated regression test.
 5. The deterministic corpus replay is rerun after every accepted fix.

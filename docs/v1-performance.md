@@ -1,6 +1,6 @@
 # v1 performance qualification
 
-QRz v1 performance is qualified by measurement, not by a claim that every
+Zymbol v1 performance is qualified by measurement, not by a claim that every
 possible optimization has been exhausted.
 
 ## Reproducible suite
@@ -13,7 +13,7 @@ zig build benchmark
 
 The benchmark executables are always compiled with `ReleaseFast` regardless
 of the surrounding build mode. Python 3 is used only for the PNG compression
-comparison and is not part of the QRz runtime.
+comparison and is not part of the Zymbol runtime.
 
 The suite reports CSV-like output for:
 
@@ -24,7 +24,7 @@ The suite reports CSV-like output for:
 - PNG rendering at scale 4
 - SVG rendering
 - end-to-end automatic QR encoding plus PNG sizing/rendering
-- QRz PNG IDAT size versus Python zlib levels 6 and 9 on identical scanlines
+- Zymbol PNG IDAT size versus Python zlib levels 6 and 9 on identical scanlines
 
 Each timed Zig benchmark records five samples and reports the median
 nanoseconds per operation and derived operations per second. Inputs and
@@ -33,7 +33,7 @@ benchmark name explicitly includes that work.
 
 ## Working memory
 
-QRz core and low-level renderers do not allocate. The benchmark therefore
+Zymbol core and low-level renderers do not allocate. The benchmark therefore
 reports caller-owned working-set bytes for the buffers required by each
 operation. This is not presented as total process RSS or stack high-water
 usage.
@@ -110,9 +110,9 @@ so it was rejected and reverted.
 
 ## Compression-size trade-off
 
-QRz's deterministic allocation-free fixed-Huffman/LZ77 encoder is intentionally
+Zymbol's deterministic allocation-free fixed-Huffman/LZ77 encoder is intentionally
 smaller in implementation scope than a general-purpose dynamic-Huffman zlib
-compressor. On the representative validation corpus QRz IDAT streams measured
+compressor. On the representative validation corpus Zymbol IDAT streams measured
 between 110.5% and 172.0% of Python zlib level 9 before the rejected filter
 experiment. The largest observed absolute difference in that corpus was
 224 bytes for the scale-4 reference image (535 versus 311 bytes).

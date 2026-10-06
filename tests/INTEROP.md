@@ -24,8 +24,8 @@ zig build interop -Dpython=python
 The gate currently checks a representative QR Code Model 2 and Micro QR
 corpus in both directions:
 
-- QRz encoder -> ZXing-cpp decoder
-- ZXing-cpp encoder -> QRz decoder
+- Zymbol encoder -> ZXing-cpp decoder
+- ZXing-cpp encoder -> Zymbol decoder
 
 The dependency is intentionally test-only and the gate is not part of the
 default `test` or `qualify` steps. Release qualification records the

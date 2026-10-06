@@ -35,7 +35,7 @@
 - Added coverage-guided `std.testing.Smith` fuzz targets for decoding, binary round trips, and PNG encoding.
 - Forced LLVM for the fuzz executable to avoid the upstream empty coverage-entry-point crash in affected Zig toolchains.
 
-- Added isolated `qrz_render` raster rendering and built-in PNG/SVG codecs.
+- Added isolated `zymbol.render` raster rendering and built-in PNG/SVG codecs.
 - Added one-call owned PNG/SVG helpers plus allocation-free buffer APIs for WASM and freestanding targets.
 - Added responsive centered SVG output, optional intrinsic sizing, and direct `std.Io.Writer` streaming.
 - Added clean `png`, `svg`, and `terminal` examples; generated files live under gitignored `zig-out/examples`, and supported terminals display the QR inline through Kitty, iTerm2-compatible, or SIXEL image protocols.

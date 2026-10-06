@@ -1,6 +1,6 @@
 # v1 ISO/IEC 18004:2024 conformance
 
-QRz 1.0.0 is blocked until every normative ISO/IEC 18004:2024 requirement that applies to software symbol encoding, module-grid decoding, transmitted data, and digital rendering is implemented and independently verified.
+Zymbol 1.0.0 is blocked until every normative ISO/IEC 18004:2024 requirement that applies to software symbol encoding, module-grid decoding, transmitted data, and digital rendering is implemented and independently verified.
 
 This document is the release conformance ledger. A green build alone is not evidence of standards conformance.
 
@@ -8,9 +8,9 @@ This document is the release conformance ledger. A green build alone is not evid
 
 The intended v1 claim is:
 
-> QRz implements the software-applicable normative requirements of ISO/IEC 18004:2024 for QR Code and Micro QR Code encoding, module-grid decoding, transmitted-data semantics, error correction, masking, format/version information, and digital symbol rendering.
+> Zymbol implements the software-applicable normative requirements of ISO/IEC 18004:2024 for QR Code and Micro QR Code encoding, module-grid decoding, transmitted-data semantics, error correction, masking, format/version information, and digital symbol rendering.
 
-Physical printing, marking, optical acquisition, camera processing, and measured print-quality grades depend on devices and processes outside QRz. QRz must nevertheless produce digital geometry and reflectance semantics that do not prevent a conforming physical realization.
+Physical printing, marking, optical acquisition, camera processing, and measured print-quality grades depend on devices and processes outside Zymbol. Zymbol must nevertheless produce digital geometry and reflectance semantics that do not prevent a conforming physical realization.
 
 QR Code Model 1 is not a v1 requirement. ISO/IEC 18004:2024 retains it as legacy information and does not require conforming equipment to support Model 1.
 
@@ -18,11 +18,11 @@ QR Code Model 1 is not a v1 requirement. ISO/IEC 18004:2024 retains it as legacy
 
 Status meanings:
 
-- implemented — present in QRz and covered by direct tests.
+- implemented — present in Zymbol and covered by direct tests.
 - covered — implemented and backed by independent reference, interoperability, or output-validation evidence.
 - verify — implemented, but independent evidence is still required.
 - missing — release blocker.
-- external — requirement depends on the physical production/acquisition system; QRz documents the boundary and enforces applicable digital prerequisites.
+- external — requirement depends on the physical production/acquisition system; Zymbol documents the boundary and enforces applicable digital prerequisites.
 
 ### Symbol families and geometry
 
@@ -89,7 +89,7 @@ Status meanings:
 - Structured Append metadata reporting: **covered**
 - Micro QR decoding: **implemented**
 - mirror/reversed symbol normalization: **implemented**
-- reference-decoder behavioral differential tests: **covered** — ZXing-cpp 3.1.1 differential gate passed locally on 2026-10-06 with 10 QRz→ZXing-cpp and 10 ZXing-cpp→QRz cases across QR Code Model 2 and Micro QR.
+- reference-decoder behavioral differential tests: **covered** — ZXing-cpp 3.1.1 differential gate passed locally on 2026-10-06 with 10 Zymbol→ZXing-cpp and 10 ZXing-cpp→Zymbol cases across QR Code Model 2 and Micro QR.
 - autodiscrimination behavior applicable to QR/Micro QR: **implemented**
 
 ### Rendering and symbol production
@@ -107,15 +107,15 @@ Status meanings:
 
 ## Independent conformance evidence required
 
-`zig build conformance` is the executable external-reference gate. The evidence set now also includes the ISO-derived four-symbol Structured Append sequence and ZXing-cpp ECI/FNC1 decoder streams. For the Structured Append sequence, symbols 1-2 are exact encode/decode goldens; symbols 3-4 remain decode/interoperability fixtures because the pinned Segno encoder has a documented byte-aligned padding defect. QRz separately asserts the standards-correct `0xEC` pad codeword for those aligned streams. The corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices, independent M1/M3/M4 regression matrices, the full QR 1–40 × L/M/Q/H external data-capacity table, all 32 QR format-information codewords, all 34 QR version-information codewords, and the Annex A Reed–Solomon generator exponents for every degree used by QR Code, converted independently to GF(256) coefficients before comparison. Matrix fixtures are checked in both directions available without linking an external runtime. Capacity, alignment-position, raw/remainder-module, block-layout, BCH, generator-polynomial, and version-band boundaries are executable conformance evidence. Fixture provenance is recorded in `tests/reference/README.md`.
+`zig build conformance` is the executable external-reference gate. The evidence set now also includes the ISO-derived four-symbol Structured Append sequence and ZXing-cpp ECI/FNC1 decoder streams. For the Structured Append sequence, symbols 1-2 are exact encode/decode goldens; symbols 3-4 remain decode/interoperability fixtures because the pinned Segno encoder has a documented byte-aligned padding defect. Zymbol separately asserts the standards-correct `0xEC` pad codeword for those aligned streams. The corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices, independent M1/M3/M4 regression matrices, the full QR 1–40 × L/M/Q/H external data-capacity table, all 32 QR format-information codewords, all 34 QR version-information codewords, and the Annex A Reed–Solomon generator exponents for every degree used by QR Code, converted independently to GF(256) coefficients before comparison. Matrix fixtures are checked in both directions available without linking an external runtime. Capacity, alignment-position, raw/remainder-module, block-layout, BCH, generator-polynomial, and version-band boundaries are executable conformance evidence. Fixture provenance is recorded in `tests/reference/README.md`.
 
 The independent conformance set covers QR geometry and block-layout tables, all QR mode capacity edges, BCH/RS evidence, special headers, static external matrices, rendering validation, and a recorded bidirectional ZXing-cpp differential campaign. Repository-level implementation/evidence review is complete; the remaining pre-tag blockers are sustained fuzzing on the final candidate and normative-text clause sign-off.
 
 `zig build interop` runs the test-only bidirectional differential gate against pinned ZXing-cpp 3.1.1 after installing `tests/interop-requirements.txt`; it is intentionally excluded from the dependency-free default gates. Self-round-trips are regression evidence, not sufficient conformance evidence. v1 requires all of the following:
 
 1. Clause-derived golden vectors covering every supported symbol family, mode, version boundary, EC level, mask and special header.
-2. Independent encoder -> QRz decoder interoperability. **Covered by 10 successful ZXing-cpp 3.1.1 → QRz cases in the recorded local campaign.**
-3. QRz encoder -> independent decoder interoperability. **Covered by 10 successful QRz → ZXing-cpp 3.1.1 cases in the recorded local campaign.**
+2. Independent encoder -> Zymbol decoder interoperability. **Covered by 10 successful ZXing-cpp 3.1.1 → Zymbol cases in the recorded local campaign.**
+3. Zymbol encoder -> independent decoder interoperability. **Covered by 10 successful Zymbol → ZXing-cpp 3.1.1 cases in the recorded local campaign.**
 4. Exact matrix comparison where the standard fixes all relevant choices.
 5. Boundary vectors at every character-count-width transition and capacity edge. **Covered for byte, numeric, alphanumeric and Kanji across all 160 QR version/EC pairs; count-width transitions 9/10 and 26/27 are explicit.**
 6. BCH tests through and beyond the correction radius. **Covered for QR format information; version BCH exact tables and four-bit rejection are covered.**
@@ -126,7 +126,7 @@ The independent conformance set covers QR geometry and block-layout tables, all 
 
 ## Portability gate
 
-zig build portability cross-compiles both qrz and qrz_render in ReleaseSafe for:
+zig build portability cross-compiles both zymbol and zymbol.render in ReleaseSafe for:
 
 - Windows: x86, x86_64, AArch64
 - Linux: x86, x86_64, AArch64, ARM, RISC-V 64, PowerPC 64, s390x
@@ -141,7 +141,7 @@ Representation widths used by the runtime smoke are compile-time asserted, while
 
 Fuzzing is part of release qualification.
 
-QRz keeps Zig 0.16.0 as its minimum supported compiler, while sustained release fuzzing is executed with Zig 0.17.0. The fuzz test executable is explicitly compiled with the LLVM backend because affected Zig toolchains can produce an empty coverage entry-point PC list with the self-hosted backend, causing `std.Build.Fuzz` to panic before the campaign starts. This is an upstream fuzzer/toolchain failure rather than a QRz target failure. Ordinary builds and portability qualification remain free to use the default backend.
+Zymbol requires Zig 0.17.0; sustained release fuzzing and release qualification use that baseline. The fuzz test executable is explicitly compiled with the LLVM backend because affected Zig toolchains can produce an empty coverage entry-point PC list with the self-hosted backend, causing `std.Build.Fuzz` to panic before the campaign starts. This is an upstream fuzzer/toolchain failure rather than a Zymbol target failure. Ordinary builds and portability qualification remain free to use the default backend.
 
 Coverage-guided targets now include:
 
@@ -162,7 +162,7 @@ Every discovered crash or invariant violation becomes a permanent regression tes
 
 ## PNG correctness and size gate
 
-PNG is not defined by ISO/IEC 18004, but it is a first-class QRz output and part of the v1 quality bar.
+PNG is not defined by ISO/IEC 18004, but it is a first-class Zymbol output and part of the v1 quality bar.
 
 Required before v1:
 
@@ -182,7 +182,7 @@ The PNG encoder no longer uses stored-DEFLATE. Symbol-specific sizing dry-runs t
 
 There is no meaningful finite claim of “all optimizations.” v1 instead uses benchmark closure.
 
-`zig build benchmark` is now wired in ReleaseFast and measures automatic versus fixed-mask QR encoding, QR decode, direct Reed-Solomon correction, PNG/SVG rendering, combined encode+PNG work, caller-owned working-set bytes, and QRz PNG IDAT size against Python zlib levels 6 and 9 on identical raw scanlines. The methodology and acceptance rule are defined in `docs/v1-performance.md`.
+`zig build benchmark` is now wired in ReleaseFast and measures automatic versus fixed-mask QR encoding, QR decode, direct Reed-Solomon correction, PNG/SVG rendering, combined encode+PNG work, caller-owned working-set bytes, and Zymbol PNG IDAT size against Python zlib levels 6 and 9 on identical raw scanlines. The methodology and acceptance rule are defined in `docs/v1-performance.md`.
 
 Performance closure is **complete** for v1. The WSL/Linux Zig 0.17 ReleaseFast run identified redundant PNG compression work, which was removed for a measured ~67.2% PNG render-latency reduction while independent PNG validation remained green. Automatic mask selection, decode, Reed–Solomon, SVG, working-set size, and PNG compression size were reviewed. A PNG Up-filter experiment was measured and reverted because it worsened both latency and output size. The fixed-Huffman PNG size delta versus zlib-9 is documented as an intentional v1 trade-off in `docs/v1-performance.md`; no universal performance claim is made.
 

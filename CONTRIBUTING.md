@@ -1,6 +1,6 @@
 # Contributing
 
-QRz keeps the public API small and the core allocation-free.
+Zymbol keeps the public API small and the core allocation-free.
 
 Before opening a pull request:
 

@@ -9,7 +9,7 @@ Before the final release run, the candidate must contain:
 
 - the intended QR Code Model 2 and Micro QR implementation;
 - conformance and interoperability evidence;
-- the frozen `qrz` and `qrz_render` public surface;
+- the frozen `zymbol` public surface, including `zymbol.render`;
 - current README and API documentation;
 - a working external-consumer package test;
 - CI and tag-release workflows;
@@ -77,7 +77,7 @@ The campaign and invalidation rules are defined in `docs/v1-fuzz.md`.
 
 A short exploratory run does not satisfy this gate.
 
-Every QRz failure found during the campaign must become a checked-in regression
+Every Zymbol failure found during the campaign must become a checked-in regression
 before the campaign can be considered complete.
 
 ## 4. Normative ISO/IEC 18004:2024 review
