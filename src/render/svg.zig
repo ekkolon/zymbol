@@ -51,7 +51,7 @@ const Sink = struct {
 
         while (remaining != 0) {
             index -= 1;
-            scratch[index] = @intCast('0' + remaining % 10);
+            scratch[index] = '0' + @as(u8, @intCast(remaining % 10));
             remaining /= 10;
         }
         try self.write(scratch[index..]);
@@ -159,9 +159,10 @@ pub fn render(
 }
 
 fn testSymbol(cells: *[qrz.requiredCells(1)]qrz.Cell) qrz.Symbol {
-    @memset(cells, qrz.Cell{});
+    @memset(cells[0..], qrz.Cell{});
     cells[0].dark = true;
-    cells[1 * qrz.size(1) + 1].dark = true;
+    const side: usize = qrz.size(1);
+    cells[side + 1].dark = true;
 
     return .{
         .cells = cells,
