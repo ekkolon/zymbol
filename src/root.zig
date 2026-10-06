@@ -182,7 +182,7 @@ test "decoder public boundaries return errors" {
         decode(&.{}, 21, &no_cells, &no_scratch, &no_out),
     );
 
-    var bits: [requiredCells(1)]bool = [_]bool{false} ** requiredCells(1);
+    var bits: [requiredCells(1)]bool = @splat(false);
     try std.testing.expectError(
         DecodeError.CellBufferTooSmall,
         decode(&bits, 21, &no_cells, &no_scratch, &no_out),

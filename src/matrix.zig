@@ -20,6 +20,12 @@ pub const Cell = packed struct(u8) {
     _reserved: u4 = 0,
 };
 
+comptime {
+    if (@sizeOf(Cell) != 1 or @bitSizeOf(Cell) != 8) {
+        @compileError("qrz.Cell must remain exactly one byte");
+    }
+}
+
 pub fn requiredCells(version: u6) usize {
     const s: usize = spec.size(version);
     return s * s;
@@ -467,7 +473,7 @@ test "data iterator matches codeword placement order" {
 
     drawCodewords(&symbol, &codewords);
 
-    var recovered: [26]u8 = [_]u8{0} ** 26;
+    var recovered: [26]u8 = @splat(0);
     var iterator = DataIterator.init(symbol.size);
     var bit_index: usize = 0;
     while (bit_index < recovered.len * 8) : (bit_index += 1) {

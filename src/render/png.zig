@@ -358,7 +358,7 @@ test "PNG transparent background emits tRNS" {
 
 
 test "PNG matches independent indexed-color fixture" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = [_]qrz.Cell{.{}} ** qrz.requiredCells(1);
+    var cells: [qrz.requiredCells(1)]qrz.Cell = @splat(.{});
     cells[0].dark = true;
     cells[qrz.size(1) + 1].dark = true;
 

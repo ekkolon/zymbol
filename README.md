@@ -6,7 +6,7 @@ QRz separates QR semantics from output formats. `qrz` encodes and decodes symbol
 
 ## Status
 
-QRz is under v1 stabilization. The public API is not frozen yet.
+QRz is under v1 conformance stabilization. The public API is not frozen yet. The v1 release is blocked on full software-applicable ISO/IEC 18004:2024 conformance, independent interoperability evidence, portability qualification, fuzzing, and performance closure; see `docs/iso-18004-2024-conformance.md`.
 
 The current implementation covers the Model 2 symbol mechanics used by QR versions 1 through 40:
 
@@ -227,20 +227,27 @@ The decoder corrects one Reed-Solomon block at a time instead of materializing e
 
 ```text
 zig build test
+zig build portability
 zig build wasm
 zig build example-terminal
 zig build example-svg
 zig build example-png
 zig build qualify
+
+# long-running coverage-guided fuzzing (Zig 0.17.0)
+zig build fuzz --fuzz
+
+# or cap fuzzing at 8 concurrent jobs
+zig build fuzz -j8 --fuzz
 ```
 
-The package currently supports Zig 0.16.0 as its minimum version. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall, compiles the examples without executing them, and compiles the core/render modules for `wasm32-freestanding` in ReleaseFast.
+The package currently supports Zig 0.16.0 as its minimum version. Release fuzzing uses Zig 0.17.0 because Zig 0.16.0's built-in `-ffuzz` test runner has an upstream stack-trace type mismatch; ordinary builds, tests and portability qualification remain supported on 0.16.0. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall, compiles the examples without executing them, and compiles the core/render modules for `wasm32-freestanding` in ReleaseFast.
 
 `zig build example-png` writes `zig-out/examples/qrz.png`. `zig build example-svg` writes `zig-out/examples/qrz.svg`. `zig build example-terminal` renders the in-memory PNG through Kitty or the iTerm inline-image protocol on iTerm2, mintty and WezTerm; Windows Terminal uses SIXEL. VS Code receives the PNG control sequence and also retains the block QR because `terminal.integrated.enableImages` is not visible to child processes. Generated example artifacts stay under the gitignored `zig-out/` tree.
 
 > **VS Code terminal:** enable `terminal.integrated.enableImages` in Settings to display the actual inline PNG. VS Code does not expose that setting to child processes, so QRz cannot detect when it is disabled.
 
-The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
+The intended v1 compatibility contract is documented in `docs/v1-contract.md`. ISO/IEC 18004:2024 release blockers and evidence requirements are tracked in `docs/iso-18004-2024-conformance.md`.
 
 ## Source layout
 
