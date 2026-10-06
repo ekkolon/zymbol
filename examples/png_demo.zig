@@ -150,14 +150,15 @@ fn encodePng(
         try writer.writeLe16(block_len);
         try writer.writeLe16(~block_len);
 
+        const block_size: usize = block_len;
         var block_offset: usize = 0;
-        while (block_offset < block_len) : (block_offset += 1) {
+        while (block_offset < block_size) : (block_offset += 1) {
             const byte = rawByte(pixels, width, raw_offset + block_offset);
             try writer.writeByte(byte);
             adler.update(byte);
         }
 
-        raw_offset += block_len;
+        raw_offset += block_size;
     }
 
     try writer.writeBe32(adler.value());
@@ -208,22 +209,27 @@ pub fn main() !void {
     });
 }
 
-test "PNG encoder emits a valid grayscale PNG structure" {
+test "PNG encoder matches independent 2x2 grayscale fixture" {
     const pixels = [_]u8{
         0, 255,
         255, 0,
     };
-    const required = pngRequiredBytes(2, 2);
-    var output: [128]u8 = undefined;
+    const expected = [_]u8{
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02,
+        0x08, 0x00, 0x00, 0x00, 0x00, 0x57, 0xDD, 0x52,
+        0xF8, 0x00, 0x00, 0x00, 0x11, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0x01, 0x01, 0x06, 0x00, 0xF9, 0xFF,
+        0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x06, 0x00,
+        0x01, 0xFF, 0x0C, 0xA3, 0x35, 0xE4, 0x00, 0x00,
+        0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42,
+        0x60, 0x82,
+    };
 
+    var output: [expected.len]u8 = undefined;
     const png = try encodePng(&pixels, 2, 2, &output);
-    try std.testing.expectEqual(required, png.len);
-    try std.testing.expectEqualSlices(
-        u8,
-        &.{ 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A },
-        png[0..8],
-    );
-    try std.testing.expectEqualStrings("IHDR", png[12..16]);
-    try std.testing.expect(std.mem.indexOf(u8, png, "IDAT") != null);
-    try std.testing.expectEqualStrings("IEND", png[png.len - 8 .. png.len - 4]);
+
+    try std.testing.expectEqual(expected.len, png.len);
+    try std.testing.expectEqualSlices(u8, &expected, png);
 }
