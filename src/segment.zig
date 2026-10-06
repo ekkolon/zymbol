@@ -16,7 +16,7 @@ const alphanumeric_charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
 const invalid_alphanumeric = 0xFF;
 
 const alphanumeric_values: [256]u8 = blk: {
-    var values = [_]u8{invalid_alphanumeric} ** 256;
+    var values: [256]u8 = @splat(invalid_alphanumeric);
     for (alphanumeric_charset, 0..) |character, index| {
         values[character] = @intCast(index);
     }
