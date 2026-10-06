@@ -202,19 +202,14 @@ fn pixelIsDark(
     };
 }
 
-fn scanlineByte(
+fn rawRowByte(
     symbol: *const qrz.Symbol,
     options: Options,
     dims: raster.Dimensions,
-    raw_index: usize,
+    y: usize,
+    byte_index: usize,
 ) u8 {
-    const row_bytes = (dims.width + 7) / 8;
-    const encoded_row_bytes = row_bytes + 1;
-    const within_row = raw_index % encoded_row_bytes;
-    if (within_row == 0) return 0;
-
-    const y = raw_index / encoded_row_bytes;
-    const first_x = (within_row - 1) * 8;
+    const first_x = byte_index * 8;
     var byte: u8 = 0;
 
     var bit: usize = 0;
@@ -224,6 +219,28 @@ fn scanlineByte(
         }
     }
     return byte;
+}
+
+fn scanlineByte(
+    symbol: *const qrz.Symbol,
+    options: Options,
+    dims: raster.Dimensions,
+    raw_index: usize,
+) u8 {
+    const row_bytes = (dims.width + 7) / 8;
+    const encoded_row_bytes = row_bytes + 1;
+    const within_row = raw_index % encoded_row_bytes;
+    const y = raw_index / encoded_row_bytes;
+
+    const use_up_filter = options.scale > 1 and y > 0;
+    if (within_row == 0) return if (use_up_filter) 2 else 0;
+
+    const byte_index = within_row - 1;
+    const current = rawRowByte(symbol, options, dims, y, byte_index);
+    if (!use_up_filter) return current;
+
+    const previous = rawRowByte(symbol, options, dims, y - 1, byte_index);
+    return current -% previous;
 }
 
 fn reverseBits(value: u16, count: u5) u16 {
@@ -672,6 +689,39 @@ test "PNG transparent background emits tRNS" {
     try std.testing.expect(std.mem.indexOf(u8, encoded, "tRNS") != null);
 }
 
+
+test "PNG scale rendering uses Up filter after first row" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try qrz.encodeText(
+        "QRZ",
+        .{
+            .min_version = 1,
+            .max_version = 1,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+        &scratch,
+    );
+
+    const options = Options{ .scale = 4 };
+    const dims = try dimensions(&symbol, options);
+    const row_bytes = (dims.width + 7) / 8;
+    const row_stride = row_bytes + 1;
+
+    try std.testing.expectEqual(@as(u8, 0), scanlineByte(&symbol, options, dims, 0));
+    try std.testing.expectEqual(@as(u8, 2), scanlineByte(&symbol, options, dims, row_stride));
+
+    var byte_index: usize = 0;
+    while (byte_index < row_bytes) : (byte_index += 1) {
+        try std.testing.expectEqual(
+            @as(u8, 0),
+            scanlineByte(&symbol, options, dims, row_stride + 1 + byte_index),
+        );
+    }
+}
 
 test "PNG fixed-Huffman output is deterministic and compressed" {
     var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
