@@ -32,11 +32,35 @@ pub fn build(b: *std.Build) void {
     const run_conformance_tests = b.addRunArtifact(conformance_tests);
     test_step.dependOn(&run_conformance_tests.step);
 
+    const conformance_spec = b.createModule(.{
+        .root_source_file = b.path("src/spec.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const conformance_rs = b.createModule(.{
+        .root_source_file = b.path("src/reed_solomon.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const ecc_conformance_module = b.createModule(.{
+        .root_source_file = b.path("tests/ecc_conformance.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "qrz_spec", .module = conformance_spec },
+            .{ .name = "qrz_rs", .module = conformance_rs },
+        },
+    });
+    const ecc_conformance_tests = b.addTest(.{ .root_module = ecc_conformance_module });
+    const run_ecc_conformance_tests = b.addRunArtifact(ecc_conformance_tests);
+    test_step.dependOn(&run_ecc_conformance_tests.step);
+
     const conformance_step = b.step(
         "conformance",
         "Run independent ISO/interoperability reference vectors",
     );
     conformance_step.dependOn(&run_conformance_tests.step);
+    conformance_step.dependOn(&run_ecc_conformance_tests.step);
 
     const fuzz_module = b.createModule(.{
         .root_source_file = b.path("tests/fuzz.zig"),
@@ -216,6 +240,7 @@ pub fn build(b: *std.Build) void {
 
     const qualify_step = b.step("qualify", "Run release qualification");
     qualify_step.dependOn(&run_conformance_tests.step);
+    qualify_step.dependOn(&run_ecc_conformance_tests.step);
     qualify_step.dependOn(&terminal_example.step);
     qualify_step.dependOn(&svg_example.step);
     qualify_step.dependOn(&png_example.step);
