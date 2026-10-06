@@ -956,10 +956,11 @@ test "symbology modifiers cover all QR FNC1 and ECI combinations" {
             .reflectance_reversed = false,
             .errors_corrected = 0,
         };
+        const identifier = result.symbologyIdentifier();
         try std.testing.expectEqualSlices(
             u8,
             &.{ ']', 'Q', '0' + @as(u8, case.modifier) },
-            &result.symbologyIdentifier(),
+            &identifier,
         );
     }
 }
@@ -984,7 +985,10 @@ test "Structured Append may precede FNC1 and ECI metadata" {
     try std.testing.expectEqual(@as(u4, 1), structured.index);
     try std.testing.expectEqual(@as(u5, 3), structured.count);
     try std.testing.expectEqual(@as(u8, 0x5A), structured.parity);
-    try std.testing.expect(parsed.fnc1 == .first_position);
+    switch (parsed.fnc1) {
+        .first_position => {},
+        else => return error.TestUnexpectedResult,
+    }
     switch (parsed.eci) {
         .assignment => |assignment| try std.testing.expectEqual(@as(u21, 26), assignment),
         else => return error.TestUnexpectedResult,
