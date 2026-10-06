@@ -6,7 +6,7 @@ QRz is an allocation-free QR Code Model 2 encoder, decoder and renderer. The v1 
 
 QRz supports versions 1-40, error-correction levels L/M/Q/H, numeric, alphanumeric, byte, Kanji and ECI segments, all eight masks, Reed-Solomon correction, and caller-owned storage.
 
-QRz core accepts and returns module grids. Image acquisition, finder detection, perspective correction and thresholding are outside the package. Rendering is provided by the separate `qrz_render` module. File I/O and raster image codecs remain application-owned.
+QRz core accepts and returns module grids. Image acquisition, finder detection, perspective correction and thresholding are outside the package. Rendering and PNG/SVG encoding are provided by the separate `qrz_render` module. File I/O remains application-owned.
 
 ## Encoding
 
@@ -24,9 +24,13 @@ Encoding never requests an allocator. The caller supplies the module buffer and 
 
 Raster rendering writes caller-selected pixel values into caller-owned buffers. Tightly packed and strided output are supported. Scaling is integral and the default quiet zone is four modules.
 
-SVG rendering writes compact vector output into a caller-owned byte buffer. The exact required byte count can be queried before rendering.
+SVG and PNG are built-in output formats. Their low-level APIs write into caller-owned buffers without allocation. PNG is emitted directly from symbol modules as a 1-bit indexed image; no intermediate raster image is required.
 
-Neither renderer requests an allocator or performs file I/O. PNG, JPEG, WebP, AVIF and similar codecs are not part of the v1 compatibility contract.
+The owned convenience APIs accept a caller-provided allocator and combine QR encoding with PNG or SVG output in one call. Binary and text payload variants are part of the public surface.
+
+WASM/freestanding callers can query buffer requirements and use the `*Into` APIs with host-owned linear memory. QRz does not prescribe a WebAssembly allocator or JavaScript ABI.
+
+No renderer performs file I/O. JPEG, WebP, AVIF and other codecs are outside the v1 compatibility contract.
 
 ## Decoding
 
