@@ -98,7 +98,7 @@ thresholding, finder detection, and perspective correction are outside QRz.
 .errors_corrected
 ```
 
-`DecodeResult.symbologyIdentifier()` returns the AIM `]Qn` identifier.
+`DecodeResult.symbologyIdentifier()` returns the AIM `]Qn` identifier. Decoding returns payload bytes; QRz reports ECI metadata but does not transcode the payload.
 
 ### Micro QR
 
@@ -135,7 +135,7 @@ qrz.decodeMicro(
 ) qrz.MicroError!qrz.MicroDecodeResult
 ```
 
-`MicroVersion` is `.m1`, `.m2`, `.m3`, or `.m4`.
+`MicroVersion` is `.m1`, `.m2`, `.m3`, or `.m4`. `encodeMicroText` accepts ASCII only. Use `encodeMicroBytes` for arbitrary bytes and `encodeMicroKanji` for Shift JIS Kanji input.
 
 `MicroEncodeOptions`:
 
@@ -189,13 +189,9 @@ qrz.defaultQuietZone
 QR versions use `qrz.Version` (`u6`) with valid values 1 through 40.
 Invalid QR versions return zero from the public QR sizing helpers.
 
-`Symbol` exposes its caller-owned cell slice plus size/version/family,
-error-correction level, and mask. Its public methods are `contains`, `isDark`,
-`kindAt`, `setData`, and `set`. `setData` rejects function modules;
-`set` is a raw bounded mutation.
+`Symbol` exposes its caller-owned cell slice plus size/version/family, error-correction level, and mask. Its public methods are `contains`, `isDark`, and `kindAt`. Treat the symbol and its aliased cell storage as read-only after encoding or decoding; direct mutation can invalidate QR invariants.
 
-`Cell` is exactly one byte. `dark` and `kind` carry its semantics. `_reserved`
-must be left at its default zero value; it has no user-visible meaning.
+`Cell` occupies one byte. `dark` and `kind` are its public fields.
 
 `BitWriter` should be constructed with `BitWriter.init` and manipulated through
 its methods. Its `bytes` and `bit_len` fields are visible because Zig struct
@@ -290,10 +286,7 @@ qrz_render.renderSvg
 qrz_render.writeSvg
 ```
 
-`SvgOptions` contains `quiet_zone`, `foreground`, `background`,
-`reflectance`, and optional square `explicit_size`. SVG is responsive by
-default and omits intrinsic width/height. `SvgWriteError` is `SvgError` plus
-`WriteFailed` from `std.Io.Writer`.
+`SvgOptions` contains `quiet_zone`, `foreground`, `background`, `reflectance`, and optional square `explicit_size`. SVG is responsive by default and omits intrinsic width/height. `requiredSvgBytes` is exact for a concrete symbol; the two `maxSvgBytes*` helpers return conservative version-based bounds. Reversed reflectance requires an opaque background. `SvgWriteError` is `SvgError` plus `WriteFailed` from `std.Io.Writer`.
 
 ### PNG
 
@@ -304,8 +297,7 @@ qrz_render.maxPngBytesForMicroVersion
 qrz_render.renderPng
 ```
 
-`PngOptions` contains `scale`, `quiet_zone`, `foreground`,
-`background`, and `reflectance`. PNG output is a 1-bit indexed image.
+`PngOptions` contains `scale`, `quiet_zone`, `foreground`, `background`, and `reflectance`. PNG output is a 1-bit indexed image. `requiredPngBytes` is exact for a concrete symbol; the two `maxPngBytes*` helpers return conservative version-based bounds. Reversed reflectance requires an opaque background.
 
 ### Allocating convenience API
 
@@ -330,7 +322,7 @@ return `OutOfMemory`, and SVG writer helpers can return `WriteFailed`.
 
 ### Caller-owned convenience API
 
-Buffer requirements:
+Buffer requirements use the configured maximum version and therefore return safe upper bounds for caller-owned storage:
 
 ```zig
 qrz_render.pngRequirements

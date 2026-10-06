@@ -249,9 +249,8 @@ test "v1 core public type shapes" {
         "data",
     });
     try expectExactFields(qrz.SymbolFamily, &.{ "qr", "micro_qr" });
-    try expectExactFields(qrz.Cell, &.{ "dark", "kind", "_reserved" });
+    try expectExactFields(qrz.Cell, &.{ "dark", "kind" });
     try std.testing.expectEqual(@as(usize, 1), @sizeOf(qrz.Cell));
-    try std.testing.expectEqual(@as(usize, 8), @bitSizeOf(qrz.Cell));
 
     try expectExactFields(qrz.Symbol, &.{
         "cells",
@@ -262,12 +261,9 @@ test "v1 core public type shapes" {
         "mask",
     });
     try expectExactTypeDecls(qrz.Symbol, &.{
-        "SetError",
         "contains",
         "isDark",
         "kindAt",
-        "setData",
-        "set",
     });
 
     try expectExactFields(qrz.EncodeOptions, &.{
