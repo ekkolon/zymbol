@@ -1,6 +1,6 @@
 # v1 contract
 
-QRz is an allocation-free QR Code Model 2 and Micro QR encoder, decoder and renderer. The v1 public surface is the declarations exported by `src/root.zig` and `src/render/root.zig`.
+QRz core encoding, decoding, and low-level rendering are allocation-free and operate on caller-owned storage. Optional convenience rendering APIs allocate only through an allocator supplied by the caller. The v1 public surface is the declarations exported by `src/root.zig` and `src/render/root.zig`.
 
 ## Scope
 
@@ -67,4 +67,4 @@ The `cells` slice is exposed for zero-copy integration. Direct mutation has the 
 
 ## Stability
 
-After the 1.0.0 release, incompatible changes to the exported root API require a major version change. Internal modules are not part of the compatibility contract.
+After the 1.0.0 release, incompatible changes to the exported root API require a major version change. Internal modules are not part of the compatibility contract. `tests/public_api.zig` freezes the exact exported root declaration set used for the 1.0.0 release candidate.
