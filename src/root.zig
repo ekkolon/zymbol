@@ -760,7 +760,8 @@ test "high-level FNC1 first-position round trip preserves byte semantics" {
 
     try std.testing.expectEqualSlices(u8, &payload, out[0..result.len]);
     try std.testing.expectEqual(@as(u3, 3), result.symbology_modifier);
-    try std.testing.expectEqualSlices(u8, "]Q3", &result.symbologyIdentifier());
+    const identifier = result.symbologyIdentifier();
+    try std.testing.expectEqualSlices(u8, "]Q3", &identifier);
     try std.testing.expect(!result.fnc1.isNone());
 }
 
@@ -799,7 +800,8 @@ test "FNC1 plus ECI selects the ECI symbology modifier" {
 
     try std.testing.expectEqualSlices(u8, text, out[0..result.len]);
     try std.testing.expectEqual(@as(u3, 4), result.symbology_modifier);
-    try std.testing.expectEqualSlices(u8, "]Q4", &result.symbologyIdentifier());
+    const identifier = result.symbologyIdentifier();
+    try std.testing.expectEqualSlices(u8, "]Q4", &identifier);
 }
 
 test "structured append metadata survives a symbol round trip" {
@@ -880,5 +882,6 @@ test "FNC1 second position reports AIM indicator and transmitted prefix" {
 
     try std.testing.expectEqualSlices(u8, "APAYLOAD", out[0..result.len]);
     try std.testing.expectEqual(@as(u3, 5), result.symbology_modifier);
-    try std.testing.expectEqualSlices(u8, "]Q5", &result.symbologyIdentifier());
+    const identifier = result.symbologyIdentifier();
+    try std.testing.expectEqualSlices(u8, "]Q5", &identifier);
 }
