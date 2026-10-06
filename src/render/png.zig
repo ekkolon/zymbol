@@ -77,8 +77,11 @@ const Adler32 = struct {
     b: u32 = 0,
 
     fn update(self: *Adler32, byte: u8) void {
-        self.a = (self.a + byte) % 65521;
-        self.b = (self.b + self.a) % 65521;
+        self.a += byte;
+        if (self.a >= 65521) self.a -= 65521;
+
+        self.b += self.a;
+        if (self.b >= 65521) self.b -= 65521;
     }
 
     fn value(self: Adler32) u32 {
