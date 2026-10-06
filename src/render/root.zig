@@ -16,7 +16,9 @@ pub const Rgb = svg.Rgb;
 
 pub const rasterDimensions = raster.dimensions;
 pub const requiredRasterPixels = raster.requiredPixels;
+pub const requiredStridedRasterPixels = raster.requiredPixelsForStride;
 pub const renderRaster = raster.render;
+pub const renderRasterStrided = raster.renderStrided;
 
 pub const requiredSvgBytes = svg.requiredBytes;
 pub const renderSvg = svg.render;
