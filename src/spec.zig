@@ -187,6 +187,13 @@ pub const Fnc1 = union(enum) {
             .second_position => |indicator| indicator.encoded() != null,
         };
     }
+
+    pub fn isNone(self: Fnc1) bool {
+        return switch (self) {
+            .none => true,
+            .first_position, .second_position => false,
+        };
+    }
 };
 
 /// Character-count field width for the mode/version band.
