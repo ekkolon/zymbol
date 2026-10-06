@@ -135,8 +135,46 @@ pub fn build(b: *std.Build) void {
     const run_fuzz_tests = b.addRunArtifact(fuzz_tests);
     test_step.dependOn(&run_fuzz_tests.step);
 
+    const fuzz_decoder_module = b.createModule(.{
+        .root_source_file = b.path("src/decoder.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const fuzz_parser_module = b.createModule(.{
+        .root_source_file = b.path("tests/fuzz_parser.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "qrz_decoder", .module = fuzz_decoder_module }},
+    });
+    const fuzz_parser_tests = b.addTest(.{
+        .root_module = fuzz_parser_module,
+        .use_llvm = true,
+    });
+    const run_fuzz_parser_tests = b.addRunArtifact(fuzz_parser_tests);
+    test_step.dependOn(&run_fuzz_parser_tests.step);
+
+    const fuzz_rs_module = b.createModule(.{
+        .root_source_file = b.path("src/reed_solomon.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const fuzz_rs_root = b.createModule(.{
+        .root_source_file = b.path("tests/fuzz_rs.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "qrz_rs", .module = fuzz_rs_module }},
+    });
+    const fuzz_rs_tests = b.addTest(.{
+        .root_module = fuzz_rs_root,
+        .use_llvm = true,
+    });
+    const run_fuzz_rs_tests = b.addRunArtifact(fuzz_rs_tests);
+    test_step.dependOn(&run_fuzz_rs_tests.step);
+
     const fuzz_step = b.step("fuzz", "Run QRz coverage-guided fuzz targets");
     fuzz_step.dependOn(&run_fuzz_tests.step);
+    fuzz_step.dependOn(&run_fuzz_parser_tests.step);
+    fuzz_step.dependOn(&run_fuzz_rs_tests.step);
 
     const wasm_target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
@@ -301,6 +339,8 @@ pub fn build(b: *std.Build) void {
     qualify_step.dependOn(&png_example.step);
     qualify_step.dependOn(&b.addRunArtifact(terminal_tests).step);
     qualify_step.dependOn(&run_fuzz_tests.step);
+    qualify_step.dependOn(&run_fuzz_parser_tests.step);
+    qualify_step.dependOn(&run_fuzz_rs_tests.step);
     qualify_step.dependOn(portability_step);
 
     inline for ([_]std.builtin.OptimizeMode{ .Debug, .ReleaseSafe, .ReleaseFast, .ReleaseSmall }) |mode| {
