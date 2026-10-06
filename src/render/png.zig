@@ -147,9 +147,11 @@ fn zlibLength(raw_len: usize) Error!usize {
 fn pngLength(dims: raster.Dimensions, transparent: bool) Error!usize {
     const raw_len = try rawLength(dims);
     const zlib_len = try zlibLength(raw_len);
-    const fixed = 8 + (12 + 13) + (12 + 6) + 12;
+    const fixed: usize = 8 + (12 + 13) + (12 + 6) + 12;
     const transparency: usize = if (transparent) 14 else 0;
-    return checkedAdd(fixed + transparency, 12 + zlib_len);
+    const headers = try checkedAdd(fixed, transparency);
+    const idat = try checkedAdd(12, zlib_len);
+    return checkedAdd(headers, idat);
 }
 
 fn pixelIsDark(
