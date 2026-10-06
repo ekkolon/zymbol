@@ -25,6 +25,8 @@ pub const Rgb = svg.Rgb;
 pub const OwnedBytes = owned.OwnedBytes;
 pub const PngEncodeOptions = owned.PngEncodeOptions;
 pub const SvgEncodeOptions = owned.SvgEncodeOptions;
+pub const MicroPngEncodeOptions = owned.MicroPngEncodeOptions;
+pub const MicroSvgEncodeOptions = owned.MicroSvgEncodeOptions;
 pub const BufferRequirements = owned.BufferRequirements;
 
 pub const rasterDimensions = raster.dimensions;
@@ -46,11 +48,17 @@ pub const renderPng = png.render;
 
 pub const pngRequirements = owned.pngRequirements;
 pub const svgRequirements = owned.svgRequirements;
+pub const pngMicroRequirements = owned.pngMicroRequirements;
+pub const svgMicroRequirements = owned.svgMicroRequirements;
 
 pub const pngText = owned.pngText;
 pub const pngBytes = owned.pngBytes;
 pub const svgText = owned.svgText;
 pub const svgBytes = owned.svgBytes;
+pub const pngMicroText = owned.pngMicroText;
+pub const pngMicroBytes = owned.pngMicroBytes;
+pub const svgMicroText = owned.svgMicroText;
+pub const svgMicroBytes = owned.svgMicroBytes;
 
 pub const writeSvgText = owned.writeSvgText;
 pub const writeSvgBytes = owned.writeSvgBytes;
@@ -61,6 +69,10 @@ pub const pngTextInto = owned.pngTextInto;
 pub const pngBytesInto = owned.pngBytesInto;
 pub const svgTextInto = owned.svgTextInto;
 pub const svgBytesInto = owned.svgBytesInto;
+pub const pngMicroTextInto = owned.pngMicroTextInto;
+pub const pngMicroBytesInto = owned.pngMicroBytesInto;
+pub const svgMicroTextInto = owned.svgMicroTextInto;
+pub const svgMicroBytesInto = owned.svgMicroBytesInto;
 
 test {
     std.testing.refAllDecls(@This());
