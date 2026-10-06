@@ -85,7 +85,42 @@ pub fn build(b: *std.Build) void {
     const svg_example_step = b.step("example-svg", "Render the SVG example");
     svg_example_step.dependOn(&run_svg_example.step);
 
+    const png_example_module = b.createModule(.{
+        .root_source_file = b.path("examples/png_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
+    });
+    const png_example = b.addExecutable(.{
+        .name = "png_demo",
+        .root_module = png_example_module,
+    });
+    const run_png_example = b.addRunArtifact(png_example);
+
+    const png_example_step = b.step("example-png", "Render qrz.png");
+    png_example_step.dependOn(&run_png_example.step);
+
+    const png_test_module = b.createModule(.{
+        .root_source_file = b.path("examples/png_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
+    });
+    const png_tests = b.addTest(.{
+        .root_module = png_test_module,
+    });
+
     const qualify_step = b.step("qualify", "Run release qualification");
+    qualify_step.dependOn(&example.step);
+    qualify_step.dependOn(&svg_example.step);
+    qualify_step.dependOn(&png_example.step);
+    qualify_step.dependOn(&b.addRunArtifact(png_tests).step);
 
     inline for ([_]std.builtin.OptimizeMode{ .Debug, .ReleaseSafe, .ReleaseFast, .ReleaseSmall }) |mode| {
         const qualification_module = b.createModule(.{
