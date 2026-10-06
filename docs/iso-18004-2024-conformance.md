@@ -136,7 +136,7 @@ Representation assumptions that cross architecture boundaries must be compile-ti
 
 Fuzzing is part of release qualification.
 
-QRz keeps Zig 0.16.0 as its minimum supported compiler, but sustained release fuzzing is executed with Zig 0.17.0. Zig 0.16.0's built-in fuzz test runner contains an upstream stack-trace type mismatch that fails while compiling the runner itself; this does not originate in QRz fuzz targets. The ordinary test and portability gates continue to qualify the minimum compiler.
+QRz keeps Zig 0.16.0 as its minimum supported compiler, while sustained release fuzzing is executed with Zig 0.17.0. The fuzz test executable is explicitly compiled with the LLVM backend because affected Zig toolchains can produce an empty coverage entry-point PC list with the self-hosted backend, causing `std.Build.Fuzz` to panic before the campaign starts. This is an upstream fuzzer/toolchain failure rather than a QRz target failure. Ordinary builds and portability qualification remain free to use the default backend.
 
 Current coverage-guided targets:
 
