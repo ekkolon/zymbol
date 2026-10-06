@@ -1,5 +1,5 @@
 const std = @import("std");
-const qrz = @import("qrz");
+const core = @import("zymbol_core");
 const Reflectance = @import("reflectance.zig").Reflectance;
 
 pub const Error = error{
@@ -31,15 +31,15 @@ fn checkedMul(a: usize, b: usize) Error!usize {
     return a * b;
 }
 
-fn validateSymbol(symbol: *const qrz.Symbol) Error!void {
-    if (!qrz.isValidSymbol(symbol)) return Error.InvalidSymbol;
+fn validateSymbol(symbol: *const core.Symbol) Error!void {
+    if (!core.isValidSymbol(symbol)) return Error.InvalidSymbol;
 }
 
-fn quietZone(symbol: *const qrz.Symbol, options: Options) u16 {
-    return options.quiet_zone orelse qrz.defaultQuietZone(symbol.family);
+fn quietZone(symbol: *const core.Symbol, options: Options) u16 {
+    return options.quiet_zone orelse core.defaultQuietZone(symbol.family);
 }
 
-pub fn dimensions(symbol: *const qrz.Symbol, options: Options) Error!Dimensions {
+pub fn dimensions(symbol: *const core.Symbol, options: Options) Error!Dimensions {
     try validateSymbol(symbol);
     if (options.scale == 0) return Error.InvalidScale;
 
@@ -50,13 +50,13 @@ pub fn dimensions(symbol: *const qrz.Symbol, options: Options) Error!Dimensions 
     return .{ .width = side, .height = side };
 }
 
-pub fn requiredPixels(symbol: *const qrz.Symbol, options: Options) Error!usize {
+pub fn requiredPixels(symbol: *const core.Symbol, options: Options) Error!usize {
     const size = try dimensions(symbol, options);
     return checkedMul(size.width, size.height);
 }
 
 pub fn requiredPixelsForStride(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     stride: usize,
     options: Options,
 ) Error!usize {
@@ -67,7 +67,7 @@ pub fn requiredPixelsForStride(
 
 pub fn renderStrided(
     comptime Pixel: type,
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     pixels: []Pixel,
     stride: usize,
     dark: Pixel,
@@ -138,7 +138,7 @@ pub fn renderStrided(
 
 pub fn render(
     comptime Pixel: type,
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     pixels: []Pixel,
     dark: Pixel,
     light: Pixel,
@@ -148,15 +148,15 @@ pub fn render(
     return renderStrided(Pixel, symbol, pixels, size.width, dark, light, options);
 }
 
-fn testSymbol(cells: *[qrz.requiredCells(1)]qrz.Cell) qrz.Symbol {
-    @memset(cells[0..], qrz.Cell{});
+fn testSymbol(cells: *[core.requiredCells(1)]core.Cell) core.Symbol {
+    @memset(cells[0..], core.Cell{});
     cells[0].dark = true;
-    const side: usize = qrz.size(1);
+    const side: usize = core.size(1);
     cells[side + 1].dark = true;
 
     return .{
         .cells = cells,
-        .size = qrz.size(1),
+        .size = core.size(1),
         .version = 1,
         .ec_level = .m,
         .mask = 0,
@@ -164,7 +164,7 @@ fn testSymbol(cells: *[qrz.requiredCells(1)]qrz.Cell) qrz.Symbol {
 }
 
 test "raster dimensions include quiet zone and scale" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     const size = try dimensions(&symbol, .{ .scale = 3, .quiet_zone = 2 });
@@ -177,7 +177,7 @@ test "raster dimensions include quiet zone and scale" {
 }
 
 test "raster renders scaled modules and preserves stride padding" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     const options = Options{ .scale = 2, .quiet_zone = 1 };
@@ -206,7 +206,7 @@ test "raster renders scaled modules and preserves stride padding" {
 }
 
 test "raster rejects malformed symbols, invalid scale and undersized output" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     try std.testing.expectError(
@@ -227,7 +227,7 @@ test "raster rejects malformed symbols, invalid scale and undersized output" {
 }
 
 test "raster reversed reflectance inverts symbol and quiet zone" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     const options = Options{

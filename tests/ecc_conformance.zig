@@ -1,5 +1,5 @@
 const std = @import("std");
-const spec = @import("qrz_spec");
+const spec = @import("zymbol_spec");
 const reference = @import("reference/ecc_tables.zig");
 const structure = @import("reference/qr_structure.zig");
 

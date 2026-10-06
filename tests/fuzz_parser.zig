@@ -1,5 +1,5 @@
 const std = @import("std");
-const decoder = @import("qrz_decoder");
+const decoder = @import("zymbol_decoder");
 
 const release_corpus = [_][]const u8{
     "\x00",

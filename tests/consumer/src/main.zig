@@ -1,17 +1,17 @@
 const std = @import("std");
-const qrz = @import("qrz");
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
 pub fn main() !void {
     try smoke();
 }
 
 fn smoke() !void {
-    const version: qrz.Version = 2;
-    var cells: [qrz.requiredCells(version)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(version)]u8 = undefined;
+    const version: zymbol.Version = 2;
+    var cells: [zymbol.requiredCells(version)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(version)]u8 = undefined;
 
-    const symbol = try qrz.encodeText(
+    const symbol = try zymbol.encodeText(
         "https://example.com",
         .{ .max_version = version, .ec_level = .m },
         &cells,
@@ -23,6 +23,6 @@ fn smoke() !void {
     if (png.len == 0) return error.EmptyOutput;
 }
 
-test "consume qrz and qrz_render as dependency modules" {
+test "consume zymbol core and render namespace" {
     try smoke();
 }

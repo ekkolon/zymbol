@@ -1,5 +1,5 @@
 const std = @import("std");
-const qrz = @import("qrz");
+const core = @import("zymbol_core");
 const raster = @import("raster.zig");
 const svg = @import("svg.zig");
 const Reflectance = @import("reflectance.zig").Reflectance;
@@ -128,7 +128,7 @@ fn writeChunk(sink: *Sink, chunk_type: *const [4]u8, data: []const u8) Error!voi
     }
 }
 
-fn dimensions(symbol: *const qrz.Symbol, options: Options) Error!raster.Dimensions {
+fn dimensions(symbol: *const core.Symbol, options: Options) Error!raster.Dimensions {
     if (options.reflectance == .reversed and options.background == null) {
         return Error.InvalidReflectance;
     }
@@ -175,13 +175,13 @@ fn pngLength(zlib_len: usize, transparent: bool) Error!usize {
 }
 
 fn pixelIsDark(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     pixel_x: usize,
     pixel_y: usize,
 ) bool {
     const scale: usize = options.scale;
-    const quiet_zone = options.quiet_zone orelse qrz.defaultQuietZone(symbol.family);
+    const quiet_zone = options.quiet_zone orelse core.defaultQuietZone(symbol.family);
     const quiet_pixels = @as(usize, quiet_zone) * scale;
     const symbol_pixels = @as(usize, symbol.size) * scale;
 
@@ -203,7 +203,7 @@ fn pixelIsDark(
 }
 
 fn scanlineByte(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
     raw_index: usize,
@@ -355,7 +355,7 @@ fn writeLengthDistance(bits: *DeflateBits, length: usize, distance: usize) Error
 }
 
 fn matchLength(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
     raw_len: usize,
@@ -376,7 +376,7 @@ fn matchLength(
 }
 
 fn bestMatch(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
     raw_len: usize,
@@ -407,7 +407,7 @@ fn bestMatch(
 }
 
 fn emitZlib(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
     sink: *Sink,
@@ -443,7 +443,7 @@ fn emitZlib(
 }
 
 fn zlibLength(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
 ) Error!usize {
@@ -452,7 +452,7 @@ fn zlibLength(
     return sink.position;
 }
 
-fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
+fn emit(symbol: *const core.Symbol, options: Options, sink: *Sink) Error!void {
     const dims = try dimensions(symbol, options);
 
     try sink.write(&.{ 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A });
@@ -526,27 +526,27 @@ fn requiredBytesForModules(
     return pngLength(try maxZlibLength(raw_len), options.background == null);
 }
 
-pub fn maxBytesForVersion(version: qrz.Version, options: Options) Error!usize {
-    if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
+pub fn maxBytesForVersion(version: core.Version, options: Options) Error!usize {
+    if (!core.isValidVersion(version)) return Error.InvalidVersion;
     return requiredBytesForModules(
-        qrz.size(version),
+        core.size(version),
         options.quiet_zone orelse 4,
         options,
     );
 }
 
 pub fn maxBytesForMicroVersion(
-    version: qrz.MicroVersion,
+    version: core.MicroVersion,
     options: Options,
 ) Error!usize {
     return requiredBytesForModules(
-        qrz.microSize(version),
+        core.microSize(version),
         options.quiet_zone orelse 2,
         options,
     );
 }
 
-pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
+pub fn requiredBytes(symbol: *const core.Symbol, options: Options) Error!usize {
     const dims = try dimensions(symbol, options);
     return pngLength(
         try zlibLength(symbol, options, dims),
@@ -554,16 +554,16 @@ pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
     );
 }
 
-pub fn render(symbol: *const qrz.Symbol, output: []u8, options: Options) Error![]const u8 {
+pub fn render(symbol: *const core.Symbol, output: []u8, options: Options) Error![]const u8 {
     var sink = Sink{ .buffer = output };
     try emit(symbol, options, &sink);
     return output[0..sink.position];
 }
 
 test "PNG required size exactly matches rendered size" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ",
         .{
             .min_version = 1,
@@ -592,9 +592,9 @@ test "PNG required size exactly matches rendered size" {
 }
 
 test "PNG render accepts exact buffer without an internal sizing pass" {
-    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(4)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ SINGLE PASS PNG",
         .{
             .min_version = 4,
@@ -623,9 +623,9 @@ test "PNG render accepts exact buffer without an internal sizing pass" {
 }
 
 test "PNG version requirement bounds exact compressed size" {
-    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(4)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ BUFFER BOUND",
         .{
             .min_version = 4,
@@ -645,9 +645,9 @@ test "PNG version requirement bounds exact compressed size" {
 }
 
 test "PNG transparent background emits tRNS" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ",
         .{
             .min_version = 1,
@@ -669,9 +669,9 @@ test "PNG transparent background emits tRNS" {
 }
 
 test "PNG fixed-Huffman output is deterministic and compressed" {
-    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(4)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ PNG COMPRESSION",
         .{
             .min_version = 1,
@@ -704,12 +704,12 @@ test "PNG fixed-Huffman output is deterministic and compressed" {
 }
 
 test "PNG reversed reflectance swaps palette usage across quiet zone and modules" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    @memset(cells[0..], qrz.Cell{});
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    @memset(cells[0..], core.Cell{});
     cells[0].dark = true;
-    var symbol = qrz.Symbol{
+    var symbol = core.Symbol{
         .cells = &cells,
-        .size = qrz.size(1),
+        .size = core.size(1),
         .version = 1,
         .ec_level = .m,
         .mask = 0,
@@ -733,11 +733,11 @@ test "PNG reversed reflectance swaps palette usage across quiet zone and modules
 }
 
 test "PNG reversed reflectance rejects transparent background" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    @memset(cells[0..], qrz.Cell{});
-    const symbol = qrz.Symbol{
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    @memset(cells[0..], core.Cell{});
+    const symbol = core.Symbol{
         .cells = &cells,
-        .size = qrz.size(1),
+        .size = core.size(1),
         .version = 1,
         .ec_level = .m,
         .mask = 0,

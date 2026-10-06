@@ -1,17 +1,17 @@
-//! Rendering and image encoding for QRz symbols.
+//! Rendering and image encoding for Zymbol symbols.
 //!
 //! Low-level APIs use caller-owned buffers and perform no file I/O.
 //! Convenience APIs accept an allocator and return owned PNG or SVG bytes.
 
 const std = @import("std");
-const qrz = @import("qrz");
+const core = @import("zymbol_core");
 const raster = @import("raster.zig");
 const svg = @import("svg.zig");
 const png = @import("png.zig");
 const owned = @import("owned.zig");
 const reflectance = @import("reflectance.zig");
 
-const max_render_side: usize = 17 + 4 * @as(usize, qrz.max_version) + 8;
+const max_render_side: usize = 17 + 4 * @as(usize, core.max_version) + 8;
 
 pub const Reflectance = reflectance.Reflectance;
 
@@ -87,9 +87,9 @@ test {
 }
 
 test "encoded symbol renders consistently to raster and SVG" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    var encode_scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    var encode_scratch: [core.requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ",
         .{
             .min_version = 1,
@@ -130,14 +130,14 @@ test "encoded symbol renders consistently to raster and SVG" {
 }
 
 test "raster projection is exact across representative versions" {
-    const versions = [_]qrz.Version{ 1, 7, 20, 40 };
+    const versions = [_]core.Version{ 1, 7, 20, 40 };
 
-    var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
-    var encode_scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
+    var cells: [core.requiredCells(core.max_version)]core.Cell = undefined;
+    var encode_scratch: [core.requiredEncodeScratch(core.max_version)]u8 = undefined;
     var pixels: [max_render_side * max_render_side]u8 = undefined;
 
     for (versions) |version| {
-        const symbol = try qrz.encodeText(
+        const symbol = try core.encodeText(
             "qrz",
             .{
                 .min_version = version,
@@ -153,7 +153,7 @@ test "raster projection is exact across representative versions" {
         const options = RasterOptions{ .scale = 1, .quiet_zone = 4 };
         const size = try rasterDimensions(&symbol, options);
         const symbol_side: usize = symbol.size;
-        const expected_side: usize = @as(usize, qrz.size(version)) + 8;
+        const expected_side: usize = @as(usize, core.size(version)) + 8;
         try std.testing.expectEqual(expected_side, size.width);
         try std.testing.expectEqual(expected_side, size.height);
 
@@ -176,8 +176,8 @@ test "raster projection is exact across representative versions" {
 }
 
 test "Micro QR rendering uses the two-module default quiet zone" {
-    var cells: [qrz.requiredMicroCells(.m2)]qrz.Cell = undefined;
-    const symbol = try qrz.encodeMicroText(
+    var cells: [core.requiredMicroCells(.m2)]core.Cell = undefined;
+    const symbol = try core.encodeMicroText(
         "12345",
         .{
             .min_version = .m2,
@@ -189,7 +189,7 @@ test "Micro QR rendering uses the two-module default quiet zone" {
         &cells,
     );
 
-    try std.testing.expectEqual(qrz.SymbolFamily.micro_qr, symbol.family);
+    try std.testing.expectEqual(core.SymbolFamily.micro_qr, symbol.family);
 
     const dims = try rasterDimensions(&symbol, .{ .scale = 1 });
     try std.testing.expectEqual(@as(usize, 17), dims.width);
@@ -235,9 +235,9 @@ test "Micro QR rendering uses the two-module default quiet zone" {
 }
 
 test "reversed raster QR decodes with reflectance metadata" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    var encode_scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    var encode_scratch: [core.requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ",
         .{
             .min_version = 1,
@@ -250,7 +250,7 @@ test "reversed raster QR decodes with reflectance metadata" {
         &encode_scratch,
     );
 
-    var pixels: [qrz.requiredCells(1)]u8 = undefined;
+    var pixels: [core.requiredCells(1)]u8 = undefined;
     _ = try renderRaster(
         u8,
         &symbol,
@@ -260,13 +260,13 @@ test "reversed raster QR decodes with reflectance metadata" {
         .{ .quiet_zone = 0, .reflectance = .reversed },
     );
 
-    var bits: [qrz.requiredCells(1)]bool = undefined;
+    var bits: [core.requiredCells(1)]bool = undefined;
     for (pixels, 0..) |pixel, index| bits[index] = pixel == 0;
 
-    var decode_cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    var decode_scratch: [qrz.requiredDecodeScratch(1)]u8 = undefined;
+    var decode_cells: [core.requiredCells(1)]core.Cell = undefined;
+    var decode_scratch: [core.requiredDecodeScratch(1)]u8 = undefined;
     var output: [32]u8 = undefined;
-    const decoded = try qrz.decode(
+    const decoded = try core.decode(
         &bits,
         symbol.size,
         &decode_cells,
@@ -280,8 +280,8 @@ test "reversed raster QR decodes with reflectance metadata" {
 }
 
 test "reversed raster Micro QR decodes with reflectance metadata" {
-    var cells: [qrz.requiredMicroCells(.m2)]qrz.Cell = undefined;
-    const symbol = try qrz.encodeMicroText(
+    var cells: [core.requiredMicroCells(.m2)]core.Cell = undefined;
+    const symbol = try core.encodeMicroText(
         "01234567",
         .{
             .min_version = .m2,
@@ -293,7 +293,7 @@ test "reversed raster Micro QR decodes with reflectance metadata" {
         &cells,
     );
 
-    var pixels: [qrz.requiredMicroCells(.m2)]u8 = undefined;
+    var pixels: [core.requiredMicroCells(.m2)]u8 = undefined;
     _ = try renderRaster(
         u8,
         &symbol,
@@ -303,12 +303,12 @@ test "reversed raster Micro QR decodes with reflectance metadata" {
         .{ .quiet_zone = 0, .reflectance = .reversed },
     );
 
-    var bits: [qrz.requiredMicroCells(.m2)]bool = undefined;
+    var bits: [core.requiredMicroCells(.m2)]bool = undefined;
     for (pixels, 0..) |pixel, index| bits[index] = pixel == 0;
 
-    var decode_cells: [qrz.requiredMicroCells(.m2)]qrz.Cell = undefined;
+    var decode_cells: [core.requiredMicroCells(.m2)]core.Cell = undefined;
     var output: [32]u8 = undefined;
-    const decoded = try qrz.decodeMicro(
+    const decoded = try core.decodeMicro(
         &bits,
         symbol.size,
         &decode_cells,

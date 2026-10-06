@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const qrz_dep = b.dependency("qrz", .{
+    const zymbol_dep = b.dependency("zymbol", .{
         .target = target,
         .optimize = optimize,
     });
@@ -14,13 +14,12 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "qrz", .module = qrz_dep.module("qrz") },
-            .{ .name = "qrz_render", .module = qrz_dep.module("qrz_render") },
+            .{ .name = "zymbol", .module = zymbol_dep.module("zymbol") },
         },
     });
 
     const exe = b.addExecutable(.{
-        .name = "qrz-consumer-smoke",
+        .name = "zymbol-consumer-smoke",
         .root_module = app,
     });
     b.installArtifact(exe);

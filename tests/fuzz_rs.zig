@@ -1,5 +1,5 @@
 const std = @import("std");
-const reed_solomon = @import("qrz_rs");
+const reed_solomon = @import("zymbol_rs");
 
 const release_corpus = [_][]const u8{
     "\x00",

@@ -1,6 +1,6 @@
 const std = @import("std");
-const qrz = @import("qrz");
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
 const expected_core_api = [_][]const u8{
     "Version",
@@ -59,6 +59,7 @@ const expected_core_api = [_][]const u8{
     "requiredMicroCells",
     "isValidSymbol",
     "defaultQuietZone",
+    "render",
 };
 
 const expected_render_api = [_][]const u8{
@@ -154,7 +155,7 @@ fn expectExactPublicSurface(comptime T: type, comptime expected: []const []const
 }
 
 test "v1 core public API snapshot" {
-    try expectExactPublicSurface(qrz, &expected_core_api);
+    try expectExactPublicSurface(zymbol, &expected_core_api);
 }
 
 test "v1 render public API snapshot" {
@@ -240,13 +241,13 @@ fn expectExactTypeDecls(
 }
 
 test "v1 core public type shapes" {
-    try expectExactFields(qrz.EcLevel, &.{ "m", "l", "h", "q" });
-    try std.testing.expectEqual(@as(u2, 0b00), @backingInt(qrz.EcLevel.m));
-    try std.testing.expectEqual(@as(u2, 0b01), @backingInt(qrz.EcLevel.l));
-    try std.testing.expectEqual(@as(u2, 0b10), @backingInt(qrz.EcLevel.h));
-    try std.testing.expectEqual(@as(u2, 0b11), @backingInt(qrz.EcLevel.q));
+    try expectExactFields(zymbol.EcLevel, &.{ "m", "l", "h", "q" });
+    try std.testing.expectEqual(@as(u2, 0b00), @backingInt(zymbol.EcLevel.m));
+    try std.testing.expectEqual(@as(u2, 0b01), @backingInt(zymbol.EcLevel.l));
+    try std.testing.expectEqual(@as(u2, 0b10), @backingInt(zymbol.EcLevel.h));
+    try std.testing.expectEqual(@as(u2, 0b11), @backingInt(zymbol.EcLevel.q));
 
-    try expectExactFields(qrz.Mode, &.{
+    try expectExactFields(zymbol.Mode, &.{
         "numeric",
         "alphanumeric",
         "structured_append",
@@ -257,14 +258,14 @@ test "v1 core public type shapes" {
         "fnc1_second_position",
     });
 
-    try expectExactFields(qrz.StructuredAppend, &.{ "index", "count", "parity" });
-    try expectExactTypeDecls(qrz.StructuredAppend, &.{"isValid"});
-    try expectExactFields(qrz.ApplicationIndicator, &.{ "numeric", "letter" });
-    try expectExactTypeDecls(qrz.ApplicationIndicator, &.{ "encoded", "fromEncoded" });
-    try expectExactFields(qrz.Fnc1, &.{ "none", "first_position", "second_position" });
-    try expectExactTypeDecls(qrz.Fnc1, &.{ "overheadBits", "isValid", "isNone" });
+    try expectExactFields(zymbol.StructuredAppend, &.{ "index", "count", "parity" });
+    try expectExactTypeDecls(zymbol.StructuredAppend, &.{"isValid"});
+    try expectExactFields(zymbol.ApplicationIndicator, &.{ "numeric", "letter" });
+    try expectExactTypeDecls(zymbol.ApplicationIndicator, &.{ "encoded", "fromEncoded" });
+    try expectExactFields(zymbol.Fnc1, &.{ "none", "first_position", "second_position" });
+    try expectExactTypeDecls(zymbol.Fnc1, &.{ "overheadBits", "isValid", "isNone" });
 
-    try expectExactFields(qrz.ModuleKind, &.{
+    try expectExactFields(zymbol.ModuleKind, &.{
         "finder",
         "separator",
         "timing",
@@ -274,11 +275,11 @@ test "v1 core public type shapes" {
         "dark_module",
         "data",
     });
-    try expectExactFields(qrz.SymbolFamily, &.{ "qr", "micro_qr" });
-    try expectExactFields(qrz.Cell, &.{ "dark", "kind" });
-    try std.testing.expectEqual(@as(usize, 1), @sizeOf(qrz.Cell));
+    try expectExactFields(zymbol.SymbolFamily, &.{ "qr", "micro_qr" });
+    try expectExactFields(zymbol.Cell, &.{ "dark", "kind" });
+    try std.testing.expectEqual(@as(usize, 1), @sizeOf(zymbol.Cell));
 
-    try expectExactFields(qrz.Symbol, &.{
+    try expectExactFields(zymbol.Symbol, &.{
         "cells",
         "size",
         "version",
@@ -286,13 +287,13 @@ test "v1 core public type shapes" {
         "ec_level",
         "mask",
     });
-    try expectExactTypeDecls(qrz.Symbol, &.{
+    try expectExactTypeDecls(zymbol.Symbol, &.{
         "contains",
         "isDark",
         "kindAt",
     });
 
-    try expectExactFields(qrz.EncodeOptions, &.{
+    try expectExactFields(zymbol.EncodeOptions, &.{
         "min_version",
         "max_version",
         "ec_level",
@@ -301,7 +302,7 @@ test "v1 core public type shapes" {
         "fnc1",
         "structured_append",
     });
-    try expectExactFieldSet(qrz.EncodeError, &.{
+    try expectExactFieldSet(zymbol.EncodeError, &.{
         "BufferFull",
         "EndOfStream",
         "InvalidBitCount",
@@ -322,7 +323,7 @@ test "v1 core public type shapes" {
         "InvalidUtf8",
     });
 
-    try expectExactFieldSet(qrz.DecodeError, &.{
+    try expectExactFieldSet(zymbol.DecodeError, &.{
         "InvalidSize",
         "InputTooSmall",
         "CellBufferTooSmall",
@@ -333,8 +334,8 @@ test "v1 core public type shapes" {
         "MalformedDataStream",
         "OutputTooSmall",
     });
-    try expectExactFields(qrz.EciState, &.{ "none", "assignment", "multiple" });
-    try expectExactFields(qrz.DecodeResult, &.{
+    try expectExactFields(zymbol.EciState, &.{ "none", "assignment", "multiple" });
+    try expectExactFields(zymbol.DecodeResult, &.{
         "len",
         "version",
         "ec_level",
@@ -347,24 +348,24 @@ test "v1 core public type shapes" {
         "reflectance_reversed",
         "errors_corrected",
     });
-    try expectExactTypeDecls(qrz.DecodeResult, &.{"symbologyIdentifier"});
+    try expectExactTypeDecls(zymbol.DecodeResult, &.{"symbologyIdentifier"});
 
-    try expectExactFields(qrz.MicroVersion, &.{ "m1", "m2", "m3", "m4" });
-    try expectExactTypeDecls(qrz.MicroVersion, &.{"number"});
-    try expectExactFields(qrz.MicroEncodeOptions, &.{
+    try expectExactFields(zymbol.MicroVersion, &.{ "m1", "m2", "m3", "m4" });
+    try expectExactTypeDecls(zymbol.MicroVersion, &.{"number"});
+    try expectExactFields(zymbol.MicroEncodeOptions, &.{
         "min_version",
         "max_version",
         "ec_level",
         "boost_ec_level",
         "mask",
     });
-    try expectExactFields(qrz.MicroSegment, &.{
+    try expectExactFields(zymbol.MicroSegment, &.{
         "numeric",
         "alphanumeric",
         "byte",
         "kanji",
     });
-    try expectExactFieldSet(qrz.MicroError, &.{
+    try expectExactFieldSet(zymbol.MicroError, &.{
         "BufferFull",
         "EndOfStream",
         "InvalidBitCount",
@@ -385,7 +386,7 @@ test "v1 core public type shapes" {
         "MalformedDataStream",
         "OutputTooSmall",
     });
-    try expectExactFields(qrz.MicroDecodeResult, &.{
+    try expectExactFields(zymbol.MicroDecodeResult, &.{
         "len",
         "version",
         "ec_level",
@@ -394,11 +395,11 @@ test "v1 core public type shapes" {
         "reflectance_reversed",
         "errors_corrected",
     });
-    try expectExactTypeDecls(qrz.MicroDecodeResult, &.{"symbologyIdentifier"});
-    try expectExactFields(qrz.AnyDecodeResult, &.{ "qr", "micro_qr" });
+    try expectExactTypeDecls(zymbol.MicroDecodeResult, &.{"symbologyIdentifier"});
+    try expectExactFields(zymbol.AnyDecodeResult, &.{ "qr", "micro_qr" });
 
-    try expectExactFields(qrz.BitWriter, &.{ "bytes", "bit_len" });
-    try expectExactTypeDecls(qrz.BitWriter, &.{
+    try expectExactFields(zymbol.BitWriter, &.{ "bytes", "bit_len" });
+    try expectExactTypeDecls(zymbol.BitWriter, &.{
         "init",
         "bitLength",
         "byteLength",
@@ -407,13 +408,13 @@ test "v1 core public type shapes" {
         "append",
         "appendBytes",
     });
-    try expectExactFieldSet(qrz.BitstreamError, &.{
+    try expectExactFieldSet(zymbol.BitstreamError, &.{
         "BufferFull",
         "EndOfStream",
         "InvalidBitCount",
         "ValueTooLarge",
     });
-    try expectExactFieldSet(qrz.SegmentError, &.{
+    try expectExactFieldSet(zymbol.SegmentError, &.{
         "BufferFull",
         "EndOfStream",
         "InvalidBitCount",

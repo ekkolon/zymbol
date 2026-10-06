@@ -1,10 +1,10 @@
 .{
-    .name = .qrz_consumer_smoke,
+    .name = .zymbol_consumer_smoke,
     .version = "0.0.0",
     .fingerprint = 0x53fd500031415926,
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
-        .qrz = .{ .path = "../.." },
+        .zymbol = .{ .path = "../.." },
     },
     .paths = .{
         "build.zig",
