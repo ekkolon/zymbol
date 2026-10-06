@@ -254,6 +254,7 @@ The decoder corrects one Reed-Solomon block at a time instead of materializing e
 ```text
 zig build test
 zig build portability
+zig build runtime-portability -fqemu
 zig build wasm
 zig build example-terminal
 zig build example-svg
@@ -267,7 +268,7 @@ zig build fuzz --fuzz
 zig build fuzz -j8 --fuzz
 ```
 
-The package currently supports Zig 0.16.0 as its minimum version. Release fuzzing uses Zig 0.17.0 because Zig 0.16.0's built-in `-ffuzz` test runner has an upstream stack-trace type mismatch; ordinary builds, tests and portability qualification remain supported on 0.16.0. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall, compiles the examples without executing them, and compiles the core/render modules for `wasm32-freestanding` in ReleaseFast.
+The package currently supports Zig 0.16.0 as its minimum version. Release fuzzing uses Zig 0.17.0 because Zig 0.16.0's built-in `-ffuzz` test runner has an upstream stack-trace type mismatch; ordinary builds, tests and portability qualification remain supported on 0.16.0. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall, compiles the examples without executing them, and compiles the core/render modules for `wasm32-freestanding` in ReleaseFast. `zig build runtime-portability -fqemu` executes representative x86 Linux-musl (32-bit little-endian) and PowerPC64 Linux-musl (64-bit big-endian) smoke binaries through Zig's QEMU runner; it requires `qemu-i386` and `qemu-ppc64` on `PATH`.
 
 `zig build example-png` writes `zig-out/examples/qrz.png`. `zig build example-svg` writes `zig-out/examples/qrz.svg`. `zig build example-terminal` renders the in-memory PNG through Kitty or the iTerm inline-image protocol on iTerm2, mintty and WezTerm; Windows Terminal uses SIXEL. VS Code receives the PNG control sequence and also retains the block QR because `terminal.integrated.enableImages` is not visible to child processes. Generated example artifacts stay under the gitignored `zig-out/` tree.
 
