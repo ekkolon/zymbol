@@ -74,7 +74,7 @@ Status meanings:
 - correction through the advertised RS radius: **verify**
 - malformed/unrecoverable block handling: **verify**
 - Micro QR block/ECC layouts: **implemented**
-- exhaustive normative Annex A/B cross-checks: **missing** (Annex A generator coefficients covered; remaining Annex audit still required)
+- exhaustive normative Annex A/B cross-checks: **missing** (Annex A generator exponents/coefficients covered; remaining Annex audit still required)
 
 ### Decoding and transmitted data
 
@@ -106,7 +106,7 @@ Status meanings:
 
 ## Independent conformance evidence required
 
-`zig build conformance` is the executable external-reference gate. The corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices, independent M1/M3/M4 regression matrices, the full QR 1–40 × L/M/Q/H external data-capacity table, all 32 QR format-information codewords, all 34 QR version-information codewords, and the Annex A Reed–Solomon generator coefficients for every degree used by QR Code. Matrix fixtures are checked in both directions available without linking an external runtime. Capacity, BCH, generator-polynomial, and version-band boundaries are executable conformance evidence. Fixture provenance is recorded in `tests/reference/README.md`.
+`zig build conformance` is the executable external-reference gate. The corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices, independent M1/M3/M4 regression matrices, the full QR 1–40 × L/M/Q/H external data-capacity table, all 32 QR format-information codewords, all 34 QR version-information codewords, and the Annex A Reed–Solomon generator exponents for every degree used by QR Code, converted independently to GF(256) coefficients before comparison. Matrix fixtures are checked in both directions available without linking an external runtime. Capacity, BCH, generator-polynomial, and version-band boundaries are executable conformance evidence. Fixture provenance is recorded in `tests/reference/README.md`.
 
 This is only the foundation of the v1 evidence set. The missing Annex A/B sweep and independent decoder differential campaign remain release blockers.
 
@@ -118,7 +118,7 @@ Self-round-trips are regression evidence, not sufficient conformance evidence. v
 4. Exact matrix comparison where the standard fixes all relevant choices.
 5. Boundary vectors at every character-count-width transition and capacity edge. **QR capacity and count-width coverage present; non-byte mode capacity edges still pending.**
 6. BCH tests through and beyond the correction radius. **Covered for QR format information; version BCH exact tables and four-bit rejection are covered.**
-7. Reed–Solomon tests at zero, maximum-correctable and uncorrectable corruption. **Covered across QR block layouts at the guaranteed radius, with explicit beyond-radius rejection cases and independent Annex A generators.**
+7. Reed–Solomon tests at zero, maximum-correctable and uncorrectable corruption. **Covered across QR block layouts at the guaranteed radius, with explicit beyond-radius rejection cases and independent Annex A generator exponents converted to raw GF(256) coefficients.**
 8. Micro QR M1–M4 vectors for every legal EC/mode combination.
 9. FNC1, Structured Append, ECI and transmitted-data vectors.
 10. Mirror and reflectance-reversal decode vectors.
