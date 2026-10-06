@@ -83,7 +83,7 @@ pub fn build(b: *std.Build) void {
     const python = b.option(
         []const u8,
         "python",
-        "Python executable for the optional ZXing-cpp interop gate",
+        "Python executable for optional interoperability/validation gates",
     ) orelse "python3";
     const run_interop = b.addSystemCommand(&.{ python, "tests/interop_zxing.py" });
     run_interop.addArtifactArg(interop_driver);
@@ -93,6 +93,28 @@ pub fn build(b: *std.Build) void {
         "Run bidirectional differential tests against ZXing-cpp",
     );
     interop_step.dependOn(&run_interop.step);
+
+    const png_validation_module = b.createModule(.{
+        .root_source_file = b.path("tests/png_driver.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
+    });
+    const png_validation_driver = b.addExecutable(.{
+        .name = "qrz-png-validation-driver",
+        .root_module = png_validation_module,
+    });
+    const run_png_validation = b.addSystemCommand(&.{ python, "tests/png_validate.py" });
+    run_png_validation.addArtifactArg(png_validation_driver);
+
+    const png_validation_step = b.step(
+        "png-validate",
+        "Validate PNG output independently with Python zlib/CRC parsing",
+    );
+    png_validation_step.dependOn(&run_png_validation.step);
 
     const fuzz_module = b.createModule(.{
         .root_source_file = b.path("tests/fuzz.zig"),
