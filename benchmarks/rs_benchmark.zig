@@ -15,7 +15,7 @@ pub fn main(init: std.process.Init) !void {
 
     var elapsed: [samples]u64 = undefined;
     for (0..samples) |sample| {
-        const started = try std.Io.Clock.awake.now(init.io);
+        const started = std.Io.Clock.awake.now(init.io);
         for (0..iterations) |_| {
             var block = original;
             corrupt(&block);
@@ -23,8 +23,8 @@ pub fn main(init: std.process.Init) !void {
             std.mem.doNotOptimizeAway(result.errors);
             std.mem.doNotOptimizeAway(block[0]);
         }
-        const stopped = try std.Io.Clock.awake.now(init.io);
-        elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
+        const stopped = std.Io.Clock.awake.now(init.io);
+        elapsed[sample] = @intCast(started.durationTo(stopped).toNanoseconds());
     }
 
     std.mem.sort(u64, &elapsed, {}, std.sort.asc(u64));
