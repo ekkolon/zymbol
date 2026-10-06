@@ -468,6 +468,14 @@ fn pushApplicationIndicator(
     }
 }
 
+pub fn parseDataStreamForTesting(
+    data: []const u8,
+    version: u6,
+    out: []u8,
+) Error!void {
+    _ = try parseDataStream(data, version, out);
+}
+
 fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream {
     var reader = bitstream.Reader.init(data);
     var written: usize = 0;

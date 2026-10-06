@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Expanded coverage-guided fuzzing to raw segment parsing, Reed-Solomon correction, BCH damage, decodeAny/buffer boundaries, Micro QR legal modes, SVG, and renderer boundary cases.
+
 - Replaced PNG stored-DEFLATE output with deterministic fixed-Huffman compression and bounded LZ77 matching; added an independent PNG CRC/Adler/inflate validation gate.
 
 - Added explicit normal/reversed reflectance rendering across raster, SVG, and PNG, including quiet-zone inversion and decode-backed regression coverage.
