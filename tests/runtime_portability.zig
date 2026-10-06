@@ -3,6 +3,12 @@ const builtin = @import("builtin");
 const qrz = @import("qrz");
 const render = @import("qrz_render");
 
+comptime {
+    if (@bitSizeOf(u8) != 8) @compileError("QRz requires 8-bit bytes");
+    if (@bitSizeOf(u16) != 16) @compileError("QRz requires 16-bit u16");
+    if (@bitSizeOf(u32) != 32) @compileError("QRz requires 32-bit u32");
+}
+
 pub fn main() !void {
     try verifyArchitecture();
     try verifyQr();
