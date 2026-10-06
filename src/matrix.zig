@@ -358,25 +358,33 @@ fn finderPenaltyLine(symbol: *const Symbol, line: usize, horizontal: bool) i32 {
         }
         if (!matches) continue;
 
-        const before_light = start >= 4 and blk: {
+        var before_light = false;
+        if (start >= 4) {
+            before_light = true;
             var index = start - 4;
             while (index < start) : (index += 1) {
                 const x = if (horizontal) index else line;
                 const y = if (horizontal) line else index;
-                if (isDarkUnchecked(symbol, x, y)) break :blk false;
+                if (isDarkUnchecked(symbol, x, y)) {
+                    before_light = false;
+                    break;
+                }
             }
-            break :blk true;
-        };
+        }
 
-        const after_light = start + core.len + 4 <= side and blk: {
+        var after_light = false;
+        if (start + core.len + 4 <= side) {
+            after_light = true;
             var index = start + core.len;
             while (index < start + core.len + 4) : (index += 1) {
                 const x = if (horizontal) index else line;
                 const y = if (horizontal) line else index;
-                if (isDarkUnchecked(symbol, x, y)) break :blk false;
+                if (isDarkUnchecked(symbol, x, y)) {
+                    after_light = false;
+                    break;
+                }
             }
-            break :blk true;
-        };
+        }
 
         if (before_light or after_light) result += penalty_n3;
     }
