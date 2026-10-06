@@ -75,7 +75,7 @@ test "encoded symbol renders consistently to raster and SVG" {
 
 test "raster projection is exact across representative versions" {
     const versions = [_]qrz.Version{ 1, 7, 20, 40 };
-    const max_side: usize = qrz.size(qrz.max_version) + 8;
+    const max_side: usize = @as(usize, qrz.size(qrz.max_version)) + 8;
 
     var cells: [qrz.requiredCells(qrz.max_version)]qrz.Cell = undefined;
     var encode_scratch: [qrz.requiredEncodeScratch(qrz.max_version)]u8 = undefined;
@@ -97,7 +97,8 @@ test "raster projection is exact across representative versions" {
 
         const options = RasterOptions{ .scale = 1, .quiet_zone = 4 };
         const size = try rasterDimensions(&symbol, options);
-        const expected_side: usize = qrz.size(version) + 8;
+        const symbol_side: usize = symbol.size;
+        const expected_side: usize = @as(usize, qrz.size(version)) + 8;
         try std.testing.expectEqual(expected_side, size.width);
         try std.testing.expectEqual(expected_side, size.height);
 
@@ -108,7 +109,7 @@ test "raster projection is exact across representative versions" {
             for (0..size.width) |x| {
                 const inside =
                     x >= 4 and y >= 4 and
-                    x < 4 + symbol.size and y < 4 + symbol.size;
+                    x < 4 + symbol_side and y < 4 + symbol_side;
                 const expected: u8 = if (inside and symbol.isDark(x - 4, y - 4))
                     0
                 else
