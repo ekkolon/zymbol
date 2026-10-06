@@ -236,7 +236,7 @@ zig build qualify
 
 The package currently supports Zig 0.16.0 as its minimum version. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall, compiles the examples without executing them, and compiles the core/render modules for `wasm32-freestanding` in ReleaseFast.
 
-`zig build example-png` writes `zig-out/examples/qrz.png`. `zig build example-svg` writes `zig-out/examples/qrz.svg`. `zig build example-terminal` displays the in-memory PNG through Kitty or iTerm2 inline-image protocols when available and falls back to a block representation on unsupported terminals. Generated example artifacts stay under the gitignored `zig-out/` tree.
+`zig build example-png` writes `zig-out/examples/qrz.png`. `zig build example-svg` writes `zig-out/examples/qrz.svg`. `zig build example-terminal` renders an inline image through Kitty, iTerm2-compatible terminals, or SIXEL on Windows Terminal, and falls back to a block representation when no supported image protocol is detected. Generated example artifacts stay under the gitignored `zig-out/` tree.
 
 The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
 
