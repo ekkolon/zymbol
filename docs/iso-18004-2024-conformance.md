@@ -99,7 +99,7 @@ Status meanings:
 - Micro QR quiet-zone rules: **implemented**
 - black/white and configurable reflectance rendering: **implemented**
 - reversed-reflectance output: **implemented** — raster, SVG and PNG invert the complete symbol including quiet zone; rendered QR/Micro grids are regression-decoded with reversed-reflectance metadata.
-- PNG structural correctness: **verify**
+- PNG structural correctness: **implemented** — independent Python validation parses chunks, verifies CRC/Adler, inflates IDAT, and checks indexed scanlines/geometry.
 - SVG structural correctness: **verify**
 - physical print/mark quality grading: **external**
 - camera thresholding/finder detection/perspective correction: **external**
@@ -170,17 +170,17 @@ PNG is not defined by ISO/IEC 18004, but it is a first-class QRz output and part
 
 Required before v1:
 
-- independent PNG decoder validation
-- CRC/Adler verification
-- all legal scale/quiet-zone/color/transparency combinations
-- exact dimensions and quiet-zone geometry
-- no intermediate full raster allocation
-- deterministic output for identical inputs/options
-- compressed IDAT output suitable for production delivery
+- independent PNG decoder validation: **covered by `zig build png-validate` over representative QR/Micro, transparent, custom-color, scale, and reversed-reflectance cases**
+- CRC/Adler verification: **covered**
+- all legal scale/quiet-zone/color/transparency combinations: **core option classes covered; exhaustive fuzz/boundary expansion remains part of fuzz closure**
+- exact dimensions and quiet-zone geometry: **covered**
+- no intermediate full raster allocation: **covered**
+- deterministic output for identical inputs/options: **covered**
+- compressed IDAT output suitable for production delivery: **implemented with fixed-Huffman DEFLATE plus bounded LZ77 matching**
 - benchmarked size against representative QR payloads and established PNG encoders
 - benchmarked encoding throughput and peak working memory
 
-The current stored-DEFLATE encoder is correct-oriented and fast, but it is not the final v1 size strategy.
+The PNG encoder no longer uses stored-DEFLATE. Symbol-specific sizing dry-runs the deterministic compressor exactly; version-based sizing remains a safe allocation upper bound.
 
 ## Performance closure
 
