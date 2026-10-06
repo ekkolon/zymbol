@@ -201,6 +201,20 @@ fn canEncode(mode: Mode, character: u8) bool {
     };
 }
 
+fn allNumeric(data: []const u8) bool {
+    for (data) |character| {
+        if (!canEncode(.numeric, character)) return false;
+    }
+    return true;
+}
+
+fn allAlphanumeric(data: []const u8) bool {
+    for (data) |character| {
+        if (!canEncode(.alphanumeric, character)) return false;
+    }
+    return true;
+}
+
 fn payloadBits(mode: Mode, count: usize) usize {
     return switch (mode) {
         .numeric => (count / 3) * 10 + ([_]usize{ 0, 4, 7 })[count % 3],
@@ -412,10 +426,19 @@ fn selectAuto(
     try validateOptions(options);
     if (data.len > max_input_len) return Error.DataTooLong;
 
+    switch (options.max_version) {
+        .m1 => if (!allNumeric(data)) return Error.InvalidCharacter,
+        .m2 => if (!allAlphanumeric(data)) return Error.InvalidCharacter,
+        .m3, .m4 => {},
+    }
+
+    var has_legal_level = false;
     var number = options.min_version.number();
     while (number <= options.max_version.number()) : (number += 1) {
         const version = versionFromNumber(number).?;
         const cap = capacity(version, options.ec_level) orelse continue;
+        has_legal_level = true;
+
         const bits = plan(version, data, null) orelse continue;
         if (bits > cap.data_bits) continue;
 
@@ -425,6 +448,8 @@ fn selectAuto(
             options.ec_level;
         return .{ .version = version, .level = level, .bits = bits };
     }
+
+    if (!has_legal_level) return Error.UnsupportedEcLevel;
     return Error.DataTooLong;
 }
 
@@ -436,10 +461,13 @@ fn selectKanji(
     if (sjis.len & 1 != 0) return Error.OddKanjiLength;
 
     const characters = sjis.len / 2;
+    var has_legal_level = false;
     var number = @max(@as(u3, 3), options.min_version.number());
     while (number <= options.max_version.number()) : (number += 1) {
         const version = versionFromNumber(number).?;
         const cap = capacity(version, options.ec_level) orelse continue;
+        has_legal_level = true;
+
         if (characters > maxCount(version, .kanji)) continue;
         const bits = segmentBits(version, .kanji, characters);
         if (bits > cap.data_bits) continue;
@@ -450,6 +478,8 @@ fn selectKanji(
             options.ec_level;
         return .{ .version = version, .level = level, .bits = bits };
     }
+
+    if (!has_legal_level) return Error.UnsupportedEcLevel;
     return Error.DataTooLong;
 }
 
@@ -1150,6 +1180,139 @@ test "Micro QR capacities and dimensions match M1-M4 tables" {
     try std.testing.expect(capacity(.m1, .m) == null);
     try std.testing.expect(capacity(.m3, .q) == null);
     try std.testing.expect(capacity(.m4, .h) == null);
+}
+
+test "Micro QR data padding matches independent codeword vectors" {
+    const cases = [_]struct {
+        version: Version,
+        level: spec.EcLevel,
+        input: []const u8,
+        expected: []const u8,
+    }{
+        .{
+            .version = .m1,
+            .level = .l,
+            .input = "1",
+            .expected = &.{ 0x22, 0x00, 0x00 },
+        },
+        .{
+            .version = .m1,
+            .level = .l,
+            .input = "12345",
+            .expected = &.{ 0xA3, 0xDA, 0xD0 },
+        },
+        .{
+            .version = .m3,
+            .level = .l,
+            .input = "1234567890123456789",
+            .expected = &.{
+                0x26, 0x3D, 0xB9, 0x18, 0xA8, 0x18,
+                0xAC, 0xD4, 0xD2, 0x00, 0x00,
+            },
+        },
+    };
+
+    for (cases) |case| {
+        const cap = capacity(case.version, case.level).?;
+        var bytes: [max_data_codewords]u8 = @splat(0);
+        var writer = bitstream.Writer.init(bytes[0..cap.data_codewords]);
+        try appendPlanned(&writer, case.version, case.input);
+        try finalizeData(&writer, case.version, cap);
+
+        try std.testing.expectEqualSlices(
+            u8,
+            case.expected,
+            bytes[0..case.expected.len],
+        );
+        try std.testing.expectEqual(@as(usize, cap.data_bits), writer.bit_len);
+    }
+}
+
+test "Micro QR numeric capacity boundaries match M1-M4" {
+    const cases = [_]struct {
+        version: Version,
+        level: spec.EcLevel,
+        fits: []const u8,
+        too_long: []const u8,
+    }{
+        .{ .version = .m1, .level = .l, .fits = "12345", .too_long = "123456" },
+        .{ .version = .m2, .level = .l, .fits = "1234567890", .too_long = "12345678901" },
+        .{ .version = .m2, .level = .m, .fits = "12345678", .too_long = "123456789" },
+        .{ .version = .m3, .level = .l, .fits = "12345678901234567890123", .too_long = "123456789012345678901234" },
+        .{ .version = .m3, .level = .m, .fits = "123456789012345678", .too_long = "1234567890123456789" },
+        .{ .version = .m4, .level = .l, .fits = "12345678901234567890123456789012345", .too_long = "123456789012345678901234567890123456" },
+        .{ .version = .m4, .level = .m, .fits = "123456789012345678901234567890", .too_long = "1234567890123456789012345678901" },
+        .{ .version = .m4, .level = .q, .fits = "123456789012345678901", .too_long = "1234567890123456789012" },
+    };
+
+    var cells: [max_cells]matrix.Cell = undefined;
+    for (cases) |case| {
+        _ = try encodeText(
+            case.fits,
+            .{
+                .min_version = case.version,
+                .max_version = case.version,
+                .ec_level = case.level,
+                .boost_ec_level = false,
+            },
+            &cells,
+        );
+
+        try std.testing.expectError(
+            Error.DataTooLong,
+            encodeText(
+                case.too_long,
+                .{
+                    .min_version = case.version,
+                    .max_version = case.version,
+                    .ec_level = case.level,
+                    .boost_ec_level = false,
+                },
+                &cells,
+            ),
+        );
+    }
+}
+
+test "Micro QR enforces version mode and EC legality" {
+    var cells: [max_cells]matrix.Cell = undefined;
+
+    try std.testing.expectError(
+        Error.InvalidCharacter,
+        encodeText(
+            "A",
+            .{ .min_version = .m1, .max_version = .m1 },
+            &cells,
+        ),
+    );
+    try std.testing.expectError(
+        Error.InvalidCharacter,
+        encodeText(
+            "a",
+            .{ .min_version = .m2, .max_version = .m2 },
+            &cells,
+        ),
+    );
+    try std.testing.expectError(
+        Error.UnsupportedEcLevel,
+        encodeText(
+            "1",
+            .{
+                .min_version = .m1,
+                .max_version = .m1,
+                .ec_level = .m,
+            },
+            &cells,
+        ),
+    );
+    try std.testing.expectError(
+        Error.UnsupportedEcLevel,
+        encodeText(
+            "1",
+            .{ .ec_level = .h },
+            &cells,
+        ),
+    );
 }
 
 test "Micro QR format codewords match Annex C.1" {
