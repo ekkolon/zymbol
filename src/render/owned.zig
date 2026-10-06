@@ -168,6 +168,50 @@ pub fn svgBytes(
     return renderOwnedSvg(allocator, &encoded.symbol, options.render);
 }
 
+pub fn writeSvgText(
+    allocator: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    text: []const u8,
+    options: SvgEncodeOptions,
+) !void {
+    var encoded = try Encoded.init(allocator, .{ .text = text }, options.encode);
+    defer encoded.deinit();
+    try svg.write(&encoded.symbol, writer, options.render);
+}
+
+pub fn writeSvgBytes(
+    allocator: std.mem.Allocator,
+    writer: *std.Io.Writer,
+    bytes: []const u8,
+    options: SvgEncodeOptions,
+) !void {
+    var encoded = try Encoded.init(allocator, .{ .bytes = bytes }, options.encode);
+    defer encoded.deinit();
+    try svg.write(&encoded.symbol, writer, options.render);
+}
+
+pub fn writeSvgTextInto(
+    writer: *std.Io.Writer,
+    text: []const u8,
+    options: SvgEncodeOptions,
+    cells: []qrz.Cell,
+    scratch: []u8,
+) !void {
+    const symbol = try qrz.encodeText(text, options.encode, cells, scratch);
+    try svg.write(&symbol, writer, options.render);
+}
+
+pub fn writeSvgBytesInto(
+    writer: *std.Io.Writer,
+    bytes: []const u8,
+    options: SvgEncodeOptions,
+    cells: []qrz.Cell,
+    scratch: []u8,
+) !void {
+    const symbol = try qrz.encodeBytes(bytes, options.encode, cells, scratch);
+    try svg.write(&symbol, writer, options.render);
+}
+
 pub fn pngTextInto(
     text: []const u8,
     options: PngEncodeOptions,
@@ -284,4 +328,63 @@ test "buffer requirements cover allocation-free helpers" {
         svg_output[0..svg_required.output],
     );
     try std.testing.expect(svg_bytes.len <= svg_required.output);
+}
+
+
+test "owned byte helpers preserve arbitrary payloads" {
+    const allocator = std.testing.allocator;
+    const payload = [_]u8{ 0x00, 0xFF, 0x80, 0x41 };
+
+    var png_image = try pngBytes(allocator, &payload, .{
+        .encode = .{ .max_version = 4 },
+        .render = .{ .scale = 2 },
+    });
+    defer png_image.deinit();
+    try std.testing.expectEqualSlices(
+        u8,
+        &.{ 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A },
+        png_image.bytes[0..8],
+    );
+
+    var svg_image = try svgBytes(allocator, &payload, .{
+        .encode = .{ .max_version = 4 },
+    });
+    defer svg_image.deinit();
+    try std.testing.expect(std.mem.startsWith(u8, svg_image.bytes, "<svg "));
+}
+
+test "SVG writer facades match buffered output" {
+    const allocator = std.testing.allocator;
+    const options = SvgEncodeOptions{
+        .encode = .{ .max_version = 4 },
+        .render = .{ .explicit_size = 256 },
+    };
+
+    var buffered = try svgText(allocator, "QRZ", options);
+    defer buffered.deinit();
+
+    var writer_storage: [16 * 1024]u8 = undefined;
+    var writer: std.Io.Writer = .fixed(&writer_storage);
+    try writeSvgText(allocator, &writer, "QRZ", options);
+
+    try std.testing.expectEqualStrings(buffered.bytes, writer_storage[0..writer.end]);
+
+    const required = try svgRequirements(options);
+    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
+    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
+    var writer_storage_into: [16 * 1024]u8 = undefined;
+    var writer_into: std.Io.Writer = .fixed(&writer_storage_into);
+
+    try std.testing.expectEqual(cells.len, required.cells);
+    try std.testing.expectEqual(scratch.len, required.scratch);
+
+    try writeSvgTextInto(
+        &writer_into,
+        "QRZ",
+        options,
+        &cells,
+        &scratch,
+    );
+
+    try std.testing.expectEqualStrings(buffered.bytes, writer_storage_into[0..writer_into.end]);
 }
