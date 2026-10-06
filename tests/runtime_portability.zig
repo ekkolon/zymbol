@@ -49,7 +49,7 @@ fn verifyQr() !void {
     );
 
     var bits: [qrz.requiredCells(10)]bool = undefined;
-    for (bits, 0..) |*bit, index| bit.* = symbol.cells[index].dark;
+    for (&bits, 0..) |*bit, index| bit.* = symbol.cells[index].dark;
 
     var decode_cells: [qrz.requiredCells(10)]qrz.Cell = undefined;
     var decode_scratch: [qrz.requiredDecodeScratch(10)]u8 = undefined;
@@ -83,7 +83,7 @@ fn verifyMicro() !void {
     );
 
     var bits: [qrz.requiredMicroCells(.m4)]bool = undefined;
-    for (bits, 0..) |*bit, index| bit.* = !symbol.cells[index].dark;
+    for (&bits, 0..) |*bit, index| bit.* = !symbol.cells[index].dark;
 
     var decode_cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
     var output: [32]u8 = undefined;
