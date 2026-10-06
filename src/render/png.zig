@@ -2,11 +2,13 @@ const std = @import("std");
 const qrz = @import("qrz");
 const raster = @import("raster.zig");
 const svg = @import("svg.zig");
+const Reflectance = @import("reflectance.zig").Reflectance;
 
 pub const Error = error{
     InvalidSymbol,
     InvalidVersion,
     InvalidDimensions,
+    InvalidReflectance,
     OutputTooSmall,
     SizeOverflow,
 };
@@ -16,6 +18,7 @@ pub const Options = struct {
     quiet_zone: ?u16 = null,
     foreground: svg.Rgb = svg.Rgb.black,
     background: ?svg.Rgb = svg.Rgb.white,
+    reflectance: Reflectance = .normal,
 };
 
 const Sink = struct {
@@ -112,6 +115,10 @@ fn writeChunk(sink: *Sink, chunk_type: *const [4]u8, data: []const u8) Error!voi
 }
 
 fn dimensions(symbol: *const qrz.Symbol, options: Options) Error!raster.Dimensions {
+    if (options.reflectance == .reversed and options.background == null) {
+        return Error.InvalidReflectance;
+    }
+
     const dims = raster.dimensions(symbol, .{
         .scale = options.scale,
         .quiet_zone = options.quiet_zone,
@@ -165,15 +172,21 @@ fn pixelIsDark(
     const quiet_pixels = @as(usize, quiet_zone) * scale;
     const symbol_pixels = @as(usize, symbol.size) * scale;
 
-    if (pixel_x < quiet_pixels or pixel_y < quiet_pixels) return false;
-    if (pixel_x >= quiet_pixels + symbol_pixels or pixel_y >= quiet_pixels + symbol_pixels) {
-        return false;
+    var logical_dark = false;
+    if (pixel_x >= quiet_pixels and pixel_y >= quiet_pixels and
+        pixel_x < quiet_pixels + symbol_pixels and
+        pixel_y < quiet_pixels + symbol_pixels)
+    {
+        const module_x = (pixel_x - quiet_pixels) / scale;
+        const module_y = (pixel_y - quiet_pixels) / scale;
+        const modules: usize = symbol.size;
+        logical_dark = symbol.cells[module_y * modules + module_x].dark;
     }
 
-    const module_x = (pixel_x - quiet_pixels) / scale;
-    const module_y = (pixel_y - quiet_pixels) / scale;
-    const modules: usize = symbol.size;
-    return symbol.cells[module_y * modules + module_x].dark;
+    return switch (options.reflectance) {
+        .normal => logical_dark,
+        .reversed => !logical_dark,
+    };
 }
 
 fn scanlineByte(
@@ -282,6 +295,9 @@ fn requiredBytesForModules(
     options: Options,
 ) Error!usize {
     if (options.scale == 0) return Error.InvalidDimensions;
+    if (options.reflectance == .reversed and options.background == null) {
+        return Error.InvalidReflectance;
+    }
 
     const quiet = try checkedMul(@as(usize, quiet_zone), 2);
     const modules = try checkedAdd(@as(usize, module_side), quiet);
@@ -421,3 +437,53 @@ test "PNG matches independent indexed-color fixture" {
     try std.testing.expectEqualSlices(u8, &expected, encoded);
 }
 
+
+
+test "PNG reversed reflectance swaps palette usage across quiet zone and modules" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    @memset(cells[0..], qrz.Cell{});
+    cells[0].dark = true;
+    var symbol = qrz.Symbol{
+        .cells = &cells,
+        .size = qrz.size(1),
+        .version = 1,
+        .ec_level = .m,
+        .mask = 0,
+    };
+
+    const options = Options{
+        .scale = 1,
+        .quiet_zone = 1,
+        .reflectance = .reversed,
+    };
+    const dims = try dimensions(&symbol, options);
+
+    try std.testing.expect(pixelIsDark(&symbol, options, 0, 0));
+    try std.testing.expect(!pixelIsDark(&symbol, options, 1, 1));
+    try std.testing.expect(pixelIsDark(&symbol, options, 2, 1));
+    try std.testing.expectEqual(@as(usize, 23), dims.width);
+
+    var output: [4096]u8 = undefined;
+    const encoded = try render(&symbol, &output, options);
+    try std.testing.expect(encoded.len > 0);
+}
+
+test "PNG reversed reflectance rejects transparent background" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    @memset(cells[0..], qrz.Cell{});
+    const symbol = qrz.Symbol{
+        .cells = &cells,
+        .size = qrz.size(1),
+        .version = 1,
+        .ec_level = .m,
+        .mask = 0,
+    };
+
+    try std.testing.expectError(
+        Error.InvalidReflectance,
+        requiredBytes(
+            &symbol,
+            .{ .reflectance = .reversed, .background = null },
+        ),
+    );
+}

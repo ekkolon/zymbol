@@ -1,5 +1,6 @@
 const std = @import("std");
 const qrz = @import("qrz");
+const Reflectance = @import("reflectance.zig").Reflectance;
 
 pub const Error = error{
     InvalidScale,
@@ -12,6 +13,7 @@ pub const Error = error{
 pub const Options = struct {
     scale: u16 = 1,
     quiet_zone: ?u16 = null,
+    reflectance: Reflectance = .normal,
 };
 
 pub const Dimensions = struct {
@@ -76,10 +78,19 @@ pub fn renderStrided(
     const required = try requiredPixelsForStride(symbol, stride, options);
     if (pixels.len < required) return Error.OutputTooSmall;
 
+    const background_pixel = switch (options.reflectance) {
+        .normal => light,
+        .reversed => dark,
+    };
+    const module_pixel = switch (options.reflectance) {
+        .normal => dark,
+        .reversed => light,
+    };
+
     var row: usize = 0;
     while (row < size.height) : (row += 1) {
         const start = row * stride;
-        @memset(pixels[start .. start + size.width], light);
+        @memset(pixels[start .. start + size.width], background_pixel);
     }
 
     const scale: usize = options.scale;
@@ -109,7 +120,7 @@ pub fn renderStrided(
 
             const pixel_start = quiet_pixels + run_start * scale;
             const pixel_end = quiet_pixels + module_x * scale;
-            @memset(first_row[pixel_start..pixel_end], dark);
+            @memset(first_row[pixel_start..pixel_end], module_pixel);
         }
 
         var duplicate: usize = 1;
@@ -213,4 +224,23 @@ test "raster rejects malformed symbols, invalid scale and undersized output" {
         Error.OutputTooSmall,
         renderStrided(u8, &symbol, &pixels, 29, 0, 255, .{}),
     );
+}
+
+
+test "raster reversed reflectance inverts symbol and quiet zone" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
+
+    const options = Options{
+        .scale = 1,
+        .quiet_zone = 1,
+        .reflectance = .reversed,
+    };
+    const size = try dimensions(&symbol, options);
+    var pixels: [23 * 23]u8 = undefined;
+    _ = try render(u8, &symbol, &pixels, 0, 255, options);
+
+    try std.testing.expectEqual(@as(u8, 0), pixels[0]);
+    try std.testing.expectEqual(@as(u8, 255), pixels[size.width + 1]);
+    try std.testing.expectEqual(@as(u8, 0), pixels[size.width + 2]);
 }

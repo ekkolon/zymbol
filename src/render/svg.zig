@@ -1,10 +1,12 @@
 const std = @import("std");
 const qrz = @import("qrz");
+const Reflectance = @import("reflectance.zig").Reflectance;
 
 pub const Error = error{
     InvalidSymbol,
     InvalidVersion,
     InvalidSize,
+    InvalidReflectance,
     OutputTooSmall,
     SizeOverflow,
 };
@@ -24,6 +26,7 @@ pub const Options = struct {
     quiet_zone: ?u16 = null,
     foreground: Rgb = Rgb.black,
     background: ?Rgb = Rgb.white,
+    reflectance: Reflectance = .normal,
     explicit_size: ?u32 = null,
 };
 
@@ -100,6 +103,9 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: anytype) !void {
     if (options.explicit_size) |size| {
         if (size == 0) return Error.InvalidSize;
     }
+    if (options.reflectance == .reversed and options.background == null) {
+        return Error.InvalidReflectance;
+    }
 
     try sink.write("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ");
     try writeUnsigned(sink, side);
@@ -117,7 +123,16 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: anytype) !void {
 
     try sink.write(" shape-rendering=\"crispEdges\">");
 
-    if (options.background) |background| {
+    const canvas_color: ?Rgb = switch (options.reflectance) {
+        .normal => options.background,
+        .reversed => options.foreground,
+    };
+    const module_color: Rgb = switch (options.reflectance) {
+        .normal => options.foreground,
+        .reversed => options.background.?,
+    };
+
+    if (canvas_color) |background| {
         try sink.write("<path fill=\"#");
         try writeColor(sink, background);
         try sink.write("\" d=\"M0 0H");
@@ -128,7 +143,7 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: anytype) !void {
     }
 
     try sink.write("<path fill=\"#");
-    try writeColor(sink, options.foreground);
+    try writeColor(sink, module_color);
     try sink.write("\" d=\"");
 
     const modules: usize = symbol.size;
@@ -184,6 +199,9 @@ fn maxBytesForModules(
 ) Error!usize {
     if (options.explicit_size) |explicit| {
         if (explicit == 0) return Error.InvalidSize;
+    }
+    if (options.reflectance == .reversed and options.background == null) {
+        return Error.InvalidReflectance;
     }
 
     const quiet = @as(usize, quiet_zone) * 2;
@@ -360,5 +378,43 @@ test "SVG rejects malformed symbols and undersized output" {
     try std.testing.expectError(
         Error.OutputTooSmall,
         render(&symbol, &tiny, .{}),
+    );
+}
+
+
+test "SVG reversed reflectance swaps full symbol polarity" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
+
+    var output: [512]u8 = undefined;
+    const rendered = try render(
+        &symbol,
+        &output,
+        .{
+            .quiet_zone = 1,
+            .reflectance = .reversed,
+        },
+    );
+
+    try std.testing.expect(
+        std.mem.indexOf(u8, rendered, "<path fill=\"#000000\" d=\"M0 0H23V23H0Z\"/>") != null,
+    );
+    try std.testing.expect(
+        std.mem.indexOf(u8, rendered, "<path fill=\"#FFFFFF\"") != null,
+    );
+}
+
+test "SVG reversed reflectance rejects transparent background" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
+    var output: [512]u8 = undefined;
+
+    try std.testing.expectError(
+        Error.InvalidReflectance,
+        render(
+            &symbol,
+            &output,
+            .{ .reflectance = .reversed, .background = null },
+        ),
     );
 }

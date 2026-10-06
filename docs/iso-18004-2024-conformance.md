@@ -97,8 +97,8 @@ Status meanings:
 - integer raster scaling: **verify**
 - four-module QR quiet-zone default: **verify**
 - Micro QR quiet-zone rules: **implemented**
-- black/white and configurable reflectance rendering: **verify**
-- reversed-reflectance output: **missing**
+- black/white and configurable reflectance rendering: **implemented**
+- reversed-reflectance output: **implemented** — raster, SVG and PNG invert the complete symbol including quiet zone; rendered QR/Micro grids are regression-decoded with reversed-reflectance metadata.
 - PNG structural correctness: **verify**
 - SVG structural correctness: **verify**
 - physical print/mark quality grading: **external**

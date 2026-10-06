@@ -124,6 +124,8 @@ defer png.deinit();
 
 PNG is encoded directly from the QR symbol as a 1-bit indexed image. It does not materialize an intermediate raster buffer. A transparent PNG background is selected with `.background = null`.
 
+ISO/IEC 18004 reflectance reversal is explicit with `.reflectance = .reversed`. QRz reverses the complete rendered symbol, including the quiet zone: logical dark modules use the configured background color and logical light modules/quiet zone use the foreground color. PNG and SVG reversed-reflectance output requires a non-transparent `.background` so both reflectance levels are self-contained.
+
 SVG is responsive by default: QRz emits a square `viewBox`, symmetric quiet zone, integer module coordinates, and `preserveAspectRatio="xMidYMid meet"`. It omits intrinsic `width`/`height`, allowing the embedding layout to choose the rendered size without distorting or off-centering the QR.
 
 Set an explicit square intrinsic size when required:

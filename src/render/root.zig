@@ -9,8 +9,11 @@ const raster = @import("raster.zig");
 const svg = @import("svg.zig");
 const png = @import("png.zig");
 const owned = @import("owned.zig");
+const reflectance = @import("reflectance.zig");
 
 const max_render_side: usize = 17 + 4 * @as(usize, qrz.max_version) + 8;
+
+pub const Reflectance = reflectance.Reflectance;
 
 pub const RasterOptions = raster.Options;
 pub const RasterDimensions = raster.Dimensions;
@@ -226,4 +229,91 @@ test "Micro QR rendering uses the two-module default quiet zone" {
         &.{ 0x00, 0x00, 0x00, 0x11 },
         rendered_png[20..24],
     );
+}
+
+
+test "reversed raster QR decodes with reflectance metadata" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var encode_scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try qrz.encodeText(
+        "QRZ",
+        .{
+            .min_version = 1,
+            .max_version = 1,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+        &encode_scratch,
+    );
+
+    var pixels: [qrz.requiredCells(1)]u8 = undefined;
+    _ = try renderRaster(
+        u8,
+        &symbol,
+        &pixels,
+        0,
+        255,
+        .{ .quiet_zone = 0, .reflectance = .reversed },
+    );
+
+    var bits: [qrz.requiredCells(1)]bool = undefined;
+    for (pixels, 0..) |pixel, index| bits[index] = pixel == 0;
+
+    var decode_cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var decode_scratch: [qrz.requiredDecodeScratch(1)]u8 = undefined;
+    var output: [32]u8 = undefined;
+    const decoded = try qrz.decode(
+        &bits,
+        symbol.size,
+        &decode_cells,
+        &decode_scratch,
+        &output,
+    );
+
+    try std.testing.expectEqualStrings("QRZ", output[0..decoded.len]);
+    try std.testing.expect(decoded.reflectance_reversed);
+    try std.testing.expect(!decoded.mirrored);
+}
+
+test "reversed raster Micro QR decodes with reflectance metadata" {
+    var cells: [qrz.requiredMicroCells(.m2)]qrz.Cell = undefined;
+    const symbol = try qrz.encodeMicroText(
+        "01234567",
+        .{
+            .min_version = .m2,
+            .max_version = .m2,
+            .ec_level = .l,
+            .boost_ec_level = false,
+            .mask = 1,
+        },
+        &cells,
+    );
+
+    var pixels: [qrz.requiredMicroCells(.m2)]u8 = undefined;
+    _ = try renderRaster(
+        u8,
+        &symbol,
+        &pixels,
+        0,
+        255,
+        .{ .quiet_zone = 0, .reflectance = .reversed },
+    );
+
+    var bits: [qrz.requiredMicroCells(.m2)]bool = undefined;
+    for (pixels, 0..) |pixel, index| bits[index] = pixel == 0;
+
+    var decode_cells: [qrz.requiredMicroCells(.m2)]qrz.Cell = undefined;
+    var output: [32]u8 = undefined;
+    const decoded = try qrz.decodeMicro(
+        &bits,
+        symbol.size,
+        &decode_cells,
+        &output,
+    );
+
+    try std.testing.expectEqualStrings("01234567", output[0..decoded.len]);
+    try std.testing.expect(decoded.reflectance_reversed);
+    try std.testing.expect(!decoded.mirrored);
 }
