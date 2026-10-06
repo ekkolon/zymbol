@@ -37,11 +37,18 @@ pub const Result = struct {
     fnc1: spec.Fnc1,
     structured_append: ?spec.StructuredAppend,
     symbology_modifier: u3,
+    mirrored: bool,
+    reflectance_reversed: bool,
     errors_corrected: u32,
 
     pub fn symbologyIdentifier(self: Result) [3]u8 {
         return .{ ']', 'Q', '0' + @as(u8, self.symbology_modifier) };
     }
+};
+
+const Transform = struct {
+    mirrored: bool = false,
+    reflectance_reversed: bool = false,
 };
 
 pub fn decode(
@@ -66,9 +73,57 @@ pub fn decode(
     const total_codewords = maxCodewords(version);
     if (codeword_scratch.len < total_codewords) return Error.ScratchTooSmall;
 
+    const transforms = [_]Transform{
+        .{},
+        .{ .mirrored = true },
+        .{ .reflectance_reversed = true },
+        .{ .mirrored = true, .reflectance_reversed = true },
+    };
+
+    var canonical_error: ?Error = null;
+    for (transforms, 0..) |transform, index| {
+        const result = decodeTransformed(
+            bits,
+            size,
+            version,
+            transform,
+            cells_scratch,
+            codeword_scratch,
+            data_out,
+        ) catch |err| {
+            if (index == 0) canonical_error = err;
+            if (err == Error.OutputTooSmall) return err;
+            continue;
+        };
+        return result;
+    }
+
+    return canonical_error orelse Error.MalformedDataStream;
+}
+
+fn decodeTransformed(
+    bits: []const bool,
+    size: u16,
+    version: u6,
+    transform: Transform,
+    cells_scratch: []matrix.Cell,
+    codeword_scratch: []u8,
+    data_out: []u8,
+) Error!Result {
+    const cell_count = matrix.requiredCells(version);
+    const total_codewords = maxCodewords(version);
+
     var symbol = matrix.layoutFunctionPatterns(cells_scratch[0..cell_count], version, .m, 0);
-    for (0..cell_count) |index| {
-        symbol.cells[index].dark = bits[index];
+    const side: usize = size;
+    for (0..side) |y| {
+        for (0..side) |x| {
+            const source_index = if (transform.mirrored)
+                x * side + y
+            else
+                y * side + x;
+            symbol.cells[y * side + x].dark =
+                bits[source_index] != transform.reflectance_reversed;
+        }
     }
 
     try validateVersionInfo(&symbol, version);
@@ -132,6 +187,8 @@ pub fn decode(
         .fnc1 = parsed.fnc1,
         .structured_append = parsed.structured_append,
         .symbology_modifier = symbologyModifier(parsed.fnc1, parsed.eci),
+        .mirrored = transform.mirrored,
+        .reflectance_reversed = transform.reflectance_reversed,
         .errors_corrected = errors_corrected,
     };
 }

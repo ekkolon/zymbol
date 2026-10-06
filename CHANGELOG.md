@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added automatic mirrored and reversed-reflectance QR normalization with decode metadata.
+
 - Added an ISO/IEC 18004:2024 conformance ledger and made unresolved normative coverage a v1 blocker.
 - Added a cross-architecture ReleaseSafe portability matrix for core and rendering modules.
 - Added coverage-guided `std.testing.Smith` fuzz targets for decoding, binary round trips, and PNG encoding.
