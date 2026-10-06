@@ -5,6 +5,7 @@ const svg = @import("svg.zig");
 
 pub const Error = error{
     InvalidSymbol,
+    InvalidVersion,
     InvalidDimensions,
     OutputTooSmall,
     SizeOverflow,
@@ -270,6 +271,18 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
     }
 
     try writeChunk(sink, "IEND", &.{});
+}
+
+pub fn requiredBytesForVersion(version: qrz.Version, options: Options) Error!usize {
+    if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
+    if (options.scale == 0) return Error.InvalidDimensions;
+
+    const quiet = try checkedMul(@as(usize, options.quiet_zone), 2);
+    const modules = try checkedAdd(@as(usize, qrz.size(version)), quiet);
+    const side = try checkedMul(modules, @as(usize, options.scale));
+    if (side == 0 or side > std.math.maxInt(u32)) return Error.InvalidDimensions;
+
+    return pngLength(.{ .width = side, .height = side }, options.background == null);
 }
 
 pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
