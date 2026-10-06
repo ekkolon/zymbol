@@ -4,6 +4,7 @@
 
 - Added isolated `qrz_render` raster rendering and built-in PNG/SVG codecs.
 - Added one-call owned PNG/SVG helpers plus allocation-free buffer APIs for WASM and freestanding targets.
+- Added responsive centered SVG output, optional intrinsic sizing, and direct `std.Io.Writer` streaming.
 
 - Added a one-command local release qualification step covering Debug, ReleaseSafe, ReleaseFast, ReleaseSmall, and wasm32-freestanding.
 - Added the v1 public compatibility contract.
