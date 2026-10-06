@@ -86,6 +86,10 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
     try sink.writeUnsigned(side);
     try sink.write(" ");
     try sink.writeUnsigned(side);
+    try sink.write("\" width=\"");
+    try sink.writeUnsigned(side);
+    try sink.write("\" height=\"");
+    try sink.writeUnsigned(side);
     try sink.write("\" shape-rendering=\"crispEdges\">");
 
     if (options.background) |background| {
@@ -178,7 +182,7 @@ test "SVG size query exactly matches rendered bytes" {
     var symbol = testSymbol(&cells);
 
     const expected =
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 23 23\" shape-rendering=\"crispEdges\">" ++
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 23 23\" width=\"23\" height=\"23\" shape-rendering=\"crispEdges\">" ++
         "<path fill=\"#FFFFFF\" d=\"M0 0H23V23H0Z\"/>" ++
         "<path fill=\"#000000\" d=\"M1 1H2V2H1ZM2 2H3V3H2Z\"/></svg>";
 
