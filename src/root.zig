@@ -27,6 +27,7 @@ pub const SymbolFamily = matrix.SymbolFamily;
 pub const Symbol = matrix.Symbol;
 pub const MicroVersion = micro.Version;
 pub const MicroEncodeOptions = micro.Options;
+pub const MicroSegment = micro.Segment;
 pub const MicroError = micro.Error;
 pub const MicroDecodeResult = micro.DecodeResult;
 pub const EncodeOptions = encoder.Options;
@@ -56,6 +57,7 @@ pub const decode = decoder.decode;
 pub const encodeMicroText = micro.encodeText;
 pub const encodeMicroBytes = micro.encodeBytes;
 pub const encodeMicroKanji = micro.encodeKanji;
+pub const encodeMicroSegments = micro.encodeSegments;
 pub const decodeMicro = micro.decode;
 
 pub const AnyDecodeResult = union(SymbolFamily) {
