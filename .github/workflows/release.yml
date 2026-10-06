@@ -24,6 +24,12 @@ jobs:
         with:
           version: 0.17.0
 
+      - name: Require public repository
+        if: ${{ github.event.repository.private }}
+        run: |
+          echo "QRz releases must be published from a public repository."
+          exit 1
+
       - name: Validate release metadata
         run: python3 tools/release.py "${GITHUB_REF_NAME}" --notes-out release-notes.md
 
@@ -53,6 +59,10 @@ jobs:
       - name: Consumer smoke
         working-directory: tests/consumer
         run: zig build test
+
+      - name: Remote package smoke
+        run: |
+          python3 tools/package_smoke.py "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
 
       - name: ZXing interoperability
         run: |
