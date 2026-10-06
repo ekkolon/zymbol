@@ -299,6 +299,65 @@ test "format BCH recovers every corruption within distance three" {
     }
 }
 
+
+test "format BCH never returns the original candidate beyond distance three" {
+    const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
+
+    for (levels) |level| {
+        var mask: u3 = 0;
+        while (true) : (mask += 1) {
+            const expected = FormatInfo{ .level = level, .mask = mask };
+            const codeword = spec.formatInfoBits(level, mask);
+
+            var a: usize = 0;
+            while (a < 12) : (a += 1) {
+                var b = a + 1;
+                while (b < 13) : (b += 1) {
+                    var d = b + 1;
+                    while (d < 14) : (d += 1) {
+                        var e = d + 1;
+                        while (e < 15) : (e += 1) {
+                            const corrupted =
+                                codeword ^
+                                (@as(u15, 1) << @intCast(a)) ^
+                                (@as(u15, 1) << @intCast(b)) ^
+                                (@as(u15, 1) << @intCast(d)) ^
+                                (@as(u15, 1) << @intCast(e));
+
+                            if (nearestFormatCandidate(corrupted)) |candidate| {
+                                try std.testing.expect(!sameFormat(expected, candidate.info));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (mask == 7) break;
+        }
+    }
+}
+
+test "version BCH rejects four corrupted bits in both copies" {
+    var cells: [matrix.requiredCells(7)]matrix.Cell = undefined;
+    var symbol = matrix.layoutFunctionPatterns(&cells, 7, .m, 0);
+
+    for (0..4) |bit_index| {
+        const a = @as(usize, symbol.size) - 11 + bit_index % 3;
+        const b = bit_index / 3;
+
+        const side: usize = symbol.size;
+        const first = b * side + a;
+        const second = a * side + b;
+        symbol.cells[first].dark = !symbol.cells[first].dark;
+        symbol.cells[second].dark = !symbol.cells[second].dark;
+    }
+
+    try std.testing.expectError(
+        Error.InvalidVersionInfo,
+        validateVersionInfo(&symbol, 7),
+    );
+}
+
 fn sameFormat(a: FormatInfo, b: FormatInfo) bool {
     return a.level == b.level and a.mask == b.mask;
 }

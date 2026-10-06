@@ -54,7 +54,7 @@ inline fn gfMulComptime(a: u8, b: u8) u8 {
     return gf.mul(a, b);
 }
 
-fn generatorPolynomial(degree: usize) []const u8 {
+pub fn generatorPolynomial(degree: usize) []const u8 {
     return generators[degree][0..degree];
 }
 
@@ -406,5 +406,51 @@ test "decode corrects the maximum guaranteed number of random byte errors" {
         };
         try testing.expectEqual(num_errors, result.errors);
         try testing.expectEqualSlices(u8, data[0..data_len], block[0..data_len]);
+    }
+}
+
+
+test "decode rejects selected corruptions beyond the guaranteed RS radius" {
+    const degrees = [_]usize{ 7, 10, 13, 15, 16, 17, 18, 20, 22, 24, 26, 28, 30 };
+
+    for (degrees) |degree| {
+        var data: [40]u8 = undefined;
+        for (&data, 0..) |*byte, index| {
+            byte.* = @truncate(index * 29 + degree);
+        }
+
+        var ec: [max_ec_codewords]u8 = undefined;
+        encode(&data, degree, ec[0..degree]);
+
+        var clean: [40 + max_ec_codewords]u8 = undefined;
+        @memcpy(clean[0..data.len], &data);
+        @memcpy(clean[data.len .. data.len + degree], ec[0..degree]);
+        const block_len = data.len + degree;
+        const error_count = degree / 2 + 1;
+
+        var rejected = false;
+        var seed: usize = 1;
+        while (seed <= 128 and !rejected) : (seed += 1) {
+            var block = clean;
+            var used: [40 + max_ec_codewords]bool = @splat(false);
+
+            var injected: usize = 0;
+            while (injected < error_count) : (injected += 1) {
+                var position = (seed * 19 + injected * 17) % block_len;
+                while (used[position]) position = (position + 1) % block_len;
+                used[position] = true;
+
+                var corruption: u8 = @truncate(seed * 31 + injected * 47 + 1);
+                if (corruption == 0) corruption = 1;
+                block[position] ^= corruption;
+            }
+
+            _ = decode(block[0..block_len], degree) catch {
+                rejected = true;
+                continue;
+            };
+        }
+
+        try std.testing.expect(rejected);
     }
 }
