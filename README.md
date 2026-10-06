@@ -116,7 +116,7 @@ const svg = try render.renderSvg(&symbol, &output, .{});
 
 The default quiet zone is four modules. Raster output uses integer module scaling, so module edges stay aligned to pixels. SVG output uses integer coordinates and `shape-rendering="crispEdges"`.
 
-QRz does not write files and does not encode PNG, JPEG, WebP, AVIF, or other raster file formats. Applications can pass the rendered raster buffer to the image codec or UI surface they already use.
+QRz does not write files and does not encode PNG, JPEG, WebP, AVIF, or other raster file formats. Applications can pass the rendered raster buffer to the image codec or UI surface they already use. `examples/png_demo.zig` demonstrates this boundary by encoding the raster output as an 8-bit grayscale PNG and writing `qrz.png` without adding a codec dependency to `qrz_render`.
 
 ## Decoding
 
@@ -166,6 +166,7 @@ zig build test
 zig build wasm
 zig build example
 zig build example-svg
+zig build example-png
 zig build qualify
 ```
 
