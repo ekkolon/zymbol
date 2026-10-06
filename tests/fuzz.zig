@@ -2,12 +2,20 @@ const std = @import("std");
 const qrz = @import("qrz");
 const render = @import("qrz_render");
 
+const release_corpus = [_][]const u8{
+    "\\x00",
+    "\\xff",
+    "QRZ",
+    "\\xaa\\x55\\xaa\\x55\\xaa\\x55\\xaa\\x55",
+    "\\x00\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08\\x09\\x0a\\x0b\\x0c\\x0d\\x0e\\x0f",
+};
+
 const max_cells = qrz.requiredCells(qrz.max_version);
 const max_encode_scratch = qrz.requiredEncodeScratch(qrz.max_version);
 const max_decode_scratch = qrz.requiredDecodeScratch(qrz.max_version);
 
 test "fuzz decoder arbitrary module grids" {
-    try std.testing.fuzz({}, fuzzDecoder, .{});
+    try std.testing.fuzz({}, fuzzDecoder, .{ .corpus = &release_corpus });
 }
 
 fn fuzzDecoder(_: void, smith: *std.testing.Smith) !void {
@@ -36,7 +44,7 @@ fn fuzzDecoder(_: void, smith: *std.testing.Smith) !void {
 }
 
 test "fuzz binary encode decode round trip" {
-    try std.testing.fuzz({}, fuzzBinaryRoundTrip, .{});
+    try std.testing.fuzz({}, fuzzBinaryRoundTrip, .{ .corpus = &release_corpus });
 }
 
 fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
@@ -114,7 +122,7 @@ fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
 }
 
 test "fuzz PNG encoding invariants" {
-    try std.testing.fuzz({}, fuzzPng, .{});
+    try std.testing.fuzz({}, fuzzPng, .{ .corpus = &release_corpus });
 }
 
 fn fuzzPng(_: void, smith: *std.testing.Smith) !void {
@@ -175,7 +183,7 @@ fn fuzzPng(_: void, smith: *std.testing.Smith) !void {
 
 
 test "fuzz ISO control modes" {
-    try std.testing.fuzz({}, fuzzControlModes, .{});
+    try std.testing.fuzz({}, fuzzControlModes, .{ .corpus = &release_corpus });
 }
 
 fn fuzzControlModes(_: void, smith: *std.testing.Smith) !void {
@@ -260,7 +268,7 @@ fn fuzzControlModes(_: void, smith: *std.testing.Smith) !void {
 
 
 test "fuzz Micro QR arbitrary module grids" {
-    try std.testing.fuzz({}, fuzzMicroDecoder, .{});
+    try std.testing.fuzz({}, fuzzMicroDecoder, .{ .corpus = &release_corpus });
 }
 
 fn fuzzMicroDecoder(_: void, smith: *std.testing.Smith) !void {
@@ -287,7 +295,7 @@ fn fuzzMicroDecoder(_: void, smith: *std.testing.Smith) !void {
 }
 
 test "fuzz Micro QR round trip and rendering" {
-    try std.testing.fuzz({}, fuzzMicroRoundTrip, .{});
+    try std.testing.fuzz({}, fuzzMicroRoundTrip, .{ .corpus = &release_corpus });
 }
 
 fn fuzzMicroRoundTrip(_: void, smith: *std.testing.Smith) !void {
@@ -361,7 +369,7 @@ fn fuzzMicroRoundTrip(_: void, smith: *std.testing.Smith) !void {
 
 
 test "fuzz legal Micro QR mode and ECC combinations" {
-    try std.testing.fuzz({}, fuzzMicroModes, .{});
+    try std.testing.fuzz({}, fuzzMicroModes, .{ .corpus = &release_corpus });
 }
 
 fn fuzzMicroModes(_: void, smith: *std.testing.Smith) !void {
@@ -438,7 +446,7 @@ fn fuzzMicroModes(_: void, smith: *std.testing.Smith) !void {
 }
 
 test "fuzz decodeAny hostile sizes and caller buffers" {
-    try std.testing.fuzz({}, fuzzDecodeAnyBoundaries, .{});
+    try std.testing.fuzz({}, fuzzDecodeAnyBoundaries, .{ .corpus = &release_corpus });
 }
 
 fn fuzzDecodeAnyBoundaries(_: void, smith: *std.testing.Smith) !void {
@@ -472,7 +480,7 @@ fn fuzzDecodeAnyBoundaries(_: void, smith: *std.testing.Smith) !void {
 }
 
 test "fuzz BCH recovery within advertised radius" {
-    try std.testing.fuzz({}, fuzzBchRecovery, .{});
+    try std.testing.fuzz({}, fuzzBchRecovery, .{ .corpus = &release_corpus });
 }
 
 fn fuzzBchRecovery(_: void, smith: *std.testing.Smith) !void {
@@ -560,7 +568,7 @@ fn fuzzBchRecovery(_: void, smith: *std.testing.Smith) !void {
 }
 
 test "fuzz SVG serialization invariants" {
-    try std.testing.fuzz({}, fuzzSvg, .{});
+    try std.testing.fuzz({}, fuzzSvg, .{ .corpus = &release_corpus });
 }
 
 fn fuzzSvg(_: void, smith: *std.testing.Smith) !void {
@@ -619,7 +627,7 @@ fn fuzzSvg(_: void, smith: *std.testing.Smith) !void {
 }
 
 test "fuzz renderer undersized output boundaries" {
-    try std.testing.fuzz({}, fuzzRendererBoundaries, .{});
+    try std.testing.fuzz({}, fuzzRendererBoundaries, .{ .corpus = &release_corpus });
 }
 
 fn fuzzRendererBoundaries(_: void, smith: *std.testing.Smith) !void {
