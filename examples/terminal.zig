@@ -70,11 +70,6 @@ pub fn main(init: std.process.Init) !void {
             defer image.deinit();
 
             try writeIterm2(stdout, image.bytes);
-            try writeBlockFallback(stdout);
-            std.log.info(
-                "VS Code renders the PNG only when terminal.integrated.enableImages=true; block QR retained as fallback",
-                .{},
-            );
         },
         .sixel => try writeSixel(stdout),
         .none => {
