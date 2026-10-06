@@ -22,6 +22,22 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&b.addRunArtifact(core_tests).step);
     test_step.dependOn(&b.addRunArtifact(render_tests).step);
 
+    const fuzz_module = b.createModule(.{
+        .root_source_file = b.path("tests/fuzz.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
+    });
+    const fuzz_tests = b.addTest(.{ .root_module = fuzz_module });
+    const run_fuzz_tests = b.addRunArtifact(fuzz_tests);
+    test_step.dependOn(&run_fuzz_tests.step);
+
+    const fuzz_step = b.step("fuzz", "Run QRz coverage-guided fuzz targets");
+    fuzz_step.dependOn(&run_fuzz_tests.step);
+
     const wasm_target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
@@ -177,6 +193,7 @@ pub fn build(b: *std.Build) void {
     qualify_step.dependOn(&svg_example.step);
     qualify_step.dependOn(&png_example.step);
     qualify_step.dependOn(&b.addRunArtifact(terminal_tests).step);
+    qualify_step.dependOn(&run_fuzz_tests.step);
     qualify_step.dependOn(portability_step);
 
     inline for ([_]std.builtin.OptimizeMode{ .Debug, .ReleaseSafe, .ReleaseFast, .ReleaseSmall }) |mode| {
