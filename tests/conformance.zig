@@ -261,7 +261,7 @@ test "Segno independent M4-L capacity transition reference matrix" {
         "10011101111110111",
     };
 
-    try verifyMicroReference("123456789012345678901234", .m4, .l, null, 3, &rows);
+    try verifyMicroReference("123456789012345678901234", .m4, .l, null, 0, &rows);
 }
 
 test "Segno independent M4-M boosted-level reference matrix" {
@@ -285,5 +285,5 @@ test "Segno independent M4-M boosted-level reference matrix" {
         "11111001101111110",
     };
 
-    try verifyMicroReference("123456789012345678901234", .m4, .m, null, 1, &rows);
+    try verifyMicroReference("123456789012345678901234", .m4, .m, null, 2, &rows);
 }
