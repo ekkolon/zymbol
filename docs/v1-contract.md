@@ -1,12 +1,12 @@
 # v1 contract
 
-QRz is an allocation-free QR Code Model 2 encoder and decoder. The v1 public surface is the declarations exported by `src/root.zig`.
+QRz is an allocation-free QR Code Model 2 encoder, decoder and renderer. The v1 public surface is the declarations exported by `src/root.zig` and `src/render/root.zig`.
 
 ## Scope
 
 QRz supports versions 1-40, error-correction levels L/M/Q/H, numeric, alphanumeric, byte, Kanji and ECI segments, all eight masks, Reed-Solomon correction, and caller-owned storage.
 
-QRz accepts and returns module grids. Image acquisition, finder detection, perspective correction, thresholding, rendering and file formats are outside the core library.
+QRz core accepts and returns module grids. Image acquisition, finder detection, perspective correction and thresholding are outside the package. Rendering is provided by the separate `qrz_render` module. File I/O and raster image codecs remain application-owned.
 
 ## Encoding
 
@@ -17,6 +17,16 @@ QRz accepts and returns module grids. Image acquisition, finder detection, persp
 `encodeRaw` is the low-level entry point. Its input must contain exactly the data-codeword count for the selected version and error-correction level.
 
 Encoding never requests an allocator. The caller supplies the module buffer and interleaved-codeword scratch buffer.
+
+## Rendering
+
+`qrz_render` depends on `qrz`; `qrz` does not depend on `qrz_render`.
+
+Raster rendering writes caller-selected pixel values into caller-owned buffers. Tightly packed and strided output are supported. Scaling is integral and the default quiet zone is four modules.
+
+SVG rendering writes compact vector output into a caller-owned byte buffer. The exact required byte count can be queried before rendering.
+
+Neither renderer requests an allocator or performs file I/O. PNG, JPEG, WebP, AVIF and similar codecs are not part of the v1 compatibility contract.
 
 ## Decoding
 
