@@ -13,7 +13,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/render/root.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz", .module = qrz }},
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
     });
 
     const test_step = b.step("test", "Run the test suite");
@@ -52,23 +55,34 @@ pub fn build(b: *std.Build) void {
     wasm_step.dependOn(&b.addInstallArtifact(wasm_render_library, .{}).step);
 
     const example_module = b.createModule(.{
-        .root_source_file = b.path("examples/terminal_demo.zig"),
+        .root_source_file = b.path("examples/terminal.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{.{ .name = "qrz", .module = qrz }},
     });
     const example = b.addExecutable(.{
-        .name = "terminal_demo",
+        .name = "terminal",
         .root_module = example_module,
     });
     const run_example = b.addRunArtifact(example);
     if (b.args) |args| run_example.addArgs(args);
 
-    const example_step = b.step("example", "Run the terminal example");
-    example_step.dependOn(&run_example.step);
+    const terminal_example_step = b.step("example-terminal", "Render QR in the terminal");
+    terminal_example_step.dependOn(&run_example.step);
+
+    const terminal_test_module = b.createModule(.{
+        .root_source_file = b.path("examples/terminal.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
+    });
+    const terminal_tests = b.addTest(.{ .root_module = terminal_test_module });
 
     const svg_example_module = b.createModule(.{
-        .root_source_file = b.path("examples/svg_demo.zig"),
+        .root_source_file = b.path("examples/svg.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -77,16 +91,16 @@ pub fn build(b: *std.Build) void {
         },
     });
     const svg_example = b.addExecutable(.{
-        .name = "svg_demo",
+        .name = "svg",
         .root_module = svg_example_module,
     });
     const run_svg_example = b.addRunArtifact(svg_example);
 
-    const svg_example_step = b.step("example-svg", "Render qrz.svg");
+    const svg_example_step = b.step("example-svg", "Write zig-out/examples/qrz.svg");
     svg_example_step.dependOn(&run_svg_example.step);
 
     const png_example_module = b.createModule(.{
-        .root_source_file = b.path("examples/png_demo.zig"),
+        .root_source_file = b.path("examples/png.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -95,18 +109,19 @@ pub fn build(b: *std.Build) void {
         },
     });
     const png_example = b.addExecutable(.{
-        .name = "png_demo",
+        .name = "png",
         .root_module = png_example_module,
     });
     const run_png_example = b.addRunArtifact(png_example);
 
-    const png_example_step = b.step("example-png", "Render qrz.png");
+    const png_example_step = b.step("example-png", "Write zig-out/examples/qrz.png");
     png_example_step.dependOn(&run_png_example.step);
 
     const qualify_step = b.step("qualify", "Run release qualification");
     qualify_step.dependOn(&example.step);
     qualify_step.dependOn(&svg_example.step);
     qualify_step.dependOn(&png_example.step);
+    qualify_step.dependOn(&b.addRunArtifact(terminal_tests).step);
 
     inline for ([_]std.builtin.OptimizeMode{ .Debug, .ReleaseSafe, .ReleaseFast, .ReleaseSmall }) |mode| {
         const qualification_module = b.createModule(.{
