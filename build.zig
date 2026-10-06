@@ -13,10 +13,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/render/root.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{
-            .{ .name = "qrz", .module = qrz },
-            .{ .name = "qrz_render", .module = qrz_render },
-        },
+        .imports = &.{.{ .name = "qrz", .module = qrz }},
     });
 
     const test_step = b.step("test", "Run the test suite");
@@ -58,7 +55,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("examples/terminal.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz", .module = qrz }},
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
     });
     const example = b.addExecutable(.{
         .name = "terminal",
