@@ -388,7 +388,7 @@ fn fuzzMicroModes(_: void, smith: *std.testing.Smith) !void {
     var bytes: [5]u8 = undefined;
     for (&bytes) |*byte| byte.* = smith.value(u8);
 
-    var kanji = [_]u8{ 0x81, 0x40, 0x81, 0x41 };
+    const kanji = [_]u8{ 0x81, 0x40, 0x81, 0x41 };
 
     const choice: u8 = switch (version) {
         .m1 => 0,
@@ -397,10 +397,10 @@ fn fuzzMicroModes(_: void, smith: *std.testing.Smith) !void {
     };
 
     const segment: qrz.MicroSegment = switch (choice) {
-        0 => .{ .numeric = numeric[0 .. 1 + smith.value(u8) % numeric.len] },
-        1 => .{ .alphanumeric = alpha[0 .. 1 + smith.value(u8) % alpha.len] },
-        2 => .{ .byte = bytes[0 .. 1 + smith.value(u8) % bytes.len] },
-        else => .{ .kanji = kanji[0 .. 2 + 2 * (smith.value(u8) % 2)] },
+        0 => .{ .numeric = numeric[0 .. 1 + @as(usize, smith.value(u8)) % numeric.len] },
+        1 => .{ .alphanumeric = alpha[0 .. 1 + @as(usize, smith.value(u8)) % alpha.len] },
+        2 => .{ .byte = bytes[0 .. 1 + @as(usize, smith.value(u8)) % bytes.len] },
+        else => .{ .kanji = kanji[0 .. 2 + 2 * (@as(usize, smith.value(u8)) % 2)] },
     };
     const segments = [_]qrz.MicroSegment{segment};
 
@@ -645,7 +645,7 @@ fn fuzzRendererBoundaries(_: void, smith: *std.testing.Smith) !void {
     const png_required = render.requiredPngBytes(&symbol, png_options) catch return;
     var png_output: [128 * 1024]u8 = undefined;
     if (png_required <= png_output.len and png_required > 0) {
-        const short_len = @as(usize, smith.value(u32)) % png_required;
+        const short_len = @as(usize, @intCast(smith.value(u32))) % png_required;
         try std.testing.expectError(
             error.OutputTooSmall,
             render.renderPng(&symbol, png_output[0..short_len], png_options),
@@ -658,7 +658,7 @@ fn fuzzRendererBoundaries(_: void, smith: *std.testing.Smith) !void {
     const svg_required = render.requiredSvgBytes(&symbol, svg_options) catch return;
     var svg_output: [64 * 1024]u8 = undefined;
     if (svg_required <= svg_output.len and svg_required > 0) {
-        const short_len = @as(usize, smith.value(u32)) % svg_required;
+        const short_len = @as(usize, @intCast(smith.value(u32))) % svg_required;
         try std.testing.expectError(
             error.OutputTooSmall,
             render.renderSvg(&symbol, svg_output[0..short_len], svg_options),
