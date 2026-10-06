@@ -106,6 +106,10 @@ Status meanings:
 
 ## Independent conformance evidence required
 
+`zig build conformance` is the executable external-reference gate. The current seed corpus is pinned to Segno commit `b11dc2913c22b22b3bc0a6efaa989904c44977bf` and includes ISO-derived QR and Micro QR matrices plus independent M1/M3/M4 regression matrices. Each fixture is checked in both directions available without linking an external runtime: QRz must reproduce the exact external matrix, and QRz must decode that external matrix back to the expected payload and metadata. Fixture provenance is recorded in `tests/reference/README.md`.
+
+This is only the foundation of the v1 evidence set. The missing Annex A/B sweep and independent decoder differential campaign remain release blockers.
+
 Self-round-trips are regression evidence, not sufficient conformance evidence. v1 requires all of the following:
 
 1. Clause-derived golden vectors covering every supported symbol family, mode, version boundary, EC level, mask and special header.
