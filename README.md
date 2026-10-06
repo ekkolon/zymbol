@@ -1,4 +1,4 @@
-# qrz
+# zymbol
 
 QR Code Model 2 and Micro QR for Zig.
 
@@ -33,7 +33,7 @@ After `v1.0.0` is published:
 zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.0.tar.gz
 ```
 
-Add the modules to your application in `build.zig`:
+Add the `zymbol` module to your application in `build.zig`:
 
 ```zig
 const target = b.standardTargetOptions(.{});
@@ -151,7 +151,7 @@ const png = try render.renderPng(&symbol, output[0..required], .{});
 
 SVG supports buffer output and direct `std.Io.Writer` output. Raster rendering supports packed and strided caller-owned pixel buffers.
 
-Advanced Micro QR inputs such as Kanji or explicit segment lists can be encoded with `qrz` and then passed to the same low-level `renderPng`, `renderSvg`, or raster functions.
+Advanced Micro QR inputs such as Kanji or explicit segment lists can be encoded with `zymbol` and then passed to the same low-level `renderPng`, `renderSvg`, or raster functions.
 
 ## API
 
@@ -168,11 +168,11 @@ Manual QR segment construction is available through `BitWriter` and the `append*
 
 ## Memory and I/O
 
-The `qrz` module does not allocate. Callers provide module storage and scratch buffers.
+Zymbol core encoding and decoding do not allocate. Callers provide module storage and scratch buffers.
 
 Low-level `zymbol.render` functions also use caller-owned output buffers. Convenience functions such as `pngText` and `svgText` allocate only through the allocator supplied by the caller.
 
-Neither module opens files, sockets, cameras, or platform graphics APIs.
+Neither the core API nor the render namespace opens files, sockets, cameras, or platform graphics APIs.
 
 ## Conformance
 
