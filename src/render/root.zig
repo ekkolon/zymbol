@@ -7,6 +7,8 @@ const std = @import("std");
 const qrz = @import("qrz");
 const raster = @import("raster.zig");
 const svg = @import("svg.zig");
+const png = @import("png.zig");
+const owned = @import("owned.zig");
 
 const max_render_side: usize = 17 + 4 * @as(usize, qrz.max_version) + 8;
 
@@ -16,7 +18,14 @@ pub const RasterError = raster.Error;
 
 pub const SvgOptions = svg.Options;
 pub const SvgError = svg.Error;
+pub const PngOptions = png.Options;
+pub const PngError = png.Error;
 pub const Rgb = svg.Rgb;
+
+pub const OwnedBytes = owned.OwnedBytes;
+pub const PngEncodeOptions = owned.PngEncodeOptions;
+pub const SvgEncodeOptions = owned.SvgEncodeOptions;
+pub const BufferRequirements = owned.BufferRequirements;
 
 pub const rasterDimensions = raster.dimensions;
 pub const requiredRasterPixels = raster.requiredPixels;
@@ -25,7 +34,25 @@ pub const renderRaster = raster.render;
 pub const renderRasterStrided = raster.renderStrided;
 
 pub const requiredSvgBytes = svg.requiredBytes;
+pub const maxSvgBytesForVersion = svg.maxBytesForVersion;
 pub const renderSvg = svg.render;
+
+pub const requiredPngBytes = png.requiredBytes;
+pub const requiredPngBytesForVersion = png.requiredBytesForVersion;
+pub const renderPng = png.render;
+
+pub const pngRequirements = owned.pngRequirements;
+pub const svgRequirements = owned.svgRequirements;
+
+pub const pngText = owned.pngText;
+pub const pngBytes = owned.pngBytes;
+pub const svgText = owned.svgText;
+pub const svgBytes = owned.svgBytes;
+
+pub const pngTextInto = owned.pngTextInto;
+pub const pngBytesInto = owned.pngBytesInto;
+pub const svgTextInto = owned.svgTextInto;
+pub const svgBytesInto = owned.svgBytesInto;
 
 test {
     std.testing.refAllDecls(@This());
