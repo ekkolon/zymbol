@@ -9,16 +9,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const imports = &.{
-        .{ .name = "qrz", .module = qrz_dep.module("qrz") },
-        .{ .name = "qrz_render", .module = qrz_dep.module("qrz_render") },
-    };
-
     const app = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = imports,
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz_dep.module("qrz") },
+            .{ .name = "qrz_render", .module = qrz_dep.module("qrz_render") },
+        },
     });
 
     const exe = b.addExecutable(.{
