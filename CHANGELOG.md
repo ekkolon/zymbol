@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a reproducible ReleaseFast v1 benchmark suite covering encode/mask selection, decode, Reed-Solomon correction, PNG/SVG rendering, working-set size, and PNG compression baselines.
+
 - Added independent SVG structural validation for QR and Micro QR geometry, colors, transparency, sizing, and reversed reflectance.
 
 - Added an opt-in QEMU runtime portability gate covering 32-bit little-endian x86 and 64-bit big-endian PowerPC64 execution.
