@@ -82,7 +82,7 @@ pub fn build(b: *std.Build) void {
     });
     const run_svg_example = b.addRunArtifact(svg_example);
 
-    const svg_example_step = b.step("example-svg", "Render the SVG example");
+    const svg_example_step = b.step("example-svg", "Render qrz.svg");
     svg_example_step.dependOn(&run_svg_example.step);
 
     const png_example_module = b.createModule(.{
