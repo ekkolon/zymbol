@@ -160,24 +160,21 @@ test "v1 render public API snapshot" {
 }
 
 
-fn expectExactFields(
-    comptime T: type,
+fn expectOrderedNames(
+    comptime fields: anytype,
     comptime expected: []const []const u8,
 ) !void {
-    const fields = comptime std.meta.fields(T);
     try std.testing.expectEqual(expected.len, fields.len);
-
     inline for (expected, 0..) |name, index| {
         try std.testing.expectEqualStrings(name, fields[index].name);
     }
 }
 
-fn expectExactFieldSet(
-    comptime T: type,
+fn expectNameSet(
+    comptime fields: anytype,
     comptime expected: []const []const u8,
 ) !void {
     @setEvalBranchQuota(20_000);
-    const fields = comptime std.meta.fields(T);
     try std.testing.expectEqual(expected.len, fields.len);
 
     inline for (expected) |name| {
@@ -194,6 +191,35 @@ fn expectExactFieldSet(
             if (comptime std.mem.eql(u8, name, field.name)) found = true;
         }
         try std.testing.expect(found);
+    }
+}
+
+fn expectExactFields(
+    comptime T: type,
+    comptime expected: []const []const u8,
+) !void {
+    switch (@typeInfo(T)) {
+        .@"struct" => |info| try expectOrderedNames(info.fields, expected),
+        .@"enum" => |info| try expectOrderedNames(info.fields, expected),
+        .@"union" => |info| try expectOrderedNames(info.fields, expected),
+        else => @compileError("expected struct, enum, or union: " ++ @typeName(T)),
+    }
+}
+
+fn expectExactFieldSet(
+    comptime T: type,
+    comptime expected: []const []const u8,
+) !void {
+    switch (@typeInfo(T)) {
+        .@"struct" => |info| try expectNameSet(info.fields, expected),
+        .@"enum" => |info| try expectNameSet(info.fields, expected),
+        .@"union" => |info| try expectNameSet(info.fields, expected),
+        .error_set => |errors| {
+            const fields = errors orelse
+                @compileError("cannot snapshot the global error set");
+            try expectNameSet(fields, expected);
+        },
+        else => @compileError("expected container or error set: " ++ @typeName(T)),
     }
 }
 
