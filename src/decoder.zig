@@ -345,8 +345,9 @@ test "version BCH rejects four corrupted bits in both copies" {
         const a = @as(usize, symbol.size) - 11 + bit_index % 3;
         const b = bit_index / 3;
 
-        const first = symbol.index(a, b);
-        const second = symbol.index(b, a);
+        const side: usize = symbol.size;
+        const first = b * side + a;
+        const second = a * side + b;
         symbol.cells[first].dark = !symbol.cells[first].dark;
         symbol.cells[second].dark = !symbol.cells[second].dark;
     }
