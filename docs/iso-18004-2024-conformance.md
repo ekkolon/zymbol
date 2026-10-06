@@ -155,9 +155,9 @@ Coverage-guided targets now include:
 - SVG serialization
 - renderer undersized-output boundaries
 
-The fuzz surface is closed for v1. Sustained release campaigns and corpus replay remain required before the release branch is cut.
+The fuzz surface is closed for v1. Every target now has a checked-in seed corpus. Ordinary `zig build fuzz` deterministically replays that corpus, while the sustained release criterion is `zig build fuzz --fuzz=100M --summary all`: 100 million executions per target, approximately 1.4 billion executions across the 14-target suite. The exact acceptance and invalidation rules are documented in `docs/v1-fuzz.md`.
 
-Every discovered crash or invariant violation becomes a permanent regression test. Release qualification must replay the accumulated corpus. Long-running fuzzing is performed separately from the bounded zig build qualify gate.
+Every discovered crash or invariant violation becomes a permanent regression test or checked-in corpus input. Zig's local fuzz cache may accumulate discovered inputs during the campaign, but cache state is not the durable regression mechanism. The sustained campaign remains required before the release branch is cut.
 
 ## PNG correctness and size gate
 
@@ -183,7 +183,7 @@ There is no meaningful finite claim of “all optimizations.” v1 instead uses 
 
 `zig build benchmark` is now wired in ReleaseFast and measures automatic versus fixed-mask QR encoding, QR decode, direct Reed-Solomon correction, PNG/SVG rendering, combined encode+PNG work, caller-owned working-set bytes, and QRz PNG IDAT size against Python zlib levels 6 and 9 on identical raw scanlines. The methodology and acceptance rule are defined in `docs/v1-performance.md`.
 
-Performance closure is **complete** for v1. The WSL/Linux Zig 0.17 ReleaseFast run identified redundant PNG compression work, which was removed for a measured ~64.8% PNG render-latency reduction while independent PNG validation remained green. Automatic mask selection, decode, Reed–Solomon, SVG, working-set size, and PNG compression size were reviewed. A PNG Up-filter experiment was measured and reverted because it worsened both latency and output size. The fixed-Huffman PNG size delta versus zlib-9 is documented as an intentional v1 trade-off in `docs/v1-performance.md`; no universal performance claim is made.
+Performance closure is **complete** for v1. The WSL/Linux Zig 0.17 ReleaseFast run identified redundant PNG compression work, which was removed for a measured ~67.2% PNG render-latency reduction while independent PNG validation remained green. Automatic mask selection, decode, Reed–Solomon, SVG, working-set size, and PNG compression size were reviewed. A PNG Up-filter experiment was measured and reverted because it worsened both latency and output size. The fixed-Huffman PNG size delta versus zlib-9 is documented as an intentional v1 trade-off in `docs/v1-performance.md`; no universal performance claim is made.
 
 ## Release rule
 
