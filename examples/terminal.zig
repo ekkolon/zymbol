@@ -5,6 +5,7 @@ const render = @import("qrz_render");
 const Protocol = enum {
     kitty,
     iterm2,
+    vscode,
     sixel,
     none,
 };
@@ -18,13 +19,6 @@ pub fn main(init: std.process.Init) !void {
 
     const protocol = detectProtocol(init.environ_map);
     std.log.info("terminal image protocol: {s}", .{@tagName(protocol)});
-    if (isVsCode(init.environ_map)) {
-        std.log.info(
-            "VS Code requires terminal.integrated.enableImages=true for inline images",
-            .{},
-        );
-    }
-
     switch (protocol) {
         .kitty => {
             var image = try render.pngText(
@@ -60,6 +54,28 @@ pub fn main(init: std.process.Init) !void {
 
             try writeIterm2(stdout, image.bytes);
         },
+        .vscode => {
+            var image = try render.pngText(
+                init.gpa,
+                "https://example.com/qrz",
+                .{
+                    .encode = .{
+                        .min_version = 6,
+                        .max_version = 6,
+                        .ec_level = .q,
+                    },
+                    .render = .{ .scale = 4 },
+                },
+            );
+            defer image.deinit();
+
+            try writeIterm2(stdout, image.bytes);
+            try writeBlockFallback(stdout);
+            std.log.info(
+                "VS Code renders the PNG only when terminal.integrated.enableImages=true; block QR retained as fallback",
+                .{},
+            );
+        },
         .sixel => try writeSixel(stdout),
         .none => {
             try writeBlockFallback(stdout);
@@ -68,17 +84,6 @@ pub fn main(init: std.process.Init) !void {
     }
 
     try stdout.flush();
-}
-
-fn isVsCode(environ_map: anytype) bool {
-    for (environ_map.keys(), environ_map.values()) |key, value| {
-        if (std.mem.eql(u8, key, "TERM_PROGRAM") and
-            std.mem.eql(u8, value, "vscode"))
-        {
-            return true;
-        }
-    }
-    return false;
 }
 
 fn detectProtocol(environ_map: anytype) Protocol {
@@ -116,7 +121,7 @@ fn detectProtocol(environ_map: anytype) Protocol {
         {
             return .iterm2;
         }
-        if (std.mem.eql(u8, program, "vscode")) return .iterm2;
+        if (std.mem.eql(u8, program, "vscode")) return .vscode;
     }
 
     if (has_mintty) return .iterm2;
