@@ -34,7 +34,14 @@ pub const Result = struct {
     ec_level: spec.EcLevel,
     mask: u3,
     eci: EciState,
+    fnc1: spec.Fnc1,
+    structured_append: ?spec.StructuredAppend,
+    symbology_modifier: u3,
     errors_corrected: u32,
+
+    pub fn symbologyIdentifier(self: Result) [3]u8 {
+        return .{ ']', 'Q', '0' + @as(u8, self.symbology_modifier) };
+    }
 };
 
 pub fn decode(
@@ -122,6 +129,9 @@ pub fn decode(
         .ec_level = format.level,
         .mask = format.mask,
         .eci = parsed.eci,
+        .fnc1 = parsed.fnc1,
+        .structured_append = parsed.structured_append,
+        .symbology_modifier = symbologyModifier(parsed.fnc1, parsed.eci),
         .errors_corrected = errors_corrected,
     };
 }
@@ -295,9 +305,12 @@ fn modeFromBits(bits: u4) ?spec.Mode {
     return switch (bits) {
         1 => .numeric,
         2 => .alphanumeric,
+        3 => .structured_append,
         4 => .byte,
+        5 => .fnc1_first_position,
         7 => .eci,
         8 => .kanji,
+        9 => .fnc1_second_position,
         else => null,
     };
 }
@@ -305,48 +318,127 @@ fn modeFromBits(bits: u4) ?spec.Mode {
 const ParsedStream = struct {
     len: usize,
     eci: EciState,
+    fnc1: spec.Fnc1,
+    structured_append: ?spec.StructuredAppend,
 };
 
 fn readBits(reader: *bitstream.Reader, count: u6) Error!u32 {
     return reader.read(count) catch Error.MalformedDataStream;
 }
 
+fn symbologyModifier(fnc1: spec.Fnc1, eci: EciState) u3 {
+    const has_eci = switch (eci) {
+        .none => false,
+        .assignment, .multiple => true,
+    };
+    return switch (fnc1) {
+        .none => if (has_eci) 2 else 1,
+        .first_position => if (has_eci) 4 else 3,
+        .second_position => if (has_eci) 6 else 5,
+    };
+}
+
+fn pushApplicationIndicator(
+    out: []u8,
+    written: *usize,
+    indicator: spec.ApplicationIndicator,
+) Error!void {
+    switch (indicator) {
+        .numeric => |value| {
+            try push(out, written, '0' + @as(u8, @intCast(value / 10)));
+            try push(out, written, '0' + @as(u8, @intCast(value % 10)));
+        },
+        .letter => |value| try push(out, written, value),
+    }
+}
+
 fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream {
     var reader = bitstream.Reader.init(data);
     var written: usize = 0;
     var eci: EciState = .none;
+    var fnc1: spec.Fnc1 = .none;
+    var structured_append: ?spec.StructuredAppend = null;
+    var saw_any_mode = false;
+    var data_or_eci_started = false;
 
     while (reader.bitsRemaining() >= 4) {
         const mode_bits = try readBits(&reader, 4);
         if (mode_bits == 0) break;
 
         const mode = modeFromBits(@intCast(mode_bits)) orelse return Error.MalformedDataStream;
-        if (mode == .eci) {
-            const assignment = try readEciDesignator(&reader);
-            eci = switch (eci) {
-                .none => .{ .assignment = assignment },
-                .assignment => |current| if (current == assignment)
-                    .{ .assignment = current }
-                else
-                    .multiple,
-                .multiple => .multiple,
-            };
-            continue;
-        }
-
-        const count_bits: u6 = @intCast(spec.charCountBits(mode, version));
-        const character_count: usize = try readBits(&reader, count_bits);
-
         switch (mode) {
-            .numeric => try decodeNumeric(&reader, character_count, out, &written),
-            .alphanumeric => try decodeAlphanumeric(&reader, character_count, out, &written),
-            .byte => try decodeByte(&reader, character_count, out, &written),
-            .kanji => try decodeKanji(&reader, character_count, out, &written),
-            .eci => unreachable,
+            .structured_append => {
+                if (saw_any_mode or structured_append != null) return Error.MalformedDataStream;
+
+                const index: u4 = @intCast(try readBits(&reader, 4));
+                const count_minus_one: u4 = @intCast(try readBits(&reader, 4));
+                const value = spec.StructuredAppend{
+                    .index = index,
+                    .count = @as(u5, count_minus_one) + 1,
+                    .parity = @intCast(try readBits(&reader, 8)),
+                };
+                if (!value.isValid()) return Error.MalformedDataStream;
+                structured_append = value;
+                saw_any_mode = true;
+            },
+            .fnc1_first_position => {
+                if (data_or_eci_started or fnc1 != .none) return Error.MalformedDataStream;
+                fnc1 = .first_position;
+                saw_any_mode = true;
+            },
+            .fnc1_second_position => {
+                if (data_or_eci_started or fnc1 != .none) return Error.MalformedDataStream;
+                const encoded: u8 = @intCast(try readBits(&reader, 8));
+                const indicator = spec.ApplicationIndicator.fromEncoded(encoded) orelse
+                    return Error.MalformedDataStream;
+                fnc1 = .{ .second_position = indicator };
+                try pushApplicationIndicator(out, &written, indicator);
+                saw_any_mode = true;
+            },
+            .eci => {
+                const assignment = try readEciDesignator(&reader);
+                eci = switch (eci) {
+                    .none => .{ .assignment = assignment },
+                    .assignment => |current| if (current == assignment)
+                        .{ .assignment = current }
+                    else
+                        .multiple,
+                    .multiple => .multiple,
+                };
+                saw_any_mode = true;
+                data_or_eci_started = true;
+            },
+            .numeric, .alphanumeric, .byte, .kanji => {
+                const count_bits: u6 = @intCast(spec.charCountBits(mode, version));
+                const character_count: usize = try readBits(&reader, count_bits);
+                const fnc1_active = fnc1 != .none;
+
+                switch (mode) {
+                    .numeric => try decodeNumeric(&reader, character_count, out, &written),
+                    .alphanumeric => try decodeAlphanumeric(
+                        &reader,
+                        character_count,
+                        fnc1_active,
+                        out,
+                        &written,
+                    ),
+                    .byte => try decodeByte(&reader, character_count, out, &written),
+                    .kanji => try decodeKanji(&reader, character_count, out, &written),
+                    else => unreachable,
+                }
+
+                saw_any_mode = true;
+                data_or_eci_started = true;
+            },
         }
     }
 
-    return .{ .len = written, .eci = eci };
+    return .{
+        .len = written,
+        .eci = eci,
+        .fnc1 = fnc1,
+        .structured_append = structured_append,
+    };
 }
 
 fn readEciDesignator(reader: *bitstream.Reader) Error!u21 {
@@ -412,28 +504,79 @@ fn decodeNumeric(
 
 const alphanumeric_charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
 
+fn pushAlphanumeric(
+    out: []u8,
+    written: *usize,
+    character: u8,
+    fnc1_active: bool,
+    pending_percent: *bool,
+) Error!void {
+    if (!fnc1_active) {
+        try push(out, written, character);
+        return;
+    }
+
+    if (character == '%') {
+        if (pending_percent.*) {
+            try push(out, written, '%');
+            pending_percent.* = false;
+        } else {
+            pending_percent.* = true;
+        }
+        return;
+    }
+
+    if (pending_percent.*) {
+        try push(out, written, 0x1D);
+        pending_percent.* = false;
+    }
+    try push(out, written, character);
+}
+
 fn decodeAlphanumeric(
     reader: *bitstream.Reader,
     character_count: usize,
+    fnc1_active: bool,
     out: []u8,
     written: *usize,
 ) Error!void {
     var remaining = character_count;
+    var pending_percent = false;
 
     while (remaining >= 2) {
         const value = try readBits(reader, 11);
         if (value >= 45 * 45) return Error.MalformedDataStream;
 
-        try push(out, written, alphanumeric_charset[value / 45]);
-        try push(out, written, alphanumeric_charset[value % 45]);
+        try pushAlphanumeric(
+            out,
+            written,
+            alphanumeric_charset[value / 45],
+            fnc1_active,
+            &pending_percent,
+        );
+        try pushAlphanumeric(
+            out,
+            written,
+            alphanumeric_charset[value % 45],
+            fnc1_active,
+            &pending_percent,
+        );
         remaining -= 2;
     }
 
     if (remaining == 1) {
         const value = try readBits(reader, 6);
         if (value >= alphanumeric_charset.len) return Error.MalformedDataStream;
-        try push(out, written, alphanumeric_charset[value]);
+        try pushAlphanumeric(
+            out,
+            written,
+            alphanumeric_charset[value],
+            fnc1_active,
+            &pending_percent,
+        );
     }
+
+    if (pending_percent) try push(out, written, 0x1D);
 }
 
 fn decodeByte(
