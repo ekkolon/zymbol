@@ -51,15 +51,17 @@ pub fn requiredPixels(symbol: *const qrz.Symbol, options: Options) Error!usize {
     return checkedMul(size.width, size.height);
 }
 
-fn requiredPixelsForStride(size: Dimensions, stride: usize) Error!usize {
+pub fn requiredPixelsForStride(
+    symbol: *const qrz.Symbol,
+    stride: usize,
+    options: Options,
+) Error!usize {
+    const size = try dimensions(symbol, options);
     if (stride < size.width) return Error.InvalidStride;
-    if (size.height == 0) return 0;
-
-    const preceding_rows = try checkedMul(size.height - 1, stride);
-    return checkedAdd(preceding_rows, size.width);
+    return checkedMul(stride, size.height);
 }
 
-pub fn render(
+pub fn renderStrided(
     comptime Pixel: type,
     symbol: *const qrz.Symbol,
     pixels: []Pixel,
@@ -69,7 +71,7 @@ pub fn render(
     options: Options,
 ) Error!Dimensions {
     const size = try dimensions(symbol, options);
-    const required = try requiredPixelsForStride(size, stride);
+    const required = try requiredPixelsForStride(symbol, stride, options);
     if (pixels.len < required) return Error.OutputTooSmall;
 
     var row: usize = 0;
@@ -121,6 +123,18 @@ pub fn render(
     return size;
 }
 
+pub fn render(
+    comptime Pixel: type,
+    symbol: *const qrz.Symbol,
+    pixels: []Pixel,
+    dark: Pixel,
+    light: Pixel,
+    options: Options,
+) Error!Dimensions {
+    const size = try dimensions(symbol, options);
+    return renderStrided(Pixel, symbol, pixels, size.width, dark, light, options);
+}
+
 fn testSymbol() struct { cells: [4]qrz.Cell, symbol: qrz.Symbol } {
     var cells = [4]qrz.Cell{
         .{ .dark = true },
@@ -160,7 +174,7 @@ test "raster renders scaled modules and preserves stride padding" {
     const stride = size.width + 3;
 
     var pixels: [88]u8 = [_]u8{0xAA} ** 88;
-    _ = try render(u8, &fixture.symbol, &pixels, stride, 0, 255, options);
+    _ = try renderStrided(u8, &fixture.symbol, &pixels, stride, 0, 255, options);
 
     var y: usize = 0;
     while (y < size.height) : (y += 1) {
@@ -190,6 +204,6 @@ test "raster rejects invalid scale and undersized output" {
     var pixels: [1]u8 = undefined;
     try std.testing.expectError(
         Error.OutputTooSmall,
-        render(u8, &fixture.symbol, &pixels, 10, 0, 255, .{}),
+        renderStrided(u8, &fixture.symbol, &pixels, 10, 0, 255, .{}),
     );
 }
