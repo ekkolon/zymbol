@@ -132,7 +132,7 @@ zig build portability cross-compiles both qrz and qrz_render in ReleaseSafe for:
 - macOS: x86_64, AArch64
 - freestanding: wasm32, ARM, RISC-V 32, RISC-V 64
 
-The matrix deliberately includes 32-bit targets and big-endian targets. Compile success is necessary but not sufficient. Native host execution is covered by `zig build qualify`; `zig build runtime-portability -fqemu` additionally executes x86 Linux-musl (32-bit little-endian) and PowerPC64 Linux-musl (64-bit big-endian), exercising QR/Micro encode-decode plus PNG/SVG serialization. The gate is wired but still requires a recorded successful QEMU run before portability is closed.
+The matrix deliberately includes 32-bit targets and big-endian targets. Compile success is necessary but not sufficient. Native host execution is covered by `zig build qualify`; `zig build runtime-portability -fqemu` additionally executes x86 Linux-musl (32-bit little-endian) and PowerPC64 Linux-musl (64-bit big-endian), exercising QR/Micro encode-decode plus PNG/SVG serialization. The QEMU runtime gate passed locally on 2026-10-06 for both targets, closing the representative runtime portability requirement.
 
 Representation widths used by the runtime smoke are compile-time asserted, while endian-sensitive output paths use explicit byte construction rather than native-memory reinterpretation.
 
