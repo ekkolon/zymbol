@@ -46,6 +46,7 @@ fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
 
     const levels = [_]qrz.EcLevel{ .l, .m, .q, .h };
     const level = levels[smith.value(u8) % levels.len];
+    const boost = smith.value(bool);
 
     var cells: [max_cells]qrz.Cell = undefined;
     var encode_scratch: [max_encode_scratch]u8 = undefined;
@@ -53,7 +54,7 @@ fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
         payload[0..len],
         .{
             .ec_level = level,
-            .boost_ec_level = smith.value(bool),
+            .boost_ec_level = boost,
         },
         &cells,
         &encode_scratch,
@@ -74,12 +75,12 @@ fn fuzzBinaryRoundTrip(_: void, smith: *std.testing.Smith) !void {
         &output,
     );
 
-    if (result.len != payload.len) {
-        const prefix_len = @min(payload.len, 16);
+    if (result.len != len) {
+        const prefix_len = @min(len, 16);
         std.debug.print(
             "binary round-trip mismatch: payload_len={} decoded_len={} version={} ec={s} mask={} boost={} prefix={any}\n",
             .{
-                payload.len,
+                len,
                 result.len,
                 symbol.version,
                 @tagName(symbol.ec_level),
