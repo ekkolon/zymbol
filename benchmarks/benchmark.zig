@@ -95,7 +95,7 @@ fn benchEncodeAuto(io: std.Io) !void {
     var elapsed: [samples]u64 = undefined;
 
     for (0..samples) |sample| {
-        const started = try std.Io.Clock.awake.now(io);
+        const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
             const symbol = try qrz.encodeText(
                 &mixed_payload,
@@ -110,8 +110,8 @@ fn benchEncodeAuto(io: std.Io) !void {
             );
             std.mem.doNotOptimizeAway(symbol.mask);
         }
-        const stopped = try std.Io.Clock.awake.now(io);
-        elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
+        const stopped = std.Io.Clock.awake.now(io);
+        elapsed[sample] = @intCast(started.durationTo(stopped).toNanoseconds());
     }
 
     report(
@@ -129,7 +129,7 @@ fn benchEncodeFixed(io: std.Io) !void {
     var elapsed: [samples]u64 = undefined;
 
     for (0..samples) |sample| {
-        const started = try std.Io.Clock.awake.now(io);
+        const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
             const symbol = try qrz.encodeText(
                 &mixed_payload,
@@ -145,8 +145,8 @@ fn benchEncodeFixed(io: std.Io) !void {
             );
             std.mem.doNotOptimizeAway(symbol.mask);
         }
-        const stopped = try std.Io.Clock.awake.now(io);
-        elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
+        const stopped = std.Io.Clock.awake.now(io);
+        elapsed[sample] = @intCast(started.durationTo(stopped).toNanoseconds());
     }
 
     report(
@@ -164,7 +164,7 @@ fn benchDecode(io: std.Io) !void {
     var elapsed: [samples]u64 = undefined;
 
     for (0..samples) |sample| {
-        const started = try std.Io.Clock.awake.now(io);
+        const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
             const result = try qrz.decode(
                 &bits,
@@ -176,8 +176,8 @@ fn benchDecode(io: std.Io) !void {
             std.mem.doNotOptimizeAway(result.errors_corrected);
             std.mem.doNotOptimizeAway(decoded[0]);
         }
-        const stopped = try std.Io.Clock.awake.now(io);
-        elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
+        const stopped = std.Io.Clock.awake.now(io);
+        elapsed[sample] = @intCast(started.durationTo(stopped).toNanoseconds());
     }
 
     report(
@@ -202,7 +202,7 @@ fn benchPng(
     var elapsed: [samples]u64 = undefined;
 
     for (0..samples) |sample| {
-        const started = try std.Io.Clock.awake.now(io);
+        const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
             const result = try render.renderPng(
                 &symbol,
@@ -211,8 +211,8 @@ fn benchPng(
             );
             std.mem.doNotOptimizeAway(result[result.len - 1]);
         }
-        const stopped = try std.Io.Clock.awake.now(io);
-        elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
+        const stopped = std.Io.Clock.awake.now(io);
+        elapsed[sample] = @intCast(started.durationTo(stopped).toNanoseconds());
     }
 
     report(
@@ -234,7 +234,7 @@ fn benchSvg(
     var elapsed: [samples]u64 = undefined;
 
     for (0..samples) |sample| {
-        const started = try std.Io.Clock.awake.now(io);
+        const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
             const result = try render.renderSvg(
                 &symbol,
@@ -243,8 +243,8 @@ fn benchSvg(
             );
             std.mem.doNotOptimizeAway(result[result.len - 1]);
         }
-        const stopped = try std.Io.Clock.awake.now(io);
-        elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
+        const stopped = std.Io.Clock.awake.now(io);
+        elapsed[sample] = @intCast(started.durationTo(stopped).toNanoseconds());
     }
 
     report(
@@ -263,7 +263,7 @@ fn benchEncodePng(io: std.Io) !void {
     var last_len: usize = 0;
 
     for (0..samples) |sample| {
-        const started = try std.Io.Clock.awake.now(io);
+        const started = std.Io.Clock.awake.now(io);
         for (0..iterations) |_| {
             const symbol = try qrz.encodeText(
                 &mixed_payload,
@@ -286,8 +286,8 @@ fn benchEncodePng(io: std.Io) !void {
             last_len = result.len;
             std.mem.doNotOptimizeAway(result[result.len - 1]);
         }
-        const stopped = try std.Io.Clock.awake.now(io);
-        elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
+        const stopped = std.Io.Clock.awake.now(io);
+        elapsed[sample] = @intCast(started.durationTo(stopped).toNanoseconds());
     }
 
     report(
