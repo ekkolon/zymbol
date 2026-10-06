@@ -23,12 +23,12 @@ pub const SvgEncodeOptions = struct {
     render: svg.Options = .{},
 };
 
-pub const MicroPngEncodeOptions = struct {
+pub const PngMicroEncodeOptions = struct {
     encode: qrz.MicroEncodeOptions = .{},
     render: png.Options = .{},
 };
 
-pub const MicroSvgEncodeOptions = struct {
+pub const SvgMicroEncodeOptions = struct {
     encode: qrz.MicroEncodeOptions = .{},
     render: svg.Options = .{},
 };
@@ -79,7 +79,7 @@ fn validateMicroEncodeOptions(options: qrz.MicroEncodeOptions) !void {
     }
 }
 
-pub fn pngMicroRequirements(options: MicroPngEncodeOptions) !BufferRequirements {
+pub fn pngMicroRequirements(options: PngMicroEncodeOptions) !BufferRequirements {
     try validateMicroEncodeOptions(options.encode);
     return .{
         .cells = qrz.requiredMicroCells(options.encode.max_version),
@@ -91,7 +91,7 @@ pub fn pngMicroRequirements(options: MicroPngEncodeOptions) !BufferRequirements 
     };
 }
 
-pub fn svgMicroRequirements(options: MicroSvgEncodeOptions) !BufferRequirements {
+pub fn svgMicroRequirements(options: SvgMicroEncodeOptions) !BufferRequirements {
     try validateMicroEncodeOptions(options.encode);
     return .{
         .cells = qrz.requiredMicroCells(options.encode.max_version),
@@ -254,7 +254,7 @@ pub fn svgBytes(
 pub fn pngMicroText(
     allocator: std.mem.Allocator,
     text: []const u8,
-    options: MicroPngEncodeOptions,
+    options: PngMicroEncodeOptions,
 ) !OwnedBytes {
     var encoded = try MicroEncoded.init(allocator, .{ .text = text }, options.encode);
     defer encoded.deinit();
@@ -264,7 +264,7 @@ pub fn pngMicroText(
 pub fn pngMicroBytes(
     allocator: std.mem.Allocator,
     bytes: []const u8,
-    options: MicroPngEncodeOptions,
+    options: PngMicroEncodeOptions,
 ) !OwnedBytes {
     var encoded = try MicroEncoded.init(allocator, .{ .bytes = bytes }, options.encode);
     defer encoded.deinit();
@@ -274,7 +274,7 @@ pub fn pngMicroBytes(
 pub fn svgMicroText(
     allocator: std.mem.Allocator,
     text: []const u8,
-    options: MicroSvgEncodeOptions,
+    options: SvgMicroEncodeOptions,
 ) !OwnedBytes {
     var encoded = try MicroEncoded.init(allocator, .{ .text = text }, options.encode);
     defer encoded.deinit();
@@ -284,7 +284,7 @@ pub fn svgMicroText(
 pub fn svgMicroBytes(
     allocator: std.mem.Allocator,
     bytes: []const u8,
-    options: MicroSvgEncodeOptions,
+    options: SvgMicroEncodeOptions,
 ) !OwnedBytes {
     var encoded = try MicroEncoded.init(allocator, .{ .bytes = bytes }, options.encode);
     defer encoded.deinit();
@@ -381,7 +381,7 @@ pub fn svgBytesInto(
 
 pub fn pngMicroTextInto(
     text: []const u8,
-    options: MicroPngEncodeOptions,
+    options: PngMicroEncodeOptions,
     cells: []qrz.Cell,
     output: []u8,
 ) ![]const u8 {
@@ -391,7 +391,7 @@ pub fn pngMicroTextInto(
 
 pub fn pngMicroBytesInto(
     bytes: []const u8,
-    options: MicroPngEncodeOptions,
+    options: PngMicroEncodeOptions,
     cells: []qrz.Cell,
     output: []u8,
 ) ![]const u8 {
@@ -401,7 +401,7 @@ pub fn pngMicroBytesInto(
 
 pub fn svgMicroTextInto(
     text: []const u8,
-    options: MicroSvgEncodeOptions,
+    options: SvgMicroEncodeOptions,
     cells: []qrz.Cell,
     output: []u8,
 ) ![]const u8 {
@@ -411,7 +411,7 @@ pub fn svgMicroTextInto(
 
 pub fn svgMicroBytesInto(
     bytes: []const u8,
-    options: MicroSvgEncodeOptions,
+    options: SvgMicroEncodeOptions,
     cells: []qrz.Cell,
     output: []u8,
 ) ![]const u8 {
@@ -555,7 +555,7 @@ test "SVG writer facades match buffered output" {
 
 test "owned and allocation-free Micro QR helpers render PNG and SVG" {
     const allocator = std.testing.allocator;
-    const png_options = MicroPngEncodeOptions{
+    const png_options = PngMicroEncodeOptions{
         .encode = .{
             .min_version = .m2,
             .max_version = .m2,
@@ -587,7 +587,7 @@ test "owned and allocation-free Micro QR helpers render PNG and SVG" {
     );
     try std.testing.expectEqualSlices(u8, owned_png.bytes, into_png);
 
-    const svg_options = MicroSvgEncodeOptions{
+    const svg_options = SvgMicroEncodeOptions{
         .encode = png_options.encode,
     };
     var owned_svg = try svgMicroText(allocator, "12345", svg_options);
