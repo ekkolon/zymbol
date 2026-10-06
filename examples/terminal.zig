@@ -16,7 +16,10 @@ pub fn main(init: std.process.Init) !void {
     var stdout_writer = std.Io.File.stdout().writer(init.io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    switch (detectProtocol(init.environ_map)) {
+    const protocol = detectProtocol(init.environ_map);
+    std.log.info("terminal image protocol: {s}", .{@tagName(protocol)});
+
+    switch (protocol) {
         .kitty => {
             var image = try render.pngText(
                 init.gpa,
@@ -66,12 +69,17 @@ fn detectProtocol(environ_map: anytype) Protocol {
     var term_program: ?[]const u8 = null;
     var has_kitty_window = false;
     var has_windows_terminal = false;
+    var has_mintty = false;
 
     for (environ_map.keys(), environ_map.values()) |key, value| {
         if (std.mem.eql(u8, key, "KITTY_WINDOW_ID")) {
             has_kitty_window = true;
         } else if (std.mem.eql(u8, key, "WT_SESSION")) {
             has_windows_terminal = true;
+        } else if (std.mem.eql(u8, key, "MINTTY_PID") or
+            std.mem.eql(u8, key, "MINTTY_SHORTCUT"))
+        {
+            has_mintty = true;
         } else if (std.mem.eql(u8, key, "TERM")) {
             term = value;
         } else if (std.mem.eql(u8, key, "TERM_PROGRAM")) {
@@ -86,13 +94,15 @@ fn detectProtocol(environ_map: anytype) Protocol {
 
     if (term_program) |program| {
         if (std.mem.eql(u8, program, "iTerm.app") or
-            std.mem.eql(u8, program, "WezTerm"))
+            std.mem.eql(u8, program, "WezTerm") or
+            std.mem.eql(u8, program, "mintty"))
         {
             return .iterm2;
         }
         if (std.mem.eql(u8, program, "vscode")) return .sixel;
     }
 
+    if (has_mintty) return .iterm2;
     if (has_windows_terminal) return .sixel;
     return .none;
 }
@@ -127,7 +137,7 @@ fn writeKitty(writer: *std.Io.Writer, png: []const u8) !void {
 
 fn writeIterm2(writer: *std.Io.Writer, png: []const u8) !void {
     try writer.writeAll(
-        "\x1b]1337;File=inline=1;preserveAspectRatio=1:",
+        "\x1b]1337;File=inline=1;width=auto;height=auto;preserveAspectRatio=1:",
     );
     try writeBase64(writer, png);
     try writer.writeAll("\x07\n");
