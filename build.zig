@@ -51,7 +51,7 @@ pub fn build(b: *std.Build) void {
     wasm_step.dependOn(&b.addInstallArtifact(wasm_library, .{}).step);
     wasm_step.dependOn(&b.addInstallArtifact(wasm_render_library, .{}).step);
 
-    const example_module = b.createModule(.{
+    const terminal_example_module = b.createModule(.{
         .root_source_file = b.path("examples/terminal.zig"),
         .target = target,
         .optimize = optimize,
@@ -60,15 +60,15 @@ pub fn build(b: *std.Build) void {
             .{ .name = "qrz_render", .module = qrz_render },
         },
     });
-    const example = b.addExecutable(.{
+    const terminal_example = b.addExecutable(.{
         .name = "terminal",
-        .root_module = example_module,
+        .root_module = terminal_example_module,
     });
-    const run_example = b.addRunArtifact(example);
-    if (b.args) |args| run_example.addArgs(args);
+    const run_terminal_example = b.addRunArtifact(terminal_example);
+    if (b.args) |args| run_terminal_example.addArgs(args);
 
     const terminal_example_step = b.step("example-terminal", "Render QR in the terminal");
-    terminal_example_step.dependOn(&run_example.step);
+    terminal_example_step.dependOn(&run_terminal_example.step);
 
     const terminal_test_module = b.createModule(.{
         .root_source_file = b.path("examples/terminal.zig"),
@@ -118,7 +118,7 @@ pub fn build(b: *std.Build) void {
     png_example_step.dependOn(&run_png_example.step);
 
     const qualify_step = b.step("qualify", "Run release qualification");
-    qualify_step.dependOn(&example.step);
+    qualify_step.dependOn(&terminal_example.step);
     qualify_step.dependOn(&svg_example.step);
     qualify_step.dependOn(&png_example.step);
     qualify_step.dependOn(&b.addRunArtifact(terminal_tests).step);
