@@ -67,6 +67,24 @@ pub fn build(b: *std.Build) void {
     const example_step = b.step("example", "Run the terminal example");
     example_step.dependOn(&run_example.step);
 
+    const svg_example_module = b.createModule(.{
+        .root_source_file = b.path("examples/svg_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
+    });
+    const svg_example = b.addExecutable(.{
+        .name = "svg_demo",
+        .root_module = svg_example_module,
+    });
+    const run_svg_example = b.addRunArtifact(svg_example);
+
+    const svg_example_step = b.step("example-svg", "Render the SVG example");
+    svg_example_step.dependOn(&run_svg_example.step);
+
     const qualify_step = b.step("qualify", "Run release qualification");
 
     inline for ([_]std.builtin.OptimizeMode{ .Debug, .ReleaseSafe, .ReleaseFast, .ReleaseSmall }) |mode| {
