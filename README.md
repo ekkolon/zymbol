@@ -1,6 +1,6 @@
 # qrz
 
-QR Code Model 2 encoding and decoding for Zig with no runtime dependencies and no mandatory heap allocation.
+QR Code Model 2 and Micro QR encoding and decoding for Zig with no runtime dependencies and no mandatory heap allocation.
 
 QRz separates QR semantics from output formats. `qrz` encodes and decodes symbols; `qrz_render` turns those symbols into raster pixels, SVG, or PNG. Neither module performs file I/O.
 
@@ -8,19 +8,22 @@ QRz separates QR semantics from output formats. `qrz` encodes and decodes symbol
 
 QRz is under v1 conformance stabilization. The public API is not frozen yet. The v1 release is blocked on full software-applicable ISO/IEC 18004:2024 conformance, independent interoperability evidence, portability qualification, fuzzing, and performance closure; see `docs/iso-18004-2024-conformance.md`.
 
-The current implementation covers the Model 2 symbol mechanics used by QR versions 1 through 40:
+The current implementation covers:
 
-- L, M, Q, and H error-correction levels
-- numeric, alphanumeric, byte, kanji, and ECI segments
+- QR Code Model 2 versions 1 through 40 with L/M/Q/H error correction
+- Micro QR M1 through M4 with the legal L/M/Q combinations
+- numeric, alphanumeric, byte, Kanji, ECI, FNC1, Structured Append, and mixed-mode QR streams
+- Micro QR numeric, alphanumeric, byte, Kanji, and explicit mixed segments
 - Reed-Solomon encoding and correction
-- all eight mask patterns
-- UTF-8 text through ECI assignment 26 when required
+- all eight QR masks and all four Micro QR masks
+- mirrored and reversed-reflectance module-grid decoding
+- QR/Micro QR size-based decode autodiscrimination
 - arbitrary binary payloads
 - caller-owned module and codeword buffers
 - allocation-free raster rendering plus built-in SVG and PNG encoding through `qrz_render`
 - `wasm32-freestanding` compilation
 
-The implementation targets the QR Code Model 2 rules in ISO/IEC 18004:2024. Structured Append and FNC1 application semantics are not part of the current high-level API.
+The v1 conformance claim remains blocked until the independent evidence and release gates in `docs/iso-18004-2024-conformance.md` are complete.
 
 ## Encoding text
 
@@ -59,6 +62,27 @@ const symbol = try qrz.encodeBytes(
 ```
 
 `encodeBytes` preserves arbitrary byte values and does not attach text-encoding semantics.
+
+## Micro QR
+
+Micro QR uses explicit M1-M4 versions and the two-module default quiet zone:
+
+```zig
+var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+
+const symbol = try qrz.encodeMicroText(
+    "12345",
+    .{
+        .max_version = .m4,
+        .ec_level = .m,
+    },
+    &cells,
+);
+```
+
+`encodeMicroText` accepts ASCII text. `encodeMicroBytes` accepts arbitrary bytes without attaching character-set semantics. `encodeMicroKanji` accepts Shift-JIS Kanji bytes, and `encodeMicroSegments` exposes explicit mixed numeric/alphanumeric/byte/Kanji construction.
+
+`decodeMicro` decodes an M1-M4 module grid directly. `decodeAny` dispatches between Micro QR and QR Code Model 2 from the unambiguous symbol dimensions.
 
 ## Rendering
 
@@ -178,7 +202,7 @@ const png = try render.pngTextInto(
 
 This keeps the WebAssembly ABI and allocator policy outside QRz while using exactly the same QR and PNG implementation as native code. An application that already has a Zig allocator in WASM can use `pngText`/`svgText` directly instead.
 
-The default quiet zone is four modules. Raster output uses integer module scaling. SVG uses integer coordinates, `shape-rendering="crispEdges"`, and centered aspect-ratio preservation.
+The default quiet zone follows the symbol family: four modules for QR Code and two modules for Micro QR. Raster output uses integer module scaling. SVG uses integer coordinates, `shape-rendering="crispEdges"`, and centered aspect-ratio preservation.
 
 QRz produces PNG/SVG bytes but deliberately does not open files, write sockets, or own browser/DOM integration. Those are application concerns.
 
@@ -195,9 +219,9 @@ const result = try qrz.decode(bits, size, &cells, &scratch, &out);
 const payload = out[0..result.len];
 ```
 
-Malformed data, invalid symbol geometry, unrecoverable Reed-Solomon blocks, and undersized caller buffers are returned as errors.
+Malformed data, invalid symbol geometry, unrecoverable Reed-Solomon blocks, and undersized caller buffers are returned as errors. QR decode results also report FNC1, Structured Append metadata, mirror state, reversed-reflectance state, and the AIM symbology modifier.
 
-`result.eci` is `.none`, `.assignment`, or `.multiple`. QRz returns decoded payload bytes; interpretation of ECI transitions belongs to the caller.
+`result.eci` is `.none`, `.assignment`, or `.multiple`. QRz returns decoded payload bytes; interpretation of ECI transitions belongs to the caller. Micro QR has no ECI mode; its decoder returns raw transmitted bytes and orientation metadata.
 
 ## Manual segments
 
@@ -255,8 +279,9 @@ The intended v1 compatibility contract is documented in `docs/v1-contract.md`. I
 - `src/gf256.zig` — GF(256) arithmetic
 - `src/reed_solomon.zig` — Reed-Solomon encoding and correction
 - `src/bitstream.zig` — bounded MSB-first bit reader/writer
-- `src/segment.zig` — segment packing
-- `src/matrix.zig` — function patterns, data traversal, masks, penalty scoring
+- `src/segment.zig` — QR segment packing and control modes
+- `src/micro.zig` — Micro QR M1-M4 encoding, decoding, masking, ECC, and conformance vectors
+- `src/matrix.zig` — shared symbol cells plus QR function patterns, traversal, masks, and penalty scoring
 - `src/encoder.zig` — version selection, interleaving, symbol construction
 - `src/decoder.zig` — format recovery, deinterleaving, correction, parsing
 - `src/render/` — raster rendering, PNG/SVG codecs, and owned-output conveniences

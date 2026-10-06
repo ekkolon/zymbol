@@ -21,7 +21,7 @@ pub const Rgb = struct {
 };
 
 pub const Options = struct {
-    quiet_zone: u16 = 4,
+    quiet_zone: ?u16 = null,
     foreground: Rgb = Rgb.black,
     background: ?Rgb = Rgb.white,
     explicit_size: ?u32 = null,
@@ -85,15 +85,18 @@ fn writeColor(sink: anytype, color: Rgb) !void {
 }
 
 fn validateSymbol(symbol: *const qrz.Symbol) Error!void {
-    if (!qrz.isValidVersion(symbol.version)) return Error.InvalidSymbol;
-    if (symbol.size != qrz.size(symbol.version)) return Error.InvalidSymbol;
-    if (symbol.cells.len < qrz.requiredCells(symbol.version)) return Error.InvalidSymbol;
+    if (!qrz.isValidSymbol(symbol)) return Error.InvalidSymbol;
+}
+
+fn quietZone(symbol: *const qrz.Symbol, options: Options) u16 {
+    return options.quiet_zone orelse qrz.defaultQuietZone(symbol.family);
 }
 
 fn emit(symbol: *const qrz.Symbol, options: Options, sink: anytype) !void {
     try validateSymbol(symbol);
 
-    const side = @as(usize, symbol.size) + @as(usize, options.quiet_zone) * 2;
+    const quiet = @as(usize, quietZone(symbol, options));
+    const side = @as(usize, symbol.size) + quiet * 2;
     if (options.explicit_size) |size| {
         if (size == 0) return Error.InvalidSize;
     }
@@ -129,7 +132,6 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: anytype) !void {
     try sink.write("\" d=\"");
 
     const modules: usize = symbol.size;
-    const quiet: usize = options.quiet_zone;
 
     var y: usize = 0;
     while (y < modules) : (y += 1) {
@@ -175,14 +177,16 @@ fn decimalDigits(value: usize) usize {
     return digits;
 }
 
-pub fn maxBytesForVersion(version: qrz.Version, options: Options) Error!usize {
-    if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
-    if (options.explicit_size) |size| {
-        if (size == 0) return Error.InvalidSize;
+fn maxBytesForModules(
+    modules: usize,
+    quiet_zone: u16,
+    options: Options,
+) Error!usize {
+    if (options.explicit_size) |explicit| {
+        if (explicit == 0) return Error.InvalidSize;
     }
 
-    const modules: usize = qrz.size(version);
-    const quiet = @as(usize, options.quiet_zone) * 2;
+    const quiet = @as(usize, quiet_zone) * 2;
     if (quiet > std.math.maxInt(usize) - modules) return Error.SizeOverflow;
     const side = modules + quiet;
     const digits = decimalDigits(side);
@@ -200,6 +204,26 @@ pub fn maxBytesForVersion(version: qrz.Version, options: Options) Error!usize {
     const paths = runs * per_run;
     if (paths > std.math.maxInt(usize) - 256) return Error.SizeOverflow;
     return paths + 256;
+}
+
+pub fn maxBytesForVersion(version: qrz.Version, options: Options) Error!usize {
+    if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
+    return maxBytesForModules(
+        qrz.size(version),
+        options.quiet_zone orelse 4,
+        options,
+    );
+}
+
+pub fn maxBytesForMicroVersion(
+    version: qrz.MicroVersion,
+    options: Options,
+) Error!usize {
+    return maxBytesForModules(
+        qrz.microSize(version),
+        options.quiet_zone orelse 2,
+        options,
+    );
 }
 
 pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {

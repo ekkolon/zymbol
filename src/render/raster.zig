@@ -11,7 +11,7 @@ pub const Error = error{
 
 pub const Options = struct {
     scale: u16 = 1,
-    quiet_zone: u16 = 4,
+    quiet_zone: ?u16 = null,
 };
 
 pub const Dimensions = struct {
@@ -30,18 +30,18 @@ fn checkedMul(a: usize, b: usize) Error!usize {
 }
 
 fn validateSymbol(symbol: *const qrz.Symbol) Error!void {
-    if (!qrz.isValidVersion(symbol.version)) return Error.InvalidSymbol;
-    if (symbol.size != qrz.size(symbol.version)) return Error.InvalidSymbol;
+    if (!qrz.isValidSymbol(symbol)) return Error.InvalidSymbol;
+}
 
-    const required = qrz.requiredCells(symbol.version);
-    if (symbol.cells.len < required) return Error.InvalidSymbol;
+fn quietZone(symbol: *const qrz.Symbol, options: Options) u16 {
+    return options.quiet_zone orelse qrz.defaultQuietZone(symbol.family);
 }
 
 pub fn dimensions(symbol: *const qrz.Symbol, options: Options) Error!Dimensions {
     try validateSymbol(symbol);
     if (options.scale == 0) return Error.InvalidScale;
 
-    const quiet = try checkedMul(@as(usize, options.quiet_zone), 2);
+    const quiet = try checkedMul(@as(usize, quietZone(symbol, options)), 2);
     const modules = try checkedAdd(@as(usize, symbol.size), quiet);
     const side = try checkedMul(modules, @as(usize, options.scale));
 
@@ -83,7 +83,7 @@ pub fn renderStrided(
     }
 
     const scale: usize = options.scale;
-    const quiet_pixels = @as(usize, options.quiet_zone) * scale;
+    const quiet_pixels = @as(usize, quietZone(symbol, options)) * scale;
     const modules: usize = symbol.size;
 
     var module_y: usize = 0;

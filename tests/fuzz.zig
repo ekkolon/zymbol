@@ -256,3 +256,104 @@ fn fuzzControlModes(_: void, smith: *std.testing.Smith) !void {
         try std.testing.expect(result.structured_append == null);
     }
 }
+
+
+test "fuzz Micro QR arbitrary module grids" {
+    try std.testing.fuzz({}, fuzzMicroDecoder, .{});
+}
+
+fn fuzzMicroDecoder(_: void, smith: *std.testing.Smith) !void {
+    const versions = [_]qrz.MicroVersion{ .m1, .m2, .m3, .m4 };
+    const version = versions[smith.value(u8) % versions.len];
+    const side = qrz.microSize(version);
+    const cell_count = qrz.requiredMicroCells(version);
+
+    var bits: [qrz.requiredMicroCells(.m4)]bool = undefined;
+    for (bits[0..cell_count]) |*bit| bit.* = smith.value(bool);
+
+    var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    var output: [64]u8 = undefined;
+    const result = qrz.decodeMicro(
+        bits[0..cell_count],
+        side,
+        &cells,
+        &output,
+    ) catch return;
+
+    try std.testing.expectEqual(version, result.version);
+    try std.testing.expect(result.mask <= 3);
+    try std.testing.expect(result.len <= output.len);
+}
+
+test "fuzz Micro QR round trip and rendering" {
+    try std.testing.fuzz({}, fuzzMicroRoundTrip, .{});
+}
+
+fn fuzzMicroRoundTrip(_: void, smith: *std.testing.Smith) !void {
+    var payload: [15]u8 = undefined;
+    const len = @as(usize, smith.value(u8)) % (payload.len + 1);
+    for (payload[0..len]) |*byte| byte.* = smith.value(u8);
+
+    const levels = [_]qrz.EcLevel{ .l, .m, .q };
+    const level = levels[smith.value(u8) % levels.len];
+
+    var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    const symbol = qrz.encodeMicroBytes(
+        payload[0..len],
+        .{
+            .max_version = .m4,
+            .ec_level = level,
+            .boost_ec_level = smith.value(bool),
+        },
+        &cells,
+    ) catch return;
+
+    const mirrored = smith.value(bool);
+    const reflectance_reversed = smith.value(bool);
+    const side: usize = symbol.size;
+    const cell_count = side * side;
+
+    var bits: [qrz.requiredMicroCells(.m4)]bool = undefined;
+    for (0..side) |y| {
+        for (0..side) |x| {
+            const source = if (mirrored)
+                x * side + y
+            else
+                y * side + x;
+            bits[y * side + x] =
+                symbol.cells[source].dark != reflectance_reversed;
+        }
+    }
+
+    var decode_cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    var output: [64]u8 = undefined;
+    const result = try qrz.decodeMicro(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &output,
+    );
+
+    try std.testing.expectEqual(len, result.len);
+    try std.testing.expectEqualSlices(u8, payload[0..len], output[0..result.len]);
+    try std.testing.expectEqual(symbol.version, result.version.number());
+    try std.testing.expectEqual(symbol.ec_level, result.ec_level);
+    try std.testing.expectEqual(@as(u2, @intCast(symbol.mask)), result.mask);
+    try std.testing.expectEqual(mirrored, result.mirrored);
+    try std.testing.expectEqual(reflectance_reversed, result.reflectance_reversed);
+
+    var png_output: [32 * 1024]u8 = undefined;
+    const png = render.renderPng(
+        &symbol,
+        &png_output,
+        .{
+            .scale = 1 + @as(u16, smith.value(u8) % 4),
+        },
+    ) catch return;
+    try std.testing.expect(png.len >= 8);
+    try std.testing.expectEqualSlices(
+        u8,
+        &.{ 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A },
+        png[0..8],
+    );
+}

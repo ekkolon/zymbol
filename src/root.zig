@@ -13,6 +13,7 @@ const segment = @import("segment.zig");
 const matrix = @import("matrix.zig");
 const encoder = @import("encoder.zig");
 const decoder = @import("decoder.zig");
+const micro = @import("micro.zig");
 
 pub const Version = u6;
 pub const EcLevel = spec.EcLevel;
@@ -22,7 +23,13 @@ pub const ApplicationIndicator = spec.ApplicationIndicator;
 pub const Fnc1 = spec.Fnc1;
 pub const Cell = matrix.Cell;
 pub const ModuleKind = matrix.ModuleKind;
+pub const SymbolFamily = matrix.SymbolFamily;
 pub const Symbol = matrix.Symbol;
+pub const MicroVersion = micro.Version;
+pub const MicroEncodeOptions = micro.Options;
+pub const MicroSegment = micro.Segment;
+pub const MicroError = micro.Error;
+pub const MicroDecodeResult = micro.DecodeResult;
 pub const EncodeOptions = encoder.Options;
 pub const EncodeError = encoder.Error;
 pub const DecodeError = decoder.Error;
@@ -46,6 +53,48 @@ pub const encodeText = encoder.encodeText;
 pub const encodeBytes = encoder.encodeBytes;
 pub const encodeRaw = encoder.encodeRaw;
 pub const decode = decoder.decode;
+
+pub const encodeMicroText = micro.encodeText;
+pub const encodeMicroBytes = micro.encodeBytes;
+pub const encodeMicroKanji = micro.encodeKanji;
+pub const encodeMicroSegments = micro.encodeSegments;
+pub const decodeMicro = micro.decode;
+
+pub const AnyDecodeResult = union(SymbolFamily) {
+    qr: DecodeResult,
+    micro_qr: MicroDecodeResult,
+};
+
+pub const DecodeAnyError = DecodeError || MicroError;
+
+pub fn decodeAny(
+    bits: []const bool,
+    symbol_size: u16,
+    cells_scratch: []Cell,
+    codeword_scratch: []u8,
+    data_out: []u8,
+) DecodeAnyError!AnyDecodeResult {
+    if (symbol_size >= 11 and symbol_size <= 17 and (symbol_size & 1) != 0) {
+        return .{
+            .micro_qr = try decodeMicro(
+                bits,
+                symbol_size,
+                cells_scratch,
+                data_out,
+            ),
+        };
+    }
+
+    return .{
+        .qr = try decode(
+            bits,
+            symbol_size,
+            cells_scratch,
+            codeword_scratch,
+            data_out,
+        ),
+    };
+}
 
 pub const min_version = spec.min_version;
 pub const max_version = spec.max_version;
@@ -79,10 +128,46 @@ pub fn dataCodewords(version: Version, level: EcLevel) usize {
     return spec.dataCodewords(version, level);
 }
 
+pub fn microSize(version: MicroVersion) u16 {
+    return micro.size(version);
+}
+
+pub fn requiredMicroCells(version: MicroVersion) usize {
+    return micro.requiredCells(version);
+}
+
+pub fn isValidSymbol(symbol: *const Symbol) bool {
+    const expected_size: u16 = switch (symbol.family) {
+        .qr => if (isValidVersion(symbol.version))
+            size(symbol.version)
+        else
+            return false,
+        .micro_qr => switch (symbol.version) {
+            1 => microSize(.m1),
+            2 => microSize(.m2),
+            3 => microSize(.m3),
+            4 => microSize(.m4),
+            else => return false,
+        },
+    };
+
+    if (symbol.size != expected_size) return false;
+    const required = @as(usize, expected_size) * expected_size;
+    return symbol.cells.len >= required;
+}
+
+pub fn defaultQuietZone(family: SymbolFamily) u16 {
+    return switch (family) {
+        .qr => 4,
+        .micro_qr => 2,
+    };
+}
+
 test {
     std.testing.refAllDecls(@This());
     _ = gf256;
     _ = reed_solomon;
+    _ = micro;
 }
 
 test "public sizing helpers reject invalid versions" {
@@ -955,4 +1040,93 @@ test "decoder normalizes mirrored and reversed reflectance symbols" {
             result.reflectance_reversed,
         );
     }
+}
+
+
+test "decodeAny discriminates QR and Micro QR by symbol geometry" {
+    var micro_cells: [requiredMicroCells(.m2)]Cell = undefined;
+    const micro_symbol = try encodeMicroText(
+        "12345",
+        .{
+            .min_version = .m2,
+            .max_version = .m2,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &micro_cells,
+    );
+
+    var micro_bits: [requiredMicroCells(.m2)]bool = undefined;
+    for (0..micro_bits.len) |index| {
+        micro_bits[index] = micro_symbol.cells[index].dark;
+    }
+
+    var common_cells: [requiredCells(1)]Cell = undefined;
+    var common_scratch: [requiredDecodeScratch(1)]u8 = undefined;
+    var out: [64]u8 = undefined;
+
+    const micro_result = try decodeAny(
+        &micro_bits,
+        micro_symbol.size,
+        &common_cells,
+        &common_scratch,
+        &out,
+    );
+    switch (micro_result) {
+        .micro_qr => |result| {
+            try std.testing.expectEqualSlices(u8, "12345", out[0..result.len]);
+            try std.testing.expectEqual(MicroVersion.m2, result.version);
+        },
+        .qr => return error.TestUnexpectedResult,
+    }
+
+    var qr_cells: [requiredCells(1)]Cell = undefined;
+    var qr_scratch: [requiredEncodeScratch(1)]u8 = undefined;
+    const qr_symbol = try encodeText(
+        "QR",
+        .{
+            .min_version = 1,
+            .max_version = 1,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &qr_cells,
+        &qr_scratch,
+    );
+
+    var qr_bits: [requiredCells(1)]bool = undefined;
+    for (0..qr_bits.len) |index| qr_bits[index] = qr_symbol.cells[index].dark;
+
+    const qr_result = try decodeAny(
+        &qr_bits,
+        qr_symbol.size,
+        &common_cells,
+        &common_scratch,
+        &out,
+    );
+    switch (qr_result) {
+        .qr => |result| {
+            try std.testing.expectEqualSlices(u8, "QR", out[0..result.len]);
+            try std.testing.expectEqual(@as(Version, 1), result.version);
+        },
+        .micro_qr => return error.TestUnexpectedResult,
+    }
+}
+
+test "symbol validation is family aware" {
+    var micro_cells: [requiredMicroCells(.m1)]Cell = undefined;
+    const micro_symbol = try encodeMicroText(
+        "1",
+        .{
+            .min_version = .m1,
+            .max_version = .m1,
+            .boost_ec_level = false,
+        },
+        &micro_cells,
+    );
+    try std.testing.expect(isValidSymbol(&micro_symbol));
+    try std.testing.expectEqual(@as(u16, 2), defaultQuietZone(.micro_qr));
+    try std.testing.expectEqual(@as(u16, 4), defaultQuietZone(.qr));
 }

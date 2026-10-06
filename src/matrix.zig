@@ -14,6 +14,11 @@ pub const ModuleKind = enum(u3) {
     data,
 };
 
+pub const SymbolFamily = enum {
+    qr,
+    micro_qr,
+};
+
 pub const Cell = packed struct(u8) {
     dark: bool = false,
     kind: ModuleKind = .data,
@@ -35,6 +40,7 @@ pub const Symbol = struct {
     cells: []Cell,
     size: u16,
     version: u6,
+    family: SymbolFamily = .qr,
     ec_level: spec.EcLevel,
     mask: u3,
 

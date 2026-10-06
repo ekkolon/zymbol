@@ -13,7 +13,7 @@ pub const Error = error{
 
 pub const Options = struct {
     scale: u16 = 4,
-    quiet_zone: u16 = 4,
+    quiet_zone: ?u16 = null,
     foreground: svg.Rgb = svg.Rgb.black,
     background: ?svg.Rgb = svg.Rgb.white,
 };
@@ -161,7 +161,8 @@ fn pixelIsDark(
     pixel_y: usize,
 ) bool {
     const scale: usize = options.scale;
-    const quiet_pixels = @as(usize, options.quiet_zone) * scale;
+    const quiet_zone = options.quiet_zone orelse qrz.defaultQuietZone(symbol.family);
+    const quiet_pixels = @as(usize, quiet_zone) * scale;
     const symbol_pixels = @as(usize, symbol.size) * scale;
 
     if (pixel_x < quiet_pixels or pixel_y < quiet_pixels) return false;
@@ -275,16 +276,39 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
     try writeChunk(sink, "IEND", &.{});
 }
 
-pub fn requiredBytesForVersion(version: qrz.Version, options: Options) Error!usize {
-    if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
+fn requiredBytesForModules(
+    module_side: u16,
+    quiet_zone: u16,
+    options: Options,
+) Error!usize {
     if (options.scale == 0) return Error.InvalidDimensions;
 
-    const quiet = try checkedMul(@as(usize, options.quiet_zone), 2);
-    const modules = try checkedAdd(@as(usize, qrz.size(version)), quiet);
+    const quiet = try checkedMul(@as(usize, quiet_zone), 2);
+    const modules = try checkedAdd(@as(usize, module_side), quiet);
     const side = try checkedMul(modules, @as(usize, options.scale));
     if (side == 0 or side > std.math.maxInt(u32)) return Error.InvalidDimensions;
 
     return pngLength(.{ .width = side, .height = side }, options.background == null);
+}
+
+pub fn requiredBytesForVersion(version: qrz.Version, options: Options) Error!usize {
+    if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
+    return requiredBytesForModules(
+        qrz.size(version),
+        options.quiet_zone orelse 4,
+        options,
+    );
+}
+
+pub fn requiredBytesForMicroVersion(
+    version: qrz.MicroVersion,
+    options: Options,
+) Error!usize {
+    return requiredBytesForModules(
+        qrz.microSize(version),
+        options.quiet_zone orelse 2,
+        options,
+    );
 }
 
 pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {

@@ -23,6 +23,16 @@ pub const SvgEncodeOptions = struct {
     render: svg.Options = .{},
 };
 
+pub const MicroPngEncodeOptions = struct {
+    encode: qrz.MicroEncodeOptions = .{},
+    render: png.Options = .{},
+};
+
+pub const MicroSvgEncodeOptions = struct {
+    encode: qrz.MicroEncodeOptions = .{},
+    render: svg.Options = .{},
+};
+
 pub const BufferRequirements = struct {
     cells: usize,
     scratch: usize,
@@ -53,6 +63,43 @@ pub fn svgRequirements(options: SvgEncodeOptions) !BufferRequirements {
         .cells = qrz.requiredCells(options.encode.max_version),
         .scratch = qrz.requiredEncodeScratch(options.encode.max_version),
         .output = try svg.maxBytesForVersion(options.encode.max_version, options.render),
+    };
+}
+
+fn validateMicroEncodeOptions(options: qrz.MicroEncodeOptions) !void {
+    if (options.min_version.number() > options.max_version.number()) {
+        return error.InvalidVersionRange;
+    }
+
+    switch (options.ec_level) {
+        .l => {},
+        .m => if (options.max_version == .m1) return error.UnsupportedEcLevel,
+        .q => if (options.max_version != .m4) return error.UnsupportedEcLevel,
+        .h => return error.UnsupportedEcLevel,
+    }
+}
+
+pub fn pngMicroRequirements(options: MicroPngEncodeOptions) !BufferRequirements {
+    try validateMicroEncodeOptions(options.encode);
+    return .{
+        .cells = qrz.requiredMicroCells(options.encode.max_version),
+        .scratch = 0,
+        .output = try png.requiredBytesForMicroVersion(
+            options.encode.max_version,
+            options.render,
+        ),
+    };
+}
+
+pub fn svgMicroRequirements(options: MicroSvgEncodeOptions) !BufferRequirements {
+    try validateMicroEncodeOptions(options.encode);
+    return .{
+        .cells = qrz.requiredMicroCells(options.encode.max_version),
+        .scratch = 0,
+        .output = try svg.maxBytesForMicroVersion(
+            options.encode.max_version,
+            options.render,
+        ),
     };
 }
 
@@ -95,6 +142,42 @@ const Encoded = struct {
 
     fn deinit(self: *Encoded) void {
         self.allocator.free(self.scratch);
+        self.allocator.free(self.cells);
+        self.* = undefined;
+    }
+};
+
+const MicroEncoded = struct {
+    allocator: std.mem.Allocator,
+    cells: []qrz.Cell,
+    symbol: qrz.Symbol,
+
+    fn init(
+        allocator: std.mem.Allocator,
+        payload: Payload,
+        options: qrz.MicroEncodeOptions,
+    ) !MicroEncoded {
+        try validateMicroEncodeOptions(options);
+
+        const cells = try allocator.alloc(
+            qrz.Cell,
+            qrz.requiredMicroCells(options.max_version),
+        );
+        errdefer allocator.free(cells);
+
+        const symbol = switch (payload) {
+            .text => |text| try qrz.encodeMicroText(text, options, cells),
+            .bytes => |bytes| try qrz.encodeMicroBytes(bytes, options, cells),
+        };
+
+        return .{
+            .allocator = allocator,
+            .cells = cells,
+            .symbol = symbol,
+        };
+    }
+
+    fn deinit(self: *MicroEncoded) void {
         self.allocator.free(self.cells);
         self.* = undefined;
     }
@@ -164,6 +247,46 @@ pub fn svgBytes(
     options: SvgEncodeOptions,
 ) !OwnedBytes {
     var encoded = try Encoded.init(allocator, .{ .bytes = bytes }, options.encode);
+    defer encoded.deinit();
+    return renderOwnedSvg(allocator, &encoded.symbol, options.render);
+}
+
+pub fn pngMicroText(
+    allocator: std.mem.Allocator,
+    text: []const u8,
+    options: MicroPngEncodeOptions,
+) !OwnedBytes {
+    var encoded = try MicroEncoded.init(allocator, .{ .text = text }, options.encode);
+    defer encoded.deinit();
+    return renderOwnedPng(allocator, &encoded.symbol, options.render);
+}
+
+pub fn pngMicroBytes(
+    allocator: std.mem.Allocator,
+    bytes: []const u8,
+    options: MicroPngEncodeOptions,
+) !OwnedBytes {
+    var encoded = try MicroEncoded.init(allocator, .{ .bytes = bytes }, options.encode);
+    defer encoded.deinit();
+    return renderOwnedPng(allocator, &encoded.symbol, options.render);
+}
+
+pub fn svgMicroText(
+    allocator: std.mem.Allocator,
+    text: []const u8,
+    options: MicroSvgEncodeOptions,
+) !OwnedBytes {
+    var encoded = try MicroEncoded.init(allocator, .{ .text = text }, options.encode);
+    defer encoded.deinit();
+    return renderOwnedSvg(allocator, &encoded.symbol, options.render);
+}
+
+pub fn svgMicroBytes(
+    allocator: std.mem.Allocator,
+    bytes: []const u8,
+    options: MicroSvgEncodeOptions,
+) !OwnedBytes {
+    var encoded = try MicroEncoded.init(allocator, .{ .bytes = bytes }, options.encode);
     defer encoded.deinit();
     return renderOwnedSvg(allocator, &encoded.symbol, options.render);
 }
@@ -253,6 +376,46 @@ pub fn svgBytesInto(
     output: []u8,
 ) ![]const u8 {
     const symbol = try qrz.encodeBytes(bytes, options.encode, cells, scratch);
+    return svg.render(&symbol, output, options.render);
+}
+
+pub fn pngMicroTextInto(
+    text: []const u8,
+    options: MicroPngEncodeOptions,
+    cells: []qrz.Cell,
+    output: []u8,
+) ![]const u8 {
+    const symbol = try qrz.encodeMicroText(text, options.encode, cells);
+    return png.render(&symbol, output, options.render);
+}
+
+pub fn pngMicroBytesInto(
+    bytes: []const u8,
+    options: MicroPngEncodeOptions,
+    cells: []qrz.Cell,
+    output: []u8,
+) ![]const u8 {
+    const symbol = try qrz.encodeMicroBytes(bytes, options.encode, cells);
+    return png.render(&symbol, output, options.render);
+}
+
+pub fn svgMicroTextInto(
+    text: []const u8,
+    options: MicroSvgEncodeOptions,
+    cells: []qrz.Cell,
+    output: []u8,
+) ![]const u8 {
+    const symbol = try qrz.encodeMicroText(text, options.encode, cells);
+    return svg.render(&symbol, output, options.render);
+}
+
+pub fn svgMicroBytesInto(
+    bytes: []const u8,
+    options: MicroSvgEncodeOptions,
+    cells: []qrz.Cell,
+    output: []u8,
+) ![]const u8 {
+    const symbol = try qrz.encodeMicroBytes(bytes, options.encode, cells);
     return svg.render(&symbol, output, options.render);
 }
 
@@ -387,4 +550,49 @@ test "SVG writer facades match buffered output" {
     );
 
     try std.testing.expectEqualStrings(buffered.bytes, writer_storage_into[0..writer_into.end]);
+}
+
+
+test "owned and allocation-free Micro QR helpers render PNG and SVG" {
+    const allocator = std.testing.allocator;
+    const png_options = MicroPngEncodeOptions{
+        .encode = .{
+            .min_version = .m2,
+            .max_version = .m2,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        .render = .{ .scale = 1 },
+    };
+
+    var owned_png = try pngMicroText(allocator, "12345", png_options);
+    defer owned_png.deinit();
+    try std.testing.expectEqualSlices(
+        u8,
+        &.{ 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A },
+        owned_png.bytes[0..8],
+    );
+
+    const required = try pngMicroRequirements(png_options);
+    try std.testing.expectEqual(@as(usize, 0), required.scratch);
+
+    var cells: [qrz.requiredMicroCells(.m2)]qrz.Cell = undefined;
+    var png_output: [8192]u8 = undefined;
+    const into_png = try pngMicroTextInto(
+        "12345",
+        png_options,
+        &cells,
+        &png_output,
+    );
+    try std.testing.expectEqualSlices(u8, owned_png.bytes, into_png);
+
+    const svg_options = MicroSvgEncodeOptions{
+        .encode = png_options.encode,
+    };
+    var owned_svg = try svgMicroText(allocator, "12345", svg_options);
+    defer owned_svg.deinit();
+    try std.testing.expect(
+        std.mem.indexOf(u8, owned_svg.bytes, "viewBox=\"0 0 17 17\"") != null,
+    );
 }
