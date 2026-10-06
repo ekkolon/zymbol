@@ -648,3 +648,87 @@ test "invalid alphanumeric values are rejected" {
         parseDataStream(writer.filled(), 1, &out),
     );
 }
+
+
+test "FNC1 first position applies alphanumeric percent semantics" {
+    var bytes: [16]u8 = undefined;
+    var writer = bitstream.Writer.init(&bytes);
+    try segment.appendFnc1(&writer, .first_position);
+    try segment.appendAlphanumeric(&writer, 1, "ABC%DEF%%G");
+    try segment.finalize(&writer);
+
+    var out: [16]u8 = undefined;
+    const parsed = try parseDataStream(&bytes, 1, &out);
+    try std.testing.expectEqualSlices(u8, "ABC\x1DDEF%G", out[0..parsed.len]);
+    try std.testing.expect(!parsed.fnc1.isNone());
+}
+
+test "FNC1 second position validates and transmits application indicator" {
+    var bytes: [16]u8 = undefined;
+    var writer = bitstream.Writer.init(&bytes);
+    try segment.appendFnc1(&writer, .{ .second_position = .{ .numeric = 7 } });
+    try segment.appendByte(&writer, 1, "A");
+    try segment.finalize(&writer);
+
+    var out: [8]u8 = undefined;
+    const parsed = try parseDataStream(&bytes, 1, &out);
+    try std.testing.expectEqualSlices(u8, "07A", out[0..parsed.len]);
+    switch (parsed.fnc1) {
+        .second_position => |indicator| switch (indicator) {
+            .numeric => |value| try std.testing.expectEqual(@as(u7, 7), value),
+            else => return error.TestUnexpectedResult,
+        },
+        else => return error.TestUnexpectedResult,
+    }
+}
+
+test "structured append metadata is preserved by the parser" {
+    var bytes: [16]u8 = undefined;
+    var writer = bitstream.Writer.init(&bytes);
+    try segment.appendStructuredAppend(
+        &writer,
+        .{ .index = 2, .count = 4, .parity = 0xA5 },
+    );
+    try segment.appendByte(&writer, 1, "X");
+    try segment.finalize(&writer);
+
+    var out: [8]u8 = undefined;
+    const parsed = try parseDataStream(&bytes, 1, &out);
+    try std.testing.expectEqualSlices(u8, "X", out[0..parsed.len]);
+    const structured = parsed.structured_append orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(u4, 2), structured.index);
+    try std.testing.expectEqual(@as(u5, 4), structured.count);
+    try std.testing.expectEqual(@as(u8, 0xA5), structured.parity);
+}
+
+test "structured append must be the first mode" {
+    var bytes: [16]u8 = undefined;
+    var writer = bitstream.Writer.init(&bytes);
+    try segment.appendByte(&writer, 1, "A");
+    try segment.appendStructuredAppend(
+        &writer,
+        .{ .index = 0, .count = 2, .parity = 0 },
+    );
+    try segment.finalize(&writer);
+
+    var out: [8]u8 = undefined;
+    try std.testing.expectError(
+        Error.MalformedDataStream,
+        parseDataStream(&bytes, 1, &out),
+    );
+}
+
+test "FNC1 must precede ECI and payload modes" {
+    var bytes: [16]u8 = undefined;
+    var writer = bitstream.Writer.init(&bytes);
+    try segment.appendEci(&writer, 26);
+    try segment.appendFnc1(&writer, .first_position);
+    try segment.appendByte(&writer, 1, "A");
+    try segment.finalize(&writer);
+
+    var out: [8]u8 = undefined;
+    try std.testing.expectError(
+        Error.MalformedDataStream,
+        parseDataStream(&bytes, 1, &out),
+    );
+}
