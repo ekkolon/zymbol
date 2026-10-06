@@ -6,7 +6,7 @@ const data_len = 120;
 const ec_len = 30;
 const iterations = 2000;
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     var original: [data_len + ec_len]u8 = undefined;
     for (original[0..data_len], 0..) |*byte, index| {
         byte.* = @truncate(index * 37 + 11);
@@ -15,7 +15,7 @@ pub fn main() !void {
 
     var elapsed: [samples]u64 = undefined;
     for (0..samples) |sample| {
-        var timer = try std.time.Timer.start();
+        const started = try std.Io.Clock.awake.now(init.io);
         for (0..iterations) |_| {
             var block = original;
             corrupt(&block);
@@ -23,7 +23,8 @@ pub fn main() !void {
             std.mem.doNotOptimizeAway(result.errors);
             std.mem.doNotOptimizeAway(block[0]);
         }
-        elapsed[sample] = timer.read();
+                const stopped = try std.Io.Clock.awake.now(init.io);
+        elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
     }
 
     std.mem.sort(u64, &elapsed, {}, std.sort.asc(u64));
