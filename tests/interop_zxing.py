@@ -40,12 +40,13 @@ def render_modules(modules, side, quiet_zone, scale=4):
                 row = (top + dy) * width + left
                 pixels[row : row + scale] = b"\x00" * scale
 
-    return zxingcpp.ImageView(
+    view = zxingcpp.ImageView(
         memoryview(pixels),
         width,
         width,
         zxingcpp.ImageFormat.Lum,
     )
+    return pixels, view
 
 
 def check_qrz_to_zxing(driver):
@@ -61,7 +62,7 @@ def check_qrz_to_zxing(driver):
             else zxingcpp.BarcodeFormat.MicroQRCode
         )
         quiet_zone = 4 if family == "Q" else 2
-        view = render_modules(modules, side, quiet_zone)
+        pixels, view = render_modules(modules, side, quiet_zone)
         result = zxingcpp.read_barcode(
             view,
             formats=[expected_format],
