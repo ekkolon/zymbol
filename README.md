@@ -277,7 +277,7 @@ The package currently supports Zig 0.16.0 as its minimum version. Release fuzzin
 
 > **VS Code terminal:** enable `terminal.integrated.enableImages` in Settings to display the actual inline PNG. VS Code does not expose that setting to child processes, so QRz cannot detect when it is disabled.
 
-The intended v1 compatibility contract is documented in `docs/v1-contract.md`. Fuzz release qualification is defined in `docs/v1-fuzz.md`. ISO/IEC 18004:2024 release blockers and evidence requirements are tracked in `docs/iso-18004-2024-conformance.md`.
+The intended v1 compatibility contract is documented in `docs/v1-contract.md`. Final release gates are in `docs/v1-release-checklist.md`; fuzz qualification is defined in `docs/v1-fuzz.md`, and ISO/IEC 18004:2024 evidence is tracked in `docs/iso-18004-2024-conformance.md`.
 
 ## Source layout
 
