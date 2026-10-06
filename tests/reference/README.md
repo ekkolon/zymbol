@@ -14,7 +14,7 @@ Current fixtures:
 - `tests/ref_matrix/iso-fig-1.txt`: QR Code Symbol, QR version 1-M.
 - `tests/ref_matrix/iso-i2.txt`: 01234567, QR version 1-M, mask 2.
 - `tests/ref_matrix/iso-i3.txt`: 01234567, Micro QR M2-L.
-- ISO Structured Append sequence: four version 1-M, mask 4 matrices from Segno `seq-iso-04-01` through `seq-iso-04-04`, reproduced inline in `tests/conformance.zig`.
+- ISO-derived Structured Append sequence: four version 1-M, mask 4 matrices from Segno `seq-iso-04-01` through `seq-iso-04-04`, reproduced inline in `tests/conformance.zig`. Symbols 1-2 are exact encode/decode goldens. Symbols 3-4 are decode/interoperability fixtures only because the pinned Segno encoder exhibits the known byte-aligned padding defect documented in `heuer/segno#148`; QRz separately checks the standards-correct final `0xEC` pad codeword for those aligned streams.
 - `tests/ref_matrix/issue-33-m1-12345.txt`: Micro QR M1.
 - `tests/ref_matrix/issue-33-m3-l-12345678901234567890123.txt`: Micro QR M3-L maximum numeric payload.
 - `tests/ref_matrix/issue-33-m3-l-to-m4-l-jump.txt`: Micro QR M4-L capacity transition.
