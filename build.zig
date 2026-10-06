@@ -9,10 +9,18 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const qrz_render = b.addModule("qrz_render", .{
+        .root_source_file = b.path("src/render/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "qrz", .module = qrz }},
+    });
 
     const test_step = b.step("test", "Run the test suite");
-    const tests = b.addTest(.{ .root_module = qrz });
-    test_step.dependOn(&b.addRunArtifact(tests).step);
+    const core_tests = b.addTest(.{ .root_module = qrz });
+    const render_tests = b.addTest(.{ .root_module = qrz_render });
+    test_step.dependOn(&b.addRunArtifact(core_tests).step);
+    test_step.dependOn(&b.addRunArtifact(render_tests).step);
 
     const wasm_target = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
@@ -28,8 +36,20 @@ pub fn build(b: *std.Build) void {
         .root_module = wasm_module,
         .linkage = .static,
     });
-    const wasm_step = b.step("wasm", "Compile qrz for wasm32-freestanding");
+    const wasm_render_module = b.createModule(.{
+        .root_source_file = b.path("src/render/root.zig"),
+        .target = wasm_target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "qrz", .module = wasm_module }},
+    });
+    const wasm_render_library = b.addLibrary(.{
+        .name = "qrz_render",
+        .root_module = wasm_render_module,
+        .linkage = .static,
+    });
+    const wasm_step = b.step("wasm", "Compile qrz and qrz_render for wasm32-freestanding");
     wasm_step.dependOn(&b.addInstallArtifact(wasm_library, .{}).step);
+    wasm_step.dependOn(&b.addInstallArtifact(wasm_render_library, .{}).step);
 
     const example_module = b.createModule(.{
         .root_source_file = b.path("examples/terminal_demo.zig"),
@@ -59,6 +79,17 @@ pub fn build(b: *std.Build) void {
             .root_module = qualification_module,
         });
         qualify_step.dependOn(&b.addRunArtifact(qualification_tests).step);
+
+        const qualification_render_module = b.createModule(.{
+            .root_source_file = b.path("src/render/root.zig"),
+            .target = target,
+            .optimize = mode,
+            .imports = &.{.{ .name = "qrz", .module = qualification_module }},
+        });
+        const qualification_render_tests = b.addTest(.{
+            .root_module = qualification_render_module,
+        });
+        qualify_step.dependOn(&b.addRunArtifact(qualification_render_tests).step);
     }
 
     const qualification_wasm_module = b.createModule(.{
@@ -72,4 +103,17 @@ pub fn build(b: *std.Build) void {
         .linkage = .static,
     });
     qualify_step.dependOn(&qualification_wasm.step);
+
+    const qualification_wasm_render_module = b.createModule(.{
+        .root_source_file = b.path("src/render/root.zig"),
+        .target = wasm_target,
+        .optimize = .ReleaseFast,
+        .imports = &.{.{ .name = "qrz", .module = qualification_wasm_module }},
+    });
+    const qualification_wasm_render = b.addLibrary(.{
+        .name = "qrz-render-qualification",
+        .root_module = qualification_wasm_render_module,
+        .linkage = .static,
+    });
+    qualify_step.dependOn(&qualification_wasm_render.step);
 }
