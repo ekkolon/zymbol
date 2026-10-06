@@ -19,8 +19,22 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run the test suite");
     const core_tests = b.addTest(.{ .root_module = qrz });
     const render_tests = b.addTest(.{ .root_module = qrz_render });
+
+    const public_api_module = b.createModule(.{
+        .root_source_file = b.path("tests/public_api.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "qrz", .module = qrz },
+            .{ .name = "qrz_render", .module = qrz_render },
+        },
+    });
+    const public_api_tests = b.addTest(.{ .root_module = public_api_module });
+    const run_public_api_tests = b.addRunArtifact(public_api_tests);
+
     test_step.dependOn(&b.addRunArtifact(core_tests).step);
     test_step.dependOn(&b.addRunArtifact(render_tests).step);
+    test_step.dependOn(&run_public_api_tests.step);
 
     const conformance_module = b.createModule(.{
         .root_source_file = b.path("tests/conformance.zig"),
@@ -458,6 +472,7 @@ pub fn build(b: *std.Build) void {
     qualify_step.dependOn(&run_conformance_tests.step);
     qualify_step.dependOn(&run_bch_conformance_tests.step);
     qualify_step.dependOn(&run_rs_conformance_tests.step);
+    qualify_step.dependOn(&run_public_api_tests.step);
     qualify_step.dependOn(&terminal_example.step);
     qualify_step.dependOn(&svg_example.step);
     qualify_step.dependOn(&png_example.step);
