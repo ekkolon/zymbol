@@ -299,7 +299,7 @@ test "external QR data capacities match all versions and EC levels" {
     var version: qrz.Version = 1;
     while (version <= qrz.max_version) : (version += 1) {
         for (levels, 0..) |level, level_index| {
-            const expected = qr_tables.qr_data_codewords[version - 1][level_index];
+            const expected: usize = qr_tables.qr_data_codewords[version - 1][level_index];
             try std.testing.expectEqual(expected, qrz.dataCodewords(version, level));
         }
     }
