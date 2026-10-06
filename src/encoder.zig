@@ -319,14 +319,18 @@ pub fn encodeRaw(
     matrix.drawCodewords(&symbol, codeword_scratch[0..total_codewords]);
 
     const chosen_mask = forced_mask orelse blk: {
+        // ISO/IEC 18004 selects the data mask before format/version
+        // information is generated. Keep those reserved modules light while
+        // evaluating the eight masked candidates, then finalize metadata only
+        // after the winning mask has been selected.
+        matrix.clearMaskEvaluationMetadata(&symbol);
+
         var best_mask: u3 = 0;
         var best_penalty: i32 = std.math.maxInt(i32);
         var mask: u3 = 0;
 
         while (true) : (mask += 1) {
             matrix.applyMask(&symbol, mask);
-            symbol.mask = mask;
-            matrix.drawFormatInfo(&symbol);
 
             const penalty = matrix.penaltyScore(&symbol);
             if (penalty < best_penalty) {
@@ -342,7 +346,7 @@ pub fn encodeRaw(
 
     symbol.mask = chosen_mask;
     matrix.applyMask(&symbol, chosen_mask);
-    matrix.drawFormatInfo(&symbol);
+    matrix.drawSymbolMetadata(&symbol);
     return symbol;
 }
 

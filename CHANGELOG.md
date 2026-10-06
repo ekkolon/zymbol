@@ -6,6 +6,7 @@
 - Added Micro QR PNG/SVG owned and caller-buffer helpers.
 - Added FNC1 first/second position, Structured Append, transmitted metadata, and AIM QR symbology modifiers.
 - Added mirror and reversed-reflectance normalization for QR and Micro QR decoding.
+- Added an independent `zig build conformance` gate with pinned ISO-derived QR/Micro reference matrices and bidirectional fixture checks.
 
 - Added automatic mirrored and reversed-reflectance QR normalization with decode metadata.
 

@@ -181,8 +181,7 @@ pub fn layoutFunctionPatterns(cells: []Cell, version: u6, ec_level: spec.EcLevel
     }
 
     var symbol = Symbol{ .cells = cells, .size = size, .version = version, .ec_level = ec_level, .mask = mask };
-    drawFormatInfo(&symbol);
-    if (version >= 7) drawVersionInfo(&symbol);
+    drawSymbolMetadata(&symbol);
     return symbol;
 }
 
@@ -208,6 +207,25 @@ pub fn drawFormatInfo(symbol: *Symbol) void {
     while (idx < 8) : (idx += 1) set(symbol.cells, symbol.size, size - 1 - @as(i32, idx), 8, bitAt(bits, idx), .format);
     idx = 8;
     while (idx < 15) : (idx += 1) set(symbol.cells, symbol.size, 8, size - 15 + @as(i32, idx), bitAt(bits, idx), .format);
+}
+
+pub fn clearMaskEvaluationMetadata(symbol: *Symbol) void {
+    for (symbol.cells) |*cell| {
+        if (cell.kind == .format or
+            cell.kind == .version or
+            cell.kind == .dark_module)
+        {
+            cell.dark = false;
+        }
+    }
+}
+
+pub fn drawSymbolMetadata(symbol: *Symbol) void {
+    for (symbol.cells) |*cell| {
+        if (cell.kind == .dark_module) cell.dark = true;
+    }
+    drawFormatInfo(symbol);
+    if (symbol.version >= 7) drawVersionInfo(symbol);
 }
 
 fn drawVersionInfo(symbol: *Symbol) void {
@@ -320,18 +338,67 @@ const penalty_n2: i32 = 3;
 const penalty_n3: i32 = 40;
 const penalty_n4: i32 = 10;
 
+fn finderPenaltyLine(symbol: *const Symbol, line: usize, horizontal: bool) i32 {
+    const side: usize = symbol.size;
+    if (side < 11) return 0;
+
+    const core = [_]bool{ true, false, true, true, true, false, true };
+    var result: i32 = 0;
+    var start: usize = 0;
+
+    while (start + core.len <= side) : (start += 1) {
+        var matches = true;
+        for (core, 0..) |expected, offset| {
+            const x = if (horizontal) start + offset else line;
+            const y = if (horizontal) line else start + offset;
+            if (isDarkUnchecked(symbol, x, y) != expected) {
+                matches = false;
+                break;
+            }
+        }
+        if (!matches) continue;
+
+        var before_light = false;
+        if (start >= 4) {
+            before_light = true;
+            var index = start - 4;
+            while (index < start) : (index += 1) {
+                const x = if (horizontal) index else line;
+                const y = if (horizontal) line else index;
+                if (isDarkUnchecked(symbol, x, y)) {
+                    before_light = false;
+                    break;
+                }
+            }
+        }
+
+        var after_light = false;
+        if (start + core.len + 4 <= side) {
+            after_light = true;
+            var index = start + core.len;
+            while (index < start + core.len + 4) : (index += 1) {
+                const x = if (horizontal) index else line;
+                const y = if (horizontal) line else index;
+                if (isDarkUnchecked(symbol, x, y)) {
+                    after_light = false;
+                    break;
+                }
+            }
+        }
+
+        if (before_light or after_light) result += penalty_n3;
+    }
+
+    return result;
+}
+
 pub fn penaltyScore(symbol: *const Symbol) i32 {
     var result: i32 = 0;
     const size = symbol.size;
-    const finder_left: u11 = 0b10111010000;
-    const finder_right: u11 = 0b00001011101;
-    const finder_mask: u11 = 0x7FF;
-
     var y: usize = 0;
     while (y < size) : (y += 1) {
         var run_color = false;
         var run_len: i32 = 0;
-        var window: u11 = 0;
 
         var x: usize = 0;
         while (x < size) : (x += 1) {
@@ -344,19 +411,15 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
                 run_color = dark;
                 run_len = 1;
             }
-
-            window = ((window << 1) & finder_mask) | @as(u11, @intFromBool(dark));
-            if (x >= 10 and (window == finder_left or window == finder_right)) {
-                result += penalty_n3;
-            }
         }
+
+        result += finderPenaltyLine(symbol, y, true);
     }
 
     var x: usize = 0;
     while (x < size) : (x += 1) {
         var run_color = false;
         var run_len: i32 = 0;
-        var window: u11 = 0;
 
         y = 0;
         while (y < size) : (y += 1) {
@@ -369,12 +432,9 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
                 run_color = dark;
                 run_len = 1;
             }
-
-            window = ((window << 1) & finder_mask) | @as(u11, @intFromBool(dark));
-            if (y >= 10 and (window == finder_left or window == finder_right)) {
-                result += penalty_n3;
-            }
         }
+
+        result += finderPenaltyLine(symbol, x, false);
     }
 
     y = 0;
@@ -406,6 +466,45 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
     result += k * penalty_n4;
 
     return result;
+}
+
+test "N3 finder-like penalty only evaluates modules inside the symbol" {
+    var cells: [21 * 21]Cell = @splat(.{});
+    var symbol = Symbol{
+        .cells = &cells,
+        .size = 21,
+        .version = 1,
+        .ec_level = .m,
+        .mask = 0,
+    };
+
+    const pattern = [_]bool{ true, false, true, true, true, false, true };
+
+    // A core at the symbol edge does not borrow light modules from the
+    // separate quiet zone. Block the in-symbol trailing side as well.
+    for (pattern, 0..) |dark, x| symbol.cells[x].dark = dark;
+    symbol.cells[7].dark = true;
+    try std.testing.expectEqual(@as(i32, 0), finderPenaltyLine(&symbol, 0, true));
+
+    @memset(&cells, Cell{});
+    for (pattern, 0..) |dark, offset| symbol.cells[4 + offset].dark = dark;
+    try std.testing.expectEqual(penalty_n3, finderPenaltyLine(&symbol, 0, true));
+
+    symbol.cells[0].dark = true;
+    symbol.cells[11].dark = true;
+    try std.testing.expectEqual(@as(i32, 0), finderPenaltyLine(&symbol, 0, true));
+}
+
+test "mask evaluation metadata excludes the fixed dark module" {
+    var cells: [21 * 21]Cell = undefined;
+    var symbol = layoutFunctionPatterns(&cells, 1, .m, 0);
+
+    try std.testing.expect(symbol.isDark(8, 13));
+    clearMaskEvaluationMetadata(&symbol);
+    try std.testing.expect(!symbol.isDark(8, 13));
+
+    drawSymbolMetadata(&symbol);
+    try std.testing.expect(symbol.isDark(8, 13));
 }
 
 test "checked symbol access rejects inconsistent public state" {
