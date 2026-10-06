@@ -146,6 +146,7 @@ fn fuzzPng(_: void, smith: *std.testing.Smith) !void {
                 }
             else
                 null,
+            .reflectance = if (smith.value(bool)) .reversed else .normal,
         },
     };
 
@@ -358,6 +359,83 @@ fn fuzzMicroRoundTrip(_: void, smith: *std.testing.Smith) !void {
     );
 }
 
+
+test "fuzz legal Micro QR mode and ECC combinations" {
+    try std.testing.fuzz({}, fuzzMicroModes, .{});
+}
+
+fn fuzzMicroModes(_: void, smith: *std.testing.Smith) !void {
+    const versions = [_]qrz.MicroVersion{ .m1, .m2, .m3, .m4 };
+    const version = versions[smith.value(u8) % versions.len];
+
+    const level: qrz.EcLevel = switch (version) {
+        .m1 => .l,
+        .m2, .m3 => if (smith.value(bool)) .l else .m,
+        .m4 => switch (smith.value(u8) % 3) {
+            0 => .l,
+            1 => .m,
+            else => .q,
+        },
+    };
+
+    var numeric: [12]u8 = undefined;
+    for (&numeric) |*byte| byte.* = '0' + smith.value(u8) % 10;
+
+    const alpha_charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+    var alpha: [8]u8 = undefined;
+    for (&alpha) |*byte| byte.* = alpha_charset[smith.value(u8) % alpha_charset.len];
+
+    var bytes: [5]u8 = undefined;
+    for (&bytes) |*byte| byte.* = smith.value(u8);
+
+    var kanji = [_]u8{ 0x81, 0x40, 0x81, 0x41 };
+
+    const choice: u8 = switch (version) {
+        .m1 => 0,
+        .m2 => smith.value(u8) % 2,
+        .m3, .m4 => smith.value(u8) % 4,
+    };
+
+    const segment: qrz.MicroSegment = switch (choice) {
+        0 => .{ .numeric = numeric[0 .. 1 + smith.value(u8) % numeric.len] },
+        1 => .{ .alphanumeric = alpha[0 .. 1 + smith.value(u8) % alpha.len] },
+        2 => .{ .byte = bytes[0 .. 1 + smith.value(u8) % bytes.len] },
+        else => .{ .kanji = kanji[0 .. 2 + 2 * (smith.value(u8) % 2)] },
+    };
+    const segments = [_]qrz.MicroSegment{segment};
+
+    var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    const symbol = qrz.encodeMicroSegments(
+        &segments,
+        .{
+            .min_version = version,
+            .max_version = version,
+            .ec_level = level,
+            .boost_ec_level = false,
+            .mask = @intCast(smith.value(u8) % 4),
+        },
+        &cells,
+    ) catch return;
+
+    const side: usize = symbol.size;
+    const cell_count = side * side;
+    var bits: [qrz.requiredMicroCells(.m4)]bool = undefined;
+    for (0..cell_count) |index| bits[index] = symbol.cells[index].dark;
+
+    var decode_cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    var output: [64]u8 = undefined;
+    const result = try qrz.decodeMicro(
+        bits[0..cell_count],
+        symbol.size,
+        &decode_cells,
+        &output,
+    );
+
+    try std.testing.expectEqual(version, result.version);
+    try std.testing.expectEqual(level, result.ec_level);
+    try std.testing.expectEqual(@as(u2, @intCast(symbol.mask)), result.mask);
+    try std.testing.expect(result.len <= output.len);
+}
 
 test "fuzz decodeAny hostile sizes and caller buffers" {
     try std.testing.fuzz({}, fuzzDecodeAnyBoundaries, .{});
