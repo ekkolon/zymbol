@@ -174,7 +174,7 @@ test "raster renders scaled modules and preserves stride padding" {
     const stride = size.width + 3;
     const required = try requiredPixelsForStride(&symbol, stride, options);
 
-    var pixels: [49 * 46]u8 = [_]u8{0xAA} ** (49 * 46);
+    var pixels: [49 * 46]u8 = @splat(0xAA);
     try std.testing.expectEqual(pixels.len, required);
     _ = try renderStrided(u8, &symbol, &pixels, stride, 0, 255, options);
 
