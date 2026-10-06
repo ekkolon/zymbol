@@ -174,7 +174,8 @@ fn encodePng(
     return output[0..writer.position];
 }
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
     var cells: [qrz.requiredCells(demo_version)]qrz.Cell = undefined;
     var scratch: [qrz.requiredEncodeScratch(demo_version)]u8 = undefined;
     const symbol = try qrz.encodeText(
@@ -198,11 +199,11 @@ pub fn main() !void {
     var png_buffer: [max_png_bytes]u8 = undefined;
     const png = try encodePng(&pixels, size.width, size.height, &png_buffer);
 
-    const file = try std.fs.cwd().createFile("qrz.png", .{});
-    defer file.close();
-    try file.writeAll(png);
+    var file = try std.Io.Dir.cwd().createFile(io, "qrz.png", .{});
+    defer file.close(io);
+    try file.writeStreamingAll(io, png);
 
-    std.debug.print("wrote qrz.png ({d}x{d}, {d} bytes)\n", .{
+    std.log.info("wrote qrz.png ({d}x{d}, {d} bytes)", .{
         size.width,
         size.height,
         png.len,
