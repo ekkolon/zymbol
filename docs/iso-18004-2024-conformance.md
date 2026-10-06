@@ -100,7 +100,7 @@ Status meanings:
 - black/white and configurable reflectance rendering: **implemented**
 - reversed-reflectance output: **implemented** — raster, SVG and PNG invert the complete symbol including quiet zone; rendered QR/Micro grids are regression-decoded with reversed-reflectance metadata.
 - PNG structural correctness: **implemented** — independent Python validation parses chunks, verifies CRC/Adler, inflates IDAT, and checks indexed scanlines/geometry.
-- SVG structural correctness: **implemented** — `zig build svg-validate` independently parses representative QR/Micro SVGs, verifies namespace/viewBox/intrinsic sizing, quiet-zone geometry, path grammar/bounds, colors, transparency, and reversed reflectance.
+- SVG structural correctness: **implemented** — `zig build svg-validate` independently parses representative QR/Micro SVGs, verifies namespace/viewBox/intrinsic sizing, quiet-zone geometry, path grammar/bounds, colors, transparency, and reversed reflectance; the six-case gate passed locally on 2026-10-06.
 - physical print/mark quality grading: **external**
 - camera thresholding/finder detection/perspective correction: **external**
 
