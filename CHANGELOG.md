@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added isolated `qrz_render` raster and SVG rendering with caller-owned buffers and no file I/O or allocator requirement.
+
 - Added a one-command local release qualification step covering Debug, ReleaseSafe, ReleaseFast, ReleaseSmall, and wasm32-freestanding.
 - Added the v1 public compatibility contract.
 - Added exhaustive format-BCH correction-radius coverage.
