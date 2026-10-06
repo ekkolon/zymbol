@@ -23,6 +23,39 @@ pub const SvgEncodeOptions = struct {
     render: svg.Options = .{},
 };
 
+pub const BufferRequirements = struct {
+    cells: usize,
+    scratch: usize,
+    output: usize,
+};
+
+fn validateEncodeOptions(options: qrz.EncodeOptions) !void {
+    if (!qrz.isValidVersion(options.min_version) or
+        !qrz.isValidVersion(options.max_version) or
+        options.min_version > options.max_version)
+    {
+        return error.InvalidVersionRange;
+    }
+}
+
+pub fn pngRequirements(options: PngEncodeOptions) !BufferRequirements {
+    try validateEncodeOptions(options.encode);
+    return .{
+        .cells = qrz.requiredCells(options.encode.max_version),
+        .scratch = qrz.requiredEncodeScratch(options.encode.max_version),
+        .output = try png.requiredBytesForVersion(options.encode.max_version, options.render),
+    };
+}
+
+pub fn svgRequirements(options: SvgEncodeOptions) !BufferRequirements {
+    try validateEncodeOptions(options.encode);
+    return .{
+        .cells = qrz.requiredCells(options.encode.max_version),
+        .scratch = qrz.requiredEncodeScratch(options.encode.max_version),
+        .output = try svg.maxBytesForVersion(options.encode.max_version, options.render),
+    };
+}
+
 const Payload = union(enum) {
     text: []const u8,
     bytes: []const u8,
@@ -39,12 +72,7 @@ const Encoded = struct {
         payload: Payload,
         options: qrz.EncodeOptions,
     ) !Encoded {
-        if (!qrz.isValidVersion(options.min_version) or
-            !qrz.isValidVersion(options.max_version) or
-            options.min_version > options.max_version)
-        {
-            return error.InvalidVersionRange;
-        }
+        try validateEncodeOptions(options);
 
         const cells = try allocator.alloc(qrz.Cell, qrz.requiredCells(options.max_version));
         errdefer allocator.free(cells);
