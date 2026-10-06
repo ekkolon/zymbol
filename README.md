@@ -122,7 +122,7 @@ var png = try render.pngText(
 defer png.deinit();
 ```
 
-PNG is encoded directly from the QR symbol as a 1-bit indexed image. It does not materialize an intermediate raster buffer. A transparent PNG background is selected with `.background = null`.
+PNG is encoded directly from the QR symbol as a 1-bit indexed image. It does not materialize an intermediate raster buffer. IDAT uses deterministic fixed-Huffman DEFLATE with bounded QR-aware LZ77 matching, keeping the encoder allocation-free and freestanding while materially reducing output size versus stored-DEFLATE. A transparent PNG background is selected with `.background = null`.
 
 ISO/IEC 18004 reflectance reversal is explicit with `.reflectance = .reversed`. QRz reverses the complete rendered symbol, including the quiet zone: logical dark modules use the configured background color and logical light modules/quiet zone use the foreground color. PNG and SVG reversed-reflectance output requires a non-transparent `.background` so both reflectance levels are self-contained.
 
