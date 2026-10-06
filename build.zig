@@ -81,7 +81,11 @@ pub fn build(b: *std.Build) void {
         .root_module = terminal_example_module,
     });
     const run_terminal_example = b.addRunArtifact(terminal_example);
-    if (b.args) |args| run_terminal_example.addArgs(args);
+    if (comptime @hasField(std.Build, "args")) {
+        if (b.args) |args| run_terminal_example.addArgs(args);
+    } else {
+        run_terminal_example.addPassthruArgs();
+    }
 
     const terminal_example_step = b.step("example-terminal", "Render QR in the terminal");
     terminal_example_step.dependOn(&run_terminal_example.step);
