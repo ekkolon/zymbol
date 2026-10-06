@@ -885,3 +885,70 @@ test "FNC1 second position reports AIM indicator and transmitted prefix" {
     const identifier = result.symbologyIdentifier();
     try std.testing.expectEqualSlices(u8, "]Q5", &identifier);
 }
+
+
+test "decoder normalizes mirrored and reversed reflectance symbols" {
+    const message = "REFLECTION V7";
+
+    var cells: [requiredCells(7)]Cell = undefined;
+    var encode_scratch: [requiredEncodeScratch(7)]u8 = undefined;
+    const symbol = try encodeText(
+        message,
+        .{
+            .min_version = 7,
+            .max_version = 7,
+            .ec_level = .q,
+            .boost_ec_level = false,
+            .mask = 6,
+        },
+        &cells,
+        &encode_scratch,
+    );
+
+    const cases = [_]struct {
+        mirrored: bool,
+        reflectance_reversed: bool,
+    }{
+        .{ .mirrored = false, .reflectance_reversed = false },
+        .{ .mirrored = true, .reflectance_reversed = false },
+        .{ .mirrored = false, .reflectance_reversed = true },
+        .{ .mirrored = true, .reflectance_reversed = true },
+    };
+
+    const side: usize = symbol.size;
+    const cell_count = side * side;
+    var bits: [requiredCells(7)]bool = undefined;
+    var decode_cells: [requiredCells(7)]Cell = undefined;
+    var decode_scratch: [requiredDecodeScratch(7)]u8 = undefined;
+    var out: [64]u8 = undefined;
+
+    for (cases) |case| {
+        for (0..side) |y| {
+            for (0..side) |x| {
+                const source_index = if (case.mirrored)
+                    x * side + y
+                else
+                    y * side + x;
+                bits[y * side + x] =
+                    symbol.cells[source_index].dark != case.reflectance_reversed;
+            }
+        }
+
+        const result = try decode(
+            bits[0..cell_count],
+            symbol.size,
+            &decode_cells,
+            &decode_scratch,
+            &out,
+        );
+
+        try std.testing.expectEqualSlices(u8, message, out[0..result.len]);
+        try std.testing.expectEqual(@as(u6, 7), result.version);
+        try std.testing.expectEqual(@as(u3, 6), result.mask);
+        try std.testing.expectEqual(case.mirrored, result.mirrored);
+        try std.testing.expectEqual(
+            case.reflectance_reversed,
+            result.reflectance_reversed,
+        );
+    }
+}
