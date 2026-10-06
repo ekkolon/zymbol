@@ -32,7 +32,7 @@ const generators: [max_ec_codewords + 1][max_ec_codewords]u8 = blk: {
     var table: [max_ec_codewords + 1][max_ec_codewords]u8 = undefined;
     var degree: usize = 1;
     while (degree <= max_ec_codewords) : (degree += 1) {
-        var coeffs: [max_ec_codewords]u8 = [_]u8{0} ** max_ec_codewords;
+        var coeffs: [max_ec_codewords]u8 = @splat(0);
         coeffs[degree - 1] = 1; // start at the monomial 1 (x^0 coefficient)
         var root: u16 = 1; // 2^0
         var i: usize = 0;
@@ -142,7 +142,7 @@ fn evaluate(codewords: []const u8, x: u8) u8 {
 
 /// Fixed-capacity GF(256) polynomial, highest-degree coefficient first.
 const Poly = struct {
-    values: [poly_capacity]u8 = [_]u8{0} ** poly_capacity,
+    values: [poly_capacity]u8 = @splat(0),
     len: usize = 1,
 
     fn init(len: usize) Poly {
@@ -319,7 +319,7 @@ test "decode corrects every QR block layout at its guaranteed limit" {
                 @memcpy(block[data_len .. data_len + ec_len], ec[0..ec_len]);
                 const block_len = data_len + ec_len;
 
-                var used = [_]bool{false} ** 255;
+                var used: [255]bool = @splat(false);
                 var injected: usize = 0;
                 while (injected < ec_len / 2) : (injected += 1) {
                     var position = (injected * 17 + @as(usize, version)) % block_len;
@@ -388,7 +388,7 @@ test "decode corrects the maximum guaranteed number of random byte errors" {
         const block_len = data_len + degree;
 
         const num_errors = 1 + random.uintLessThan(usize, max_correctable);
-        var used = [_]bool{false} ** (100 + max_ec_codewords);
+        var used: [100 + max_ec_codewords]bool = @splat(false);
         var injected: usize = 0;
         while (injected < num_errors) {
             const pos = random.uintLessThan(usize, block_len);
