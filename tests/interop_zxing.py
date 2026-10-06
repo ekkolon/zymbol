@@ -64,11 +64,22 @@ def check_qrz_to_zxing(driver):
         view = render_modules(modules, side, quiet_zone)
         result = zxingcpp.read_barcode(
             view,
-            formats=expected_format,
+            formats=[expected_format],
+            try_rotate=False,
+            try_downscale=False,
+            try_invert=False,
+            binarizer=zxingcpp.Binarizer.FixedThreshold,
             is_pure=True,
+            return_errors=True,
         )
         if result is None:
-            raise AssertionError(f"ZXing-cpp did not decode QRz vector {payload!r}")
+            raise AssertionError(f"ZXing-cpp found no QRz vector for {payload!r}")
+        if not result.valid:
+            raise AssertionError(
+                f"ZXing-cpp rejected QRz vector {payload!r}: "
+                f"format={result.format!r}, error={result.error!r}, "
+                f"text={result.text!r}"
+            )
         if result.format != expected_format:
             raise AssertionError(
                 f"wrong ZXing-cpp format for {payload!r}: {result.format}"
