@@ -1,7 +1,7 @@
-//! Allocation-free rendering for QRz symbols.
+//! Rendering and image encoding for QRz symbols.
 //!
-//! This module renders caller-owned `qrz.Symbol` values without file I/O,
-//! image codecs, or allocator requirements.
+//! Low-level APIs use caller-owned buffers and perform no file I/O.
+//! Convenience APIs accept an allocator and return owned PNG or SVG bytes.
 
 const std = @import("std");
 const qrz = @import("qrz");
