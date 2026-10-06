@@ -26,7 +26,9 @@ Raster rendering writes caller-selected pixel values into caller-owned buffers. 
 
 SVG and PNG are built-in output formats. Their low-level APIs write into caller-owned buffers without allocation. PNG is emitted directly from symbol modules as a 1-bit indexed image; no intermediate raster image is required.
 
-The owned convenience APIs accept a caller-provided allocator and combine QR encoding with PNG or SVG output in one call. Binary and text payload variants are part of the public surface.
+SVG output has a square viewBox, symmetric quiet zone and `preserveAspectRatio="xMidYMid meet"`. Width and height are omitted by default for responsive embedding; an optional explicit square intrinsic size can be emitted. SVG can also stream directly to `std.Io.Writer` without materializing the complete SVG output.
+
+The owned convenience APIs accept a caller-provided allocator and combine QR encoding with PNG or SVG output in one call. Binary and text payload variants are part of the public surface. Writer-based SVG text/byte variants are also part of the public surface.
 
 WASM/freestanding callers can query buffer requirements and use the `*Into` APIs with host-owned linear memory. QRz does not prescribe a WebAssembly allocator or JavaScript ABI.
 
