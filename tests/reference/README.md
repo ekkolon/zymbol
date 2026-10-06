@@ -6,11 +6,13 @@ Pinned sources:
 
 - `heuer/segno@b11dc2913c22b22b3bc0a6efaa989904c44977bf`
 - `zxing-cpp/zxing-cpp@2c3dcfeffa7878950a58c1703c86774a428b0c91` for ECI/FNC1 decoder streams.
+- `nayuki/QR-Code-generator@3c6d0b3cefb4e049dc337e82237c9644399716a8` for independent QR ECC/block-layout and raw-module formulas.
 
 Current fixtures:
 
 - `qr_tables.zig`: QR versions 1-40 data-codeword capacities for L/M/Q/H, transcribed from Segno `SYMBOL_CAPACITY` at the pinned commit.
 - `ecc_tables.zig`: QR format/version BCH tables and Annex A Reed-Solomon generator exponents for every degree used by QR Code, transcribed from Segno at the pinned commit.
+- `qr_structure.zig`: all QR alignment positions plus ECC-codewords-per-block and block-count tables, pinned from Segno/Nayuki.
 - `tests/ref_matrix/iso-fig-1.txt`: QR Code Symbol, QR version 1-M.
 - `tests/ref_matrix/iso-i2.txt`: 01234567, QR version 1-M, mask 2.
 - `tests/ref_matrix/iso-i3.txt`: 01234567, Micro QR M2-L.
@@ -26,4 +28,4 @@ For the QR Figure 1 fixture, mask 5 is pinned as part of the external matrix. An
 
 ZXing-cpp reference streams cover ECI assignment 2 plus FNC1 first- and second-position decoding semantics.
 
-The release gate must continue to expand beyond these fixtures. Annex A generator exponents are independently converted to GF(256) coefficients and checked against QRz; QR capacity/count-width boundaries and BCH/RS correction-radius behavior also have executable evidence. Remaining work includes the rest of the Annex audit, non-byte capacity edges, special-header vectors, and behavioral differential tests against independent decoders.
+The conformance gate now includes independent QR geometry/block-layout sweeps, all QR byte/numeric/alphanumeric/Kanji capacity edges, Annex A generator checks, Annex B RS correction/rejection behavior, BCH recovery, special-header vectors, and a separately executable bidirectional ZXing-cpp differential campaign. Remaining release work is outside this fixture set: rendering, output-format qualification, portability runtime evidence, fuzz closure, and final clause audit.
