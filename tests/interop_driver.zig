@@ -82,7 +82,7 @@ fn emitMicro(
 
 fn writeVector(out: anytype, family: []const u8, payload: []const u8, symbol: qrz.Symbol) !void {
     try out.print("{s}\t{s}\t{d}\t", .{ family, payload, symbol.size });
-    const side: usize = symbol.size;
+    const side: usize = @intCast(symbol.size);
     for (0..side) |y| {
         for (0..side) |x| {
             try out.writeByte(if (symbol.isDark(x, y)) '1' else '0');
@@ -97,7 +97,8 @@ fn decodeExternal(init: std.process.Init) !void {
     const side_text = init.environ_map.get("QRZ_INTEROP_SIDE") orelse return error.MissingInteropInput;
     const modules = init.environ_map.get("QRZ_INTEROP_MODULES") orelse return error.MissingInteropInput;
     const side = try std.fmt.parseInt(u16, side_text, 10);
-    const count = @as(usize, side) * side;
+    const side_usize: usize = @intCast(side);
+    const count = side_usize * side_usize;
     if (modules.len != count) return error.InvalidInteropMatrix;
 
     var bits: [qrz.requiredCells(qrz.max_version)]bool = undefined;
