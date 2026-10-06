@@ -124,7 +124,7 @@ fn verifyMicroReference(
     try std.testing.expectEqualSlices(u8, payload, output[0..decoded.len]);
 }
 
-test "ISO Figure 1 QR reference matrix" {
+test "ISO-derived Figure 1 QR reference matrix with pinned mask" {
     const rows = [_][]const u8{
         "111111100001101111111",
         "100000101001101000001",
@@ -149,7 +149,10 @@ test "ISO Figure 1 QR reference matrix" {
         "111111101011001010010",
     };
 
-    try verifyQrReference("QR Code Symbol", 1, .m, null, 5, &rows);
+    // This Segno fixture is derived from the informative ISO/IEC 18004:2015
+    // Figure 1 example. Its mask is part of the external fixture, not a
+    // normative oracle for QR automatic-mask selection.
+    try verifyQrReference("QR Code Symbol", 1, .m, 5, 5, &rows);
 }
 
 test "ISO Annex I.2 QR reference matrix" {
