@@ -1039,3 +1039,92 @@ test "decoder normalizes mirrored and reversed reflectance symbols" {
         );
     }
 }
+
+
+test "decodeAny discriminates QR and Micro QR by symbol geometry" {
+    var micro_cells: [requiredMicroCells(.m2)]Cell = undefined;
+    const micro_symbol = try encodeMicroText(
+        "12345",
+        .{
+            .min_version = .m2,
+            .max_version = .m2,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &micro_cells,
+    );
+
+    var micro_bits: [requiredMicroCells(.m2)]bool = undefined;
+    for (0..micro_bits.len) |index| {
+        micro_bits[index] = micro_symbol.cells[index].dark;
+    }
+
+    var common_cells: [requiredCells(1)]Cell = undefined;
+    var common_scratch: [requiredDecodeScratch(1)]u8 = undefined;
+    var out: [64]u8 = undefined;
+
+    const micro_result = try decodeAny(
+        &micro_bits,
+        micro_symbol.size,
+        &common_cells,
+        &common_scratch,
+        &out,
+    );
+    switch (micro_result) {
+        .micro_qr => |result| {
+            try std.testing.expectEqualSlices(u8, "12345", out[0..result.len]);
+            try std.testing.expectEqual(MicroVersion.m2, result.version);
+        },
+        .qr => return error.TestUnexpectedResult,
+    }
+
+    var qr_cells: [requiredCells(1)]Cell = undefined;
+    var qr_scratch: [requiredEncodeScratch(1)]u8 = undefined;
+    const qr_symbol = try encodeText(
+        "QR",
+        .{
+            .min_version = 1,
+            .max_version = 1,
+            .ec_level = .m,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &qr_cells,
+        &qr_scratch,
+    );
+
+    var qr_bits: [requiredCells(1)]bool = undefined;
+    for (0..qr_bits.len) |index| qr_bits[index] = qr_symbol.cells[index].dark;
+
+    const qr_result = try decodeAny(
+        &qr_bits,
+        qr_symbol.size,
+        &common_cells,
+        &common_scratch,
+        &out,
+    );
+    switch (qr_result) {
+        .qr => |result| {
+            try std.testing.expectEqualSlices(u8, "QR", out[0..result.len]);
+            try std.testing.expectEqual(@as(Version, 1), result.version);
+        },
+        .micro_qr => return error.TestUnexpectedResult,
+    }
+}
+
+test "symbol validation is family aware" {
+    var micro_cells: [requiredMicroCells(.m1)]Cell = undefined;
+    const micro_symbol = try encodeMicroText(
+        "1",
+        .{
+            .min_version = .m1,
+            .max_version = .m1,
+            .boost_ec_level = false,
+        },
+        &micro_cells,
+    );
+    try std.testing.expect(isValidSymbol(&micro_symbol));
+    try std.testing.expectEqual(@as(u16, 2), defaultQuietZone(.micro_qr));
+    try std.testing.expectEqual(@as(u16, 4), defaultQuietZone(.qr));
+}
