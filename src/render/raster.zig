@@ -30,8 +30,10 @@ fn checkedMul(a: usize, b: usize) Error!usize {
 }
 
 fn validateSymbol(symbol: *const qrz.Symbol) Error!void {
-    const side: usize = symbol.size;
-    const required = try checkedMul(side, side);
+    if (!qrz.isValidVersion(symbol.version)) return Error.InvalidSymbol;
+    if (symbol.size != qrz.size(symbol.version)) return Error.InvalidSymbol;
+
+    const required = qrz.requiredCells(symbol.version);
     if (symbol.cells.len < required) return Error.InvalidSymbol;
 }
 
@@ -135,46 +137,45 @@ pub fn render(
     return renderStrided(Pixel, symbol, pixels, size.width, dark, light, options);
 }
 
-fn testSymbol() struct { cells: [4]qrz.Cell, symbol: qrz.Symbol } {
-    var cells = [4]qrz.Cell{
-        .{ .dark = true },
-        .{ .dark = false },
-        .{ .dark = false },
-        .{ .dark = true },
-    };
-    const symbol = qrz.Symbol{
-        .cells = &cells,
-        .size = 2,
+fn testSymbol(cells: *[qrz.requiredCells(1)]qrz.Cell) qrz.Symbol {
+    @memset(cells, qrz.Cell{});
+    cells[0].dark = true;
+    cells[1 * qrz.size(1) + 1].dark = true;
+
+    return .{
+        .cells = cells,
+        .size = qrz.size(1),
         .version = 1,
         .ec_level = .m,
         .mask = 0,
     };
-    return .{ .cells = cells, .symbol = symbol };
 }
 
 test "raster dimensions include quiet zone and scale" {
-    var fixture = testSymbol();
-    fixture.symbol.cells = &fixture.cells;
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
 
-    const size = try dimensions(&fixture.symbol, .{ .scale = 3, .quiet_zone = 2 });
-    try std.testing.expectEqual(@as(usize, 18), size.width);
-    try std.testing.expectEqual(@as(usize, 18), size.height);
-    try std.testing.expectEqual(@as(usize, 324), try requiredPixels(&fixture.symbol, .{
+    const size = try dimensions(&symbol, .{ .scale = 3, .quiet_zone = 2 });
+    try std.testing.expectEqual(@as(usize, 75), size.width);
+    try std.testing.expectEqual(@as(usize, 75), size.height);
+    try std.testing.expectEqual(@as(usize, 5625), try requiredPixels(&symbol, .{
         .scale = 3,
         .quiet_zone = 2,
     }));
 }
 
 test "raster renders scaled modules and preserves stride padding" {
-    var fixture = testSymbol();
-    fixture.symbol.cells = &fixture.cells;
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
 
     const options = Options{ .scale = 2, .quiet_zone = 1 };
-    const size = try dimensions(&fixture.symbol, options);
+    const size = try dimensions(&symbol, options);
     const stride = size.width + 3;
+    const required = try requiredPixelsForStride(&symbol, stride, options);
 
-    var pixels: [88]u8 = [_]u8{0xAA} ** 88;
-    _ = try renderStrided(u8, &fixture.symbol, &pixels, stride, 0, 255, options);
+    var pixels: [49 * 46]u8 = [_]u8{0xAA} ** (49 * 46);
+    try std.testing.expectEqual(pixels.len, required);
+    _ = try renderStrided(u8, &symbol, &pixels, stride, 0, 255, options);
 
     var y: usize = 0;
     while (y < size.height) : (y += 1) {
@@ -192,18 +193,23 @@ test "raster renders scaled modules and preserves stride padding" {
     }
 }
 
-test "raster rejects invalid scale and undersized output" {
-    var fixture = testSymbol();
-    fixture.symbol.cells = &fixture.cells;
+test "raster rejects malformed symbols, invalid scale and undersized output" {
+    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var symbol = testSymbol(&cells);
 
     try std.testing.expectError(
         Error.InvalidScale,
-        dimensions(&fixture.symbol, .{ .scale = 0 }),
+        dimensions(&symbol, .{ .scale = 0 }),
     );
+
+    const original_size = symbol.size;
+    symbol.size = 20;
+    try std.testing.expectError(Error.InvalidSymbol, dimensions(&symbol, .{}));
+    symbol.size = original_size;
 
     var pixels: [1]u8 = undefined;
     try std.testing.expectError(
         Error.OutputTooSmall,
-        renderStrided(u8, &fixture.symbol, &pixels, 10, 0, 255, .{}),
+        renderStrided(u8, &symbol, &pixels, 29, 0, 255, .{}),
     );
 }
