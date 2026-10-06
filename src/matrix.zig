@@ -211,13 +211,19 @@ pub fn drawFormatInfo(symbol: *Symbol) void {
 
 pub fn clearMaskEvaluationMetadata(symbol: *Symbol) void {
     for (symbol.cells) |*cell| {
-        if (cell.kind == .format or cell.kind == .version) {
+        if (cell.kind == .format or
+            cell.kind == .version or
+            cell.kind == .dark_module)
+        {
             cell.dark = false;
         }
     }
 }
 
 pub fn drawSymbolMetadata(symbol: *Symbol) void {
+    for (symbol.cells) |*cell| {
+        if (cell.kind == .dark_module) cell.dark = true;
+    }
     drawFormatInfo(symbol);
     if (symbol.version >= 7) drawVersionInfo(symbol);
 }
@@ -334,7 +340,7 @@ const penalty_n4: i32 = 10;
 
 fn finderPenaltyLine(symbol: *const Symbol, line: usize, horizontal: bool) i32 {
     const side: usize = symbol.size;
-    if (side < 7) return 0;
+    if (side < 11) return 0;
 
     const core = [_]bool{ true, false, true, true, true, false, true };
     var result: i32 = 0;
@@ -352,34 +358,26 @@ fn finderPenaltyLine(symbol: *const Symbol, line: usize, horizontal: bool) i32 {
         }
         if (!matches) continue;
 
-        var before_light = true;
-        const before_start = start -| 4;
-        var index = before_start;
-        while (index < start) : (index += 1) {
-            const x = if (horizontal) index else line;
-            const y = if (horizontal) line else index;
-            if (isDarkUnchecked(symbol, x, y)) {
-                before_light = false;
-                break;
+        const before_light = start >= 4 and blk: {
+            var index = start - 4;
+            while (index < start) : (index += 1) {
+                const x = if (horizontal) index else line;
+                const y = if (horizontal) line else index;
+                if (isDarkUnchecked(symbol, x, y)) break :blk false;
             }
-        }
+            break :blk true;
+        };
 
-        var after_light = true;
-        const after_start = start + core.len;
-        const after_end = @min(side, after_start + 4);
-        index = after_start;
-        while (index < after_end) : (index += 1) {
-            const x = if (horizontal) index else line;
-            const y = if (horizontal) line else index;
-            if (isDarkUnchecked(symbol, x, y)) {
-                after_light = false;
-                break;
+        const after_light = start + core.len + 4 <= side and blk: {
+            var index = start + core.len;
+            while (index < start + core.len + 4) : (index += 1) {
+                const x = if (horizontal) index else line;
+                const y = if (horizontal) line else index;
+                if (isDarkUnchecked(symbol, x, y)) break :blk false;
             }
-        }
+            break :blk true;
+        };
 
-        // Modules beyond the matrix are part of the required light quiet
-        // region, so a finder-like core touching an edge can still satisfy
-        // the four-light-module condition.
         if (before_light or after_light) result += penalty_n3;
     }
 
@@ -462,7 +460,7 @@ pub fn penaltyScore(symbol: *const Symbol) i32 {
     return result;
 }
 
-test "N3 finder-like penalty recognizes symbol-edge quiet region" {
+test "N3 finder-like penalty only evaluates modules inside the symbol" {
     var cells: [21 * 21]Cell = @splat(.{});
     var symbol = Symbol{
         .cells = &cells,
@@ -473,24 +471,32 @@ test "N3 finder-like penalty recognizes symbol-edge quiet region" {
     };
 
     const pattern = [_]bool{ true, false, true, true, true, false, true };
-    for (pattern, 0..) |dark, x| {
-        symbol.cells[x].dark = dark;
-    }
 
-    // The light quiet region outside the left edge satisfies N3.
-    try std.testing.expectEqual(penalty_n3, finderPenaltyLine(&symbol, 0, true));
+    // A core at the symbol edge does not borrow light modules from the
+    // separate quiet zone. Block the in-symbol trailing side as well.
+    for (pattern, 0..) |dark, x| symbol.cells[x].dark = dark;
+    symbol.cells[7].dark = true;
+    try std.testing.expectEqual(@as(i32, 0), finderPenaltyLine(&symbol, 0, true));
 
     @memset(&cells, Cell{});
-    for (pattern, 0..) |dark, offset| {
-        symbol.cells[4 + offset].dark = dark;
-    }
+    for (pattern, 0..) |dark, offset| symbol.cells[4 + offset].dark = dark;
     try std.testing.expectEqual(penalty_n3, finderPenaltyLine(&symbol, 0, true));
 
-    // With the core away from an edge, blocking both four-module light
-    // regions must remove the N3 match.
     symbol.cells[0].dark = true;
     symbol.cells[11].dark = true;
     try std.testing.expectEqual(@as(i32, 0), finderPenaltyLine(&symbol, 0, true));
+}
+
+test "mask evaluation metadata excludes the fixed dark module" {
+    var cells: [21 * 21]Cell = undefined;
+    var symbol = layoutFunctionPatterns(&cells, 1, .m, 0);
+
+    try std.testing.expect(symbol.isDark(8, 13));
+    clearMaskEvaluationMetadata(&symbol);
+    try std.testing.expect(!symbol.isDark(8, 13));
+
+    drawSymbolMetadata(&symbol);
+    try std.testing.expect(symbol.isDark(8, 13));
 }
 
 test "checked symbol access rejects inconsistent public state" {
