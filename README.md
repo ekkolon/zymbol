@@ -118,7 +118,13 @@ defer svg.deinit();
 SVG can also stream directly to any Zig 0.16 `std.Io.Writer`, avoiding the SVG output allocation:
 
 ```zig
-var file = try std.Io.Dir.cwd().createFile(init.io, "qrz.svg", .{});
+try std.Io.Dir.cwd().createDirPath(init.io, "zig-out/examples");
+
+var file = try std.Io.Dir.cwd().createFile(
+    init.io,
+    "zig-out/examples/qrz.svg",
+    .{},
+);
 defer file.close(init.io);
 
 var write_buffer: [4096]u8 = undefined;
@@ -222,13 +228,15 @@ The decoder corrects one Reed-Solomon block at a time instead of materializing e
 ```text
 zig build test
 zig build wasm
-zig build example
+zig build example-terminal
 zig build example-svg
 zig build example-png
 zig build qualify
 ```
 
-The package currently supports Zig 0.16.0 as its minimum version. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall and compiles the core for `wasm32-freestanding` in ReleaseFast.
+The package currently supports Zig 0.16.0 as its minimum version. `zig build qualify` runs the test suite in Debug, ReleaseSafe, ReleaseFast and ReleaseSmall, compiles the examples without executing them, and compiles the core/render modules for `wasm32-freestanding` in ReleaseFast.
+
+`zig build example-png` writes `zig-out/examples/qrz.png`. `zig build example-svg` writes `zig-out/examples/qrz.svg`. `zig build example-terminal` displays the in-memory PNG through Kitty or iTerm2 inline-image protocols when available and falls back to a block representation on unsupported terminals. Generated example artifacts stay under the gitignored `zig-out/` tree.
 
 The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
 
@@ -243,6 +251,7 @@ The intended v1 compatibility contract is documented in `docs/v1-contract.md`.
 - `src/encoder.zig` — version selection, interleaving, symbol construction
 - `src/decoder.zig` — format recovery, deinterleaving, correction, parsing
 - `src/render/` — raster rendering, PNG/SVG codecs, and owned-output conveniences
+- `examples/png.zig`, `examples/svg.zig`, `examples/terminal.zig` — output and terminal integrations
 - `src/root.zig` — public API and integration tests
 
 ## License
