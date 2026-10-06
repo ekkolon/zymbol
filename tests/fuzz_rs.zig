@@ -1,8 +1,16 @@
 const std = @import("std");
 const reed_solomon = @import("qrz_rs");
 
+const release_corpus = [_][]const u8{
+    "\x00",
+    "\xff",
+    "QRZ",
+    "\xaa\x55\xaa\x55\xaa\x55\xaa\x55",
+    "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f",
+};
+
 test "fuzz Reed-Solomon correction radius" {
-    try std.testing.fuzz({}, fuzzCorrection, .{});
+    try std.testing.fuzz({}, fuzzCorrection, .{ .corpus = &release_corpus });
 }
 
 fn fuzzCorrection(_: void, smith: *std.testing.Smith) !void {
@@ -47,7 +55,7 @@ fn fuzzCorrection(_: void, smith: *std.testing.Smith) !void {
 }
 
 test "fuzz arbitrary Reed-Solomon blocks never return an invalid correction" {
-    try std.testing.fuzz({}, fuzzArbitraryBlock, .{});
+    try std.testing.fuzz({}, fuzzArbitraryBlock, .{ .corpus = &release_corpus });
 }
 
 fn fuzzArbitraryBlock(_: void, smith: *std.testing.Smith) !void {
