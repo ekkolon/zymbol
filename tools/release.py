@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import pathlib
 import re
-import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "build.zig.zon"
