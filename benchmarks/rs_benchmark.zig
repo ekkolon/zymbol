@@ -23,7 +23,7 @@ pub fn main(init: std.process.Init) !void {
             std.mem.doNotOptimizeAway(result.errors);
             std.mem.doNotOptimizeAway(block[0]);
         }
-                const stopped = try std.Io.Clock.awake.now(init.io);
+        const stopped = try std.Io.Clock.awake.now(init.io);
         elapsed[sample] = @intCast(started.durationTo(stopped).raw.toNanoseconds());
     }
 
