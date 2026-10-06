@@ -15,3 +15,18 @@ pub const version_info = [34]u18{
     0x1f250, 0x209d5, 0x216f0, 0x228ba, 0x2379f, 0x24b0b, 0x2542e, 0x26a64,
     0x27541, 0x28c69,
 };
+
+pub const Generator = struct {
+    degree: usize,
+    coefficients: []const u8,
+};
+
+pub const generators_a = [_]Generator{
+    .{ .degree = 7, .coefficients = &.{ 87, 229, 146, 149, 238, 102, 21 } },
+    .{ .degree = 10, .coefficients = &.{ 251, 67, 46, 61, 118, 70, 64, 94, 32, 45 } },
+    .{ .degree = 13, .coefficients = &.{ 74, 152, 176, 100, 86, 100, 106, 104, 130, 218, 206, 140, 78 } },
+    .{ .degree = 15, .coefficients = &.{ 8, 183, 61, 91, 202, 37, 51, 58, 58, 237, 140, 124, 5, 99, 105 } },
+    .{ .degree = 16, .coefficients = &.{ 120, 104, 107, 109, 102, 161, 76, 3, 91, 191, 147, 169, 182, 194, 225, 120 } },
+    .{ .degree = 17, .coefficients = &.{ 43, 139, 206, 78, 43, 239, 123, 206, 214, 147, 24, 99, 150, 39, 243, 163, 136 } },
+    .{ .degree = 18, .coefficients = &.{ 215, 234, 158, 94, 184, 97, 118, 170, 79, 187, 152, 148, 252, 179, 5, 98, 96, 153 } },
+};
