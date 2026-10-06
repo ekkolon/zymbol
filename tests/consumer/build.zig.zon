@@ -1,0 +1,14 @@
+.{
+    .name = .qrz_consumer_smoke,
+    .version = "0.0.0",
+    .fingerprint = 0x53fd500031415926,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .qrz = .{ .path = "../.." },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
