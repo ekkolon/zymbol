@@ -48,6 +48,9 @@ jobs:
       - name: Check API docs
         run: python3 tools/check_api_docs.py
 
+      - name: Test release tooling
+        run: python3 tools/test_release_tools.py
+
   linux:
     needs: preflight
     name: Linux / Zig 0.17.0
