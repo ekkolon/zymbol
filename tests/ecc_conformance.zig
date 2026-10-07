@@ -99,7 +99,7 @@ test "ISO Table 9 protection codewords reduce small-symbol correction radii" {
     }
 
     try std.testing.expectEqual(@as(u8, 0), spec.protectionCodewords(3, .m));
-    try std.testing.expectEqual(@as(u8, 9), spec.correctionCapacity(3, .m));
+    try std.testing.expectEqual(@as(u8, 13), spec.correctionCapacity(3, .m));
 }
 
 test "independent QR ECC block tables match all version and level pairs" {

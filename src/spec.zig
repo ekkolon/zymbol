@@ -318,7 +318,7 @@ test "small-symbol correction capacities honor protection codewords" {
     try testing.expectEqual(@as(u8, 8), correctionCapacity(1, .h));
     try testing.expectEqual(@as(u8, 4), correctionCapacity(2, .l));
     try testing.expectEqual(@as(u8, 7), correctionCapacity(3, .l));
-    try testing.expectEqual(@as(u8, 9), correctionCapacity(3, .m));
+    try testing.expectEqual(@as(u8, 13), correctionCapacity(3, .m));
 }
 
 test "block layout accounts for every raw codeword at every version and level" {

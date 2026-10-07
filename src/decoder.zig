@@ -987,15 +987,15 @@ test "symbology modifiers cover all QR FNC1 and ECI combinations" {
     }
 }
 
-test "Structured Append may precede FNC1 and ECI metadata" {
+test "Structured Append may precede initial ECI and FNC1 metadata" {
     var bytes: [32]u8 = undefined;
     var writer = bitstream.Writer.init(&bytes);
     try segment.appendStructuredAppend(
         &writer,
         .{ .index = 1, .count = 3, .parity = 0x5A },
     );
-    try segment.appendFnc1(&writer, .first_position);
     try segment.appendEci(&writer, 26);
+    try segment.appendFnc1(&writer, .first_position);
     try segment.appendByte(&writer, 1, "A");
     try segment.finalize(&writer);
 
