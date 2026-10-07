@@ -52,6 +52,40 @@ normalized by Zymbol.
 
 QR Code Model 1 is not implemented.
 
+## Requirement matrix
+
+The table below follows the normative document in order. A check mark means the
+requirement is implemented within Zymbol's documented component boundary. An
+external or partial status is explicit rather than being counted as
+implemented.
+
+| Clause | Requirement area | Status | Zymbol coverage |
+| --- | --- | --- | --- |
+| 1 | Scope | Reference | Defines the standard's scope; no runtime behavior to implement |
+| 2 | Normative references | Reference | External standards are applied where they intersect the component boundary |
+| 3 | Terms and definitions | Reference | Terminology is reflected in the API and conformance documentation |
+| 4 | Mathematical and logical conventions | Reference | GF(256), BCH, masking, and related operations follow the defined conventions |
+| 5 | Symbol description | ✓ Implemented | QR Code Model 2 and Micro QR geometry, function patterns, and quiet-zone defaults |
+| 6 | Conformance | ✓ Implemented within boundary | Component claim is explicitly scoped to software-controlled symbol behavior |
+| 7 | Requirements | ✓ Implemented | Encoding, modes, padding, ECC, interleaving, placement, masking, format, and version information |
+| 8 | Structured append | ✓ Implemented | Header, sequence index/count, parity, encode, and per-symbol decode metadata |
+| 9 | Symbol printing and marking | External | Digital square geometry and quiet-zone defaults are provided; physical marking is application-owned |
+| 10 | Symbol quality | External | ISO/IEC 15415 print-quality measurement and grading require physical output/scanning |
+| 11 | Decoding procedure overview | ✓ Implemented from sampled grid | Applicable decoding stages begin after acquisition and orientation |
+| 12 | Reference decode algorithm for QR Code | ✓ Implemented from sampled grid | Format/version recovery, unmasking, block reconstruction, ECC, and mode parsing |
+| 13 | Autodiscrimination capability | Partial by design | `decodeAny` distinguishes QR from Micro QR; unrelated symbologies belong to the reader layer |
+| 14 | Transmitted data | Partial by design | Payload and ECI/FNC1/Structured Append metadata are returned; host transport framing is outside the API |
+| Annex A | Error detection and correction generator polynomials | ✓ Implemented | Independent generator-exponent reference coverage |
+| Annex B | Error correction decoding steps | ✓ Implemented | Guaranteed-radius correction and over-radius rejection, including Table 9 protection limits |
+| Annex C | Format information | ✓ Implemented | QR and Micro QR BCH generation and recovery |
+| Annex D | Version information | ✓ Implemented | Versions 7-40 generation, placement, and recovery |
+| Annex E | Position of alignment patterns | ✓ Implemented | Alignment positions checked for QR versions 1-40 |
+| Annex F | Symbology identifiers | ✓ Implemented | QR FNC1/ECI modifiers and Micro QR identifier metadata |
+| Annex G | Physical print quality | External | Requires physical production and measurement outside Zymbol |
+
+Informative annexes are used as supporting test material where useful, but they
+do not create additional normative implementation requirements.
+
 ## Normative review
 
 ### Clause 5: Symbol description

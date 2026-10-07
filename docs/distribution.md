@@ -4,6 +4,24 @@ Zymbol is distributed as a Zig source package. There is no project-specific
 binary artifact; consumers compile the package for their own target and
 optimization mode.
 
+## Package identity
+
+| Field | Value |
+| --- | --- |
+| Package | `zymbol` |
+| Version | `0.1.0` release candidate |
+| Minimum Zig | `0.17.0` |
+| Runtime package dependencies | None |
+| Author and maintainer | Nelson Dominguez |
+| License | MIT |
+| Canonical source | `github.com/ekkolon/zymbol` |
+
+Zig's `build.zig.zon` manifest carries Zig package identity and dependency
+metadata. It does not define standard author, license, or description fields.
+Those project-level attributes are therefore carried by the repository,
+README, license file, and release metadata rather than by non-standard manifest
+keys.
+
 ## Release identity
 
 A stable release is identified by all of the following:

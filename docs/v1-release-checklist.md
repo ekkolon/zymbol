@@ -67,15 +67,16 @@ affected qualification and must be retested.
 Before creating the first public release:
 
 1. make the repository public;
-2. set an accurate repository description;
-3. add the topics `zig`, `zig-package`, `qr-code`, `qrcode`, and
+2. set the repository description to a concise statement of the package scope;
+3. verify the README names Nelson Dominguez as maintainer and includes the DENSO WAVE QR Code trademark notice;
+4. add the topics `zig`, `zig-package`, `qr-code`, `qrcode`, and
    `micro-qr`;
-4. enable GitHub Actions;
-5. enable private vulnerability reporting so `SECURITY.md` has a private
+5. enable GitHub Actions;
+6. enable private vulnerability reporting so `SECURITY.md` has a private
    reporting path;
-6. mark the release-candidate PR ready only after the local structural qualification passes;
-7. let the staged CI workflow pass on the public repository;
-8. protect `main` and require the CI checks before merge.
+7. mark the release-candidate PR ready only after the local structural qualification passes;
+8. let the staged CI workflow pass on the public repository;
+9. protect `main` and require the CI checks before merge.
 
 Do not create `v1.0.0` merely to test the release workflow.
 
