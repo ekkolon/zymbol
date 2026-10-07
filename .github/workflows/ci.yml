@@ -8,9 +8,17 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+    paths:
+      - "**"
+      - "!**/*.md"
+      - "docs/api.md"
   push:
     branches:
       - main
+    paths:
+      - "**"
+      - "!**/*.md"
+      - "docs/api.md"
 
 permissions:
   contents: read

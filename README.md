@@ -57,7 +57,7 @@ scope.
 
 Zig 0.17.0 is required.
 
-The first stable package will be `v1.0.0`. Once that tag is published:
+Install the stable `v1.0.0` release with:
 
 ```sh
 zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.0.tar.gz
@@ -84,8 +84,8 @@ const app = b.createModule(.{
 });
 ```
 
-Until `v1.0.0` is tagged, treat `main` as a release candidate and pin the
-exact commit you evaluate rather than relying on a moving branch.
+For reproducible builds, depend on a published release tag rather than the
+moving `main` branch and retain the content hash recorded by `zig fetch`.
 
 ## Quick start
 
