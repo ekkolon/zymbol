@@ -149,23 +149,32 @@ jobs:
       - name: ZXing interoperability
         run: zig build interop
 
-      - name: Create draft GitHub Release
+      - name: Create release tag
         if: env.PUBLISH_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
+
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release $RELEASE_TAG already exists."
             exit 1
           fi
 
-          gh release create "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$RELEASE_SHA" \
-            --draft \
-            --title "Zymbol $RELEASE_TAG" \
-            --notes-file release-notes.md
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $RELEASE_TAG already exists."
+            exit 1
+          fi
+
+          echo "RELEASE_TAG_CLEANUP=true" >> "$GITHUB_ENV"
+
+          gh api \
+            --method POST \
+            "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$RELEASE_TAG" \
+            -f sha="$RELEASE_SHA" \
+            >/dev/null
 
           actual="$(gh api \
             "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
@@ -176,33 +185,105 @@ jobs:
             exit 1
           fi
 
-          echo "RELEASE_DRAFT_CREATED=true" >> "$GITHUB_ENV"
-
       - name: Validate canonical tag archive
         if: env.PUBLISH_RELEASE == 'true'
+        shell: bash
         run: |
-          python3 tools/package_smoke.py \
-            "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz"
+          set -euo pipefail
 
-      - name: Clean up failed draft release
-        if: failure() && env.RELEASE_DRAFT_CREATED == 'true'
+          for attempt in {1..5}; do
+            if python3 tools/package_smoke.py \
+              "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz"; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::Canonical tag archive failed package validation."
+          exit 1
+
+      - name: Create draft GitHub Release
+        if: env.PUBLISH_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          gh release delete "$RELEASE_TAG" \
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release $RELEASE_TAG already exists."
+            exit 1
+          fi
+
+          echo "RELEASE_DRAFT_CLEANUP=true" >> "$GITHUB_ENV"
+
+          gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --cleanup-tag \
-            --yes || true
+            --verify-tag \
+            --draft \
+            --title "Zymbol $RELEASE_TAG" \
+            --notes-file release-notes.md
+
+      - name: Clean up failed release preparation
+        if: failure() && env.PUBLISH_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [[ "${RELEASE_DRAFT_CLEANUP:-false}" == "true" ]]; then
+            gh release delete "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --yes || true
+          fi
+
+          if [[ "${RELEASE_TAG_CLEANUP:-false}" == "true" ]]; then
+            gh api \
+              --method DELETE \
+              "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" \
+              >/dev/null 2>&1 || true
+          fi
 
       - name: Publish immutable GitHub Release
         if: success() && env.PUBLISH_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
+          set -euo pipefail
+
           gh release edit "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
             --draft=false \
             --latest
+
+      - name: Verify immutable release state
+        if: success() && env.PUBLISH_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          actual="$(gh api \
+            "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+            --jq '.object.sha')"
+          immutable="$(gh api \
+            "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            --jq '.immutable')"
+          draft="$(gh api \
+            "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            --jq '.draft')"
+
+          if [[ "$actual" != "$RELEASE_SHA" ]]; then
+            echo "::error::Published tag points to $actual instead of $RELEASE_SHA."
+            exit 1
+          fi
+
+          if [[ "$draft" != "false" || "$immutable" != "true" ]]; then
+            echo "::error::Published release is not immutable."
+            exit 1
+          fi
 
       - name: Verify GitHub release attestation
         if: success() && env.PUBLISH_RELEASE == 'true'
@@ -217,5 +298,5 @@ jobs:
             sleep 5
           done
 
-          echo "::error::No valid GitHub release attestation was found. Ensure release immutability is enabled."
+          echo "::error::No valid GitHub release attestation was found."
           exit 1
