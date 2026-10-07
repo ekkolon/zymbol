@@ -574,5 +574,4 @@ pub fn build(b: *std.Build) void {
         .linkage = .static,
     });
     qualify_step.dependOn(&qualification_wasm_render.step);
-
 }
