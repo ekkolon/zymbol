@@ -8,6 +8,8 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "build.zig.zon"
 CHANGELOG = ROOT / "CHANGELOG.md"
+README = ROOT / "README.md"
+DISTRIBUTION = ROOT / "docs" / "distribution.md"
 
 
 def manifest_version() -> str:
@@ -39,6 +41,31 @@ def release_section(version: str) -> str:
     return body + "\n"
 
 
+def validate_project_metadata(version: str) -> None:
+    readme = README.read_text(encoding="utf-8")
+    expected_status = f"> **Release:** `v{version}`."
+    if expected_status not in readme:
+        raise SystemExit(
+            f"README.md does not declare Zymbol v{version} as the release"
+        )
+
+    expected_badge = (
+        "[version-badge]: "
+        f"https://img.shields.io/badge/version-{version}-555.svg"
+    )
+    if expected_badge not in readme:
+        raise SystemExit(
+            f"README.md version badge does not match {version}"
+        )
+
+    distribution = DISTRIBUTION.read_text(encoding="utf-8")
+    expected_row = f"| Version | `{version}` |"
+    if expected_row not in distribution:
+        raise SystemExit(
+            f"docs/distribution.md version does not match {version}"
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("tag", nargs="?", help="release tag, for example v1.0.0")
@@ -64,6 +91,7 @@ def main() -> None:
             f"release tag {args.tag} does not match build.zig.zon version {manifest}"
         )
 
+    validate_project_metadata(version)
     notes = release_section(version)
     if args.notes_out:
         args.notes_out.write_text(notes, encoding="utf-8")
