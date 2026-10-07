@@ -63,9 +63,9 @@ jobs:
           git push --force-with-lease origin HEAD:release/next
 
           title="release: Zymbol v$VERSION"
-          body="Automated release candidate for Zymbol v$VERSION.
-
-This PR is intentionally kept as a draft while changes accumulate. Mark it ready to run normal CI, then merge it to trigger the full release validation pipeline. A public repository publishes only after every release gate passes. The same pipeline can be run manually with publishing disabled while the repository is private."
+          body="$(printf '%s\n\n%s' \
+            "Automated release candidate for Zymbol v$VERSION." \
+            "This PR is intentionally kept as a draft while changes accumulate. Mark it ready to run normal CI, then merge it to trigger the full release validation pipeline. A public repository publishes only after every release gate passes. The same pipeline can be run manually with publishing disabled while the repository is private.")"
 
           number="$(gh pr list --head release/next --base main --state open --json number --jq '.[0].number // empty')"
 
