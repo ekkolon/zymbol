@@ -5,95 +5,34 @@
 [![Zig][zig-badge]][zig]
 [![License][license-badge]][license]
 
-**QR Code Model 2 and Micro QR for Zig, with a dependency-free, allocation-free core.**
-
-Zymbol is a QR library for applications that need control over memory, portability,
-and the symbol itself. It encodes and decodes sampled module grids and renders
-them directly to raster pixels, SVG, or PNG.
-
-> **Release:** `v1.0.1`. Semantic versioning applies to the documented public API.
-
-## Highlights
-
-- **QR and Micro QR:** QR Code Model 2 versions 1 through 40 and Micro QR M1
-  through M4.
-- **Predictable memory:** core encoding, decoding, and low-level rendering use
-  caller-owned buffers and do not allocate.
-- **No package dependencies:** the runtime package depends only on Zig's
-  standard library.
-- **Standards reviewed:** the v1 implementation was reviewed against
-  ISO/IEC 18004:2024 within a documented component boundary.
-- **Built-in output:** raster, SVG, and deterministic PNG rendering are part of
-  the package.
-- **Portable by construction:** the release matrix covers Windows, Linux,
-  macOS, freestanding targets, and `wasm32-freestanding`.
-- **Independent evidence:** conformance fixtures, ZXing-cpp interoperability,
-  renderer validation, cross-architecture builds, QEMU runtime checks, and
-  fuzz regression corpora are part of release qualification.
-
-## Support
-
-| Area | Support |
-| --- | --- |
-| QR Code | Model 2, versions 1-40, L/M/Q/H |
-| Micro QR | M1-M4 with legal mode and EC combinations |
-| Modes | Numeric, alphanumeric, byte, Kanji |
-| QR control modes | ECI, FNC1 first/second position, Structured Append |
-| Error control | Reed-Solomon encoding and bounded correction |
-| Masking | All 8 QR masks and all 4 Micro QR masks |
-| Decode input | Canonically oriented sampled module grids |
-| Decode normalization | Mirrored and reversed-reflectance symbols |
-| Rendering | Raster pixels, SVG, PNG |
-| Memory model | Caller-owned core buffers, optional allocator-backed helpers |
-| Runtime dependencies | None |
-| Zig | 0.17.0 |
-
-Zymbol is not an image scanner. Camera acquisition, finder detection,
-thresholding, perspective correction, and rotation recovery belong to the
-acquisition layer. See the [conformance boundary][conformance] for the exact
-scope.
+Zymbol is a QR code library for Zig. It generates and decodes QR and Micro QR
+codes, with PNG and SVG output built in and no external dependencies.
 
 ## Installation
 
-Zig 0.17.0 is required.
-
-Install the stable `v1.0.0` release with:
+Requires Zig 0.17.0.
 
 ```sh
-zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.0.tar.gz
+zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.1.tar.gz
 ```
 
-Add the package's single public module to your application:
+After creating your executable in `build.zig`, add the dependency to its module:
 
 ```zig
-const target = b.standardTargetOptions(.{});
-const optimize = b.standardOptimizeOption(.{});
-
 const zymbol_dep = b.dependency("zymbol", .{
     .target = target,
     .optimize = optimize,
 });
 
-const app = b.createModule(.{
-    .root_source_file = b.path("src/main.zig"),
-    .target = target,
-    .optimize = optimize,
-    .imports = &.{
-        .{ .name = "zymbol", .module = zymbol_dep.module("zymbol") },
-    },
-});
+exe.root_module.addImport("zymbol", zymbol_dep.module("zymbol"));
 ```
 
-For reproducible builds, depend on a published release tag rather than the
-moving `main` branch and retain the content hash recorded by `zig fetch`.
+## Usage
 
-## Quick start
-
-### Encode a QR symbol without allocating
+### Encode
 
 ```zig
 const zymbol = @import("zymbol");
-
 const max_version: zymbol.Version = 10;
 
 var cells: [zymbol.requiredCells(max_version)]zymbol.Cell = undefined;
@@ -101,157 +40,99 @@ var scratch: [zymbol.requiredEncodeScratch(max_version)]u8 = undefined;
 
 const symbol = try zymbol.encodeText(
     "https://example.com",
-    .{
-        .max_version = max_version,
-        .ec_level = .m,
-    },
+    .{ .max_version = max_version },
     &cells,
     &scratch,
 );
 ```
 
-`encodeText` accepts UTF-8 and emits ECI assignment 26 when non-ASCII text
-requires it. `encodeBytes` preserves byte values and emits no ECI.
+`encodeText` accepts UTF-8 and adds ECI assignment 26 for non-ASCII text.
+Use `encodeBytes` for raw bytes without ECI.
 
-### Render PNG with an allocator
+### Render PNG
+
+Supply your allocator to the convenience helper:
 
 ```zig
-const zymbol = @import("zymbol");
-const render = zymbol.render;
-
-var png = try render.pngText(
-    allocator,
-    "https://example.com",
-    .{},
-);
+var png = try zymbol.render.pngText(allocator, "https://example.com", .{});
 defer png.deinit();
 
-// png.bytes contains the encoded PNG.
+// The PNG is in png.bytes.
 ```
 
-The low-level raster, SVG, and PNG APIs write into caller-owned output buffers
-instead. SVG can also stream directly to `std.Io.Writer`.
+Raster, SVG and PNG also have APIs that write into caller-owned buffers.
+SVG can stream to `std.Io.Writer`.
 
-### Decode a sampled module grid
+### Decode
+
+Decoding takes a sampled, oriented module grid. The buffers below accommodate
+QR symbols up to version 10:
 
 ```zig
 var cells: [zymbol.requiredCells(10)]zymbol.Cell = undefined;
 var scratch: [zymbol.requiredDecodeScratch(10)]u8 = undefined;
 var output: [512]u8 = undefined;
 
-const decoded = try zymbol.decode(
-    modules,
-    side,
-    &cells,
-    &scratch,
-    &output,
-);
-
+const decoded = try zymbol.decode(modules, side, &cells, &scratch, &output);
 const payload = output[0..decoded.len];
 ```
 
-`modules` is a row-major square `[]const bool` grid. The decoder reports
-version, error-correction level, mask, corrected-error count, control metadata,
-and any mirror or reflectance normalization it applied. Use `decodeAny` when
-the grid may contain either QR Code or Micro QR.
+`modules` is a row-major square `[]const bool` grid; `side` is its width.
+The result includes payload length, symbol details and control metadata.
+Use `decodeAny` for grids that may contain QR Code or Micro QR.
 
-## Design
+## ISO/IEC 18004:2024
 
-### Caller-owned memory
+The QR Code Model 2 and Micro QR implementation was reviewed against
+ISO/IEC 18004:2024 for encoding, sampled-grid decoding and default digital
+quiet zones.
 
-Core encoding and decoding never request an allocator. Callers provide module
-storage and scratch buffers sized through `requiredCells`,
-`requiredEncodeScratch`, and `requiredDecodeScratch`.
+**Legend**
 
-Low-level rendering follows the same model. Convenience APIs such as
-`pngText` and `svgText` allocate only through an allocator supplied by the
-caller.
+- ✅ **Implemented** for supported versions and valid mode/error-correction combinations.
+- 🚫 **Not applicable** to this symbol family.
 
-### One public module
+| Feature | QR Code | Micro QR |
+| --- | --- | --- |
+| Symbol versions and dimensions | ✅ Versions 1–40 | ✅ M1–M4 |
+| Finder, separator and timing patterns | ✅ | ✅ |
+| Alignment patterns | ✅ Versions 2–40 | 🚫 |
+| Default digital quiet zone | ✅ 4 modules | ✅ 2 modules |
+| Numeric encoding and decoding | ✅ | ✅ M1–M4 |
+| Alphanumeric encoding and decoding | ✅ | ✅ M2–M4 |
+| Byte encoding and decoding | ✅ | ✅ M3–M4 |
+| Kanji encoding, decoding and Shift-JIS byte validation | ✅ | ✅ M3–M4 |
+| Mixed-mode segments | ✅ | ✅ M2–M4 |
+| Count fields, terminators and data padding | ✅ | ✅ Including M1/M3 final four-bit data units |
+| ECI headers and decoded metadata | ✅ | 🚫 |
+| FNC1 first/second position and separator handling | ✅ | 🚫 |
+| Structured Append headers, parity and per-symbol metadata | ✅ | 🚫 |
+| Reed-Solomon codeword generation | ✅ | ✅ |
+| Reed-Solomon decoding within specified correction limits | ✅ | ✅ M2–M4; M1 detects errors only |
+| Final message construction and module placement | ✅ Including block interleaving and remainder bits | ✅ |
+| Data mask patterns | ✅ All 8 | ✅ All 4 |
+| Automatic mask evaluation and selection | ✅ N1–N4, including scaled N3 patterns | ✅ Micro QR edge scoring |
+| Format information generation and BCH recovery | ✅ | ✅ |
+| Version information generation and BCH recovery | ✅ Versions 7–40 | 🚫 |
+| Payload recovery from sampled module grids | ✅ | ✅ |
+| Mirror and reversed-reflectance normalization | ✅ | ✅ |
+| Symbology identifier metadata | ✅ | ✅ |
 
-Consumers import one module:
-
-```zig
-const zymbol = @import("zymbol");
-const render = zymbol.render;
-```
-
-Encoding and decoding live at the module root. Rendering is grouped under
-`zymbol.render`. Internal modules are not part of the compatibility contract.
-
-### Explicit boundaries
-
-Zymbol does not open files, sockets, cameras, or platform graphics APIs.
-Character-set transcoding is application-owned. The decoder returns payload
-bytes plus structured ECI, FNC1, and Structured Append metadata rather than
-implementing the ISO Clause 14 host-transmission byte stream.
-
-## Conformance and validation
-
-The v1 implementation was reviewed against ISO/IEC 18004:2024. The claim is
-deliberately scoped to symbol-format behavior that Zymbol controls: encoding,
-matrix construction, error control, masking, format/version information,
-sampled-grid decoding, and default digital quiet-zone geometry.
-
-The review does not claim that Zymbol is complete printing or reading
-equipment. Physical print quality, optical acquisition, and host transport
-framing are outside the component boundary.
-
-Release evidence includes:
-
-- clause-derived and independent QR/Micro reference data;
-- QR versions 1-40 capacity and block-layout sweeps;
-- format/version BCH and Reed-Solomon boundary tests;
-- bidirectional ZXing-cpp 3.1.1 interoperability;
-- independent PNG and SVG validation;
-- cross-target compilation and QEMU runtime qualification;
-- deterministic fuzz-corpus replay.
-
-The full scope and evidence are documented in the
-[ISO/IEC 18004:2024 conformance ledger][conformance]. Sustained
-coverage-guided fuzzing continues as a parallel hardening process.
-
-## Performance
-
-Zymbol's benchmark suite measures encoding, automatic mask selection, decoding,
-Reed-Solomon correction, PNG/SVG rendering, working-set requirements, and PNG
-compression trade-offs in `ReleaseFast`.
-
-The project does not make hardware-independent claims such as "fastest QR
-library." Measurements, methodology, and accepted trade-offs are recorded in
-the [performance qualification][performance].
+See the [conformance scope and test evidence][conformance] for details.
 
 ## Documentation
 
-| Document | Purpose |
-| --- | --- |
-| [Documentation index][docs] | Map of user, assurance, and maintainer documentation |
-| [API reference][api] | Public functions, options, return types, and buffer contracts |
-| [v1 compatibility contract][contract] | Scope and stability guarantees for the v1 surface |
-| [ISO/IEC 18004:2024 conformance][conformance] | Claim boundary, normative review, and evidence |
-| [Distribution][distribution] | Package source, installation, and release provenance |
-| [Performance qualification][performance] | Benchmark methodology and recorded v1 analysis |
-| [Fuzz qualification][fuzz] | Durable corpus and sustained-fuzz policy |
-| [Interoperability][interop] | ZXing-cpp differential test environment and procedure |
-| [Changelog][changelog] | User-visible changes by release |
+[Overview][docs]\
+[Examples][examples]\
+[API reference][api]\
+[Benchmarks][performance]
 
-## Contributing and security
-
-Contributions should preserve the small public surface, caller-owned core
-memory model, and conformance evidence. See [CONTRIBUTING.md][contributing] for
-the local qualification commands and pull-request expectations.
-
-Security issues should not be filed publicly. Follow the process in
-[SECURITY.md][security].
-
-Zymbol is created and maintained by [Nelson Dominguez][nelson].
+For development and security reporting, see [CONTRIBUTING.md][contributing]
+and [SECURITY.md][security].
 
 ## License
 
-Zymbol is dual-licensed under either the [MIT License][mit-license] or the
-[Apache License 2.0][apache-license], at your option. See [LICENSE][license].
-
-## Trademark
+Licensed under [MIT][mit-license] or [Apache 2.0][apache-license], at your option.
 
 QR Code is a registered trademark of DENSO WAVE INCORPORATED.
 
@@ -260,13 +141,9 @@ QR Code is a registered trademark of DENSO WAVE INCORPORATED.
 [ci]: https://github.com/ekkolon/zymbol/actions/workflows/ci.yml
 [ci-badge]: https://github.com/ekkolon/zymbol/actions/workflows/ci.yml/badge.svg?branch=main
 [conformance]: docs/iso-18004-2024-conformance.md
-[contract]: docs/v1-contract.md
 [contributing]: CONTRIBUTING.md
-[distribution]: docs/distribution.md
 [docs]: docs/README.md
-[nelson]: https://github.com/ekkolon
-[fuzz]: docs/v1-fuzz.md
-[interop]: tests/INTEROP.md
+[examples]: examples/
 [license]: LICENSE
 [mit-license]: LICENSE-MIT
 [apache-license]: LICENSE-APACHE
