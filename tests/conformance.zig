@@ -184,6 +184,64 @@ fn verifyMicroReference(
     try std.testing.expectEqualSlices(u8, payload, output[0..decoded.len]);
 }
 
+test "QR version 1-L corrects two codeword errors and rejects three" {
+    const version: zymbol.Version = 1;
+    var cells: [zymbol.requiredCells(version)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(version)]u8 = undefined;
+    const symbol = try zymbol.encodeText(
+        "HELLO",
+        .{
+            .min_version = version,
+            .max_version = version,
+            .ec_level = .l,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+        &scratch,
+    );
+
+    var clean: [zymbol.requiredCells(version)]bool = undefined;
+    for (&clean, 0..) |*bit, index| bit.* = symbol.cells[index].dark;
+
+    // Version 1 starts data placement in the lower-right two-module column.
+    // These are the first bits of three successive codewords.
+    const first_bits = [_]struct { x: usize, y: usize }{
+        .{ .x = 20, .y = 20 },
+        .{ .x = 20, .y = 16 },
+        .{ .x = 20, .y = 12 },
+    };
+
+    var decode_cells: [zymbol.requiredCells(version)]zymbol.Cell = undefined;
+    var decode_scratch: [zymbol.requiredDecodeScratch(version)]u8 = undefined;
+    var out: [32]u8 = undefined;
+
+    var within = clean;
+    for (first_bits[0..2]) |position| {
+        const index = position.y * 21 + position.x;
+        within[index] = !within[index];
+    }
+    const corrected = try zymbol.decode(
+        &within,
+        21,
+        &decode_cells,
+        &decode_scratch,
+        &out,
+    );
+    try std.testing.expectEqualSlices(u8, "HELLO", out[0..corrected.len]);
+    try std.testing.expectEqual(@as(u32, 2), corrected.errors_corrected);
+
+    var beyond = clean;
+    for (first_bits) |position| {
+        const index = position.y * 21 + position.x;
+        beyond[index] = !beyond[index];
+    }
+    try std.testing.expectError(
+        zymbol.DecodeError.UnrecoverableBlock,
+        zymbol.decode(&beyond, 21, &decode_cells, &decode_scratch, &out),
+    );
+}
+
 test "ISO-derived Figure 1 QR reference matrix with pinned mask" {
     const rows = [_][]const u8{
         "111111100001101111111",

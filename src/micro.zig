@@ -1362,6 +1362,35 @@ test "Micro QR rejects empty input and empty explicit segments" {
     );
 }
 
+test "M1 is error-detection-only and rejects a damaged codeword" {
+    var cells: [requiredCells(.m1)]matrix.Cell = undefined;
+    const symbol = try encodeText(
+        "1",
+        .{
+            .min_version = .m1,
+            .max_version = .m1,
+            .ec_level = .l,
+            .boost_ec_level = false,
+            .mask = 0,
+        },
+        &cells,
+    );
+
+    var bits: [requiredCells(.m1)]bool = undefined;
+    for (&bits, 0..) |*bit, index| bit.* = symbol.cells[index].dark;
+
+    const position = dataPosition(&symbol, 0) orelse return error.TestUnexpectedResult;
+    bits[position.y * @as(usize, symbol.size) + position.x] =
+        !bits[position.y * @as(usize, symbol.size) + position.x];
+
+    var decode_cells: [requiredCells(.m1)]matrix.Cell = undefined;
+    var out: [8]u8 = undefined;
+    try std.testing.expectError(
+        Error.UnrecoverableBlock,
+        decode(&bits, symbol.size, &decode_cells, &out),
+    );
+}
+
 test "Micro QR correction capacities honor protection codewords" {
     try std.testing.expectEqual(@as(?u8, 0), correctionCapacity(.m1, .l));
     try std.testing.expectEqual(@as(?u8, 1), correctionCapacity(.m2, .l));
