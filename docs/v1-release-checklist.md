@@ -68,20 +68,23 @@ Before creating the first public release:
 
 1. make the repository public;
 2. set the repository description to:
-   `Standards-conformant QR Code Model 2 and Micro QR library for Zig with an allocation-free core, zero package dependencies, and built-in PNG/SVG rendering.`;
+   `QR Code Model 2 and Micro QR for Zig, with an allocation-free core, zero package dependencies, built-in PNG/SVG rendering, and ISO/IEC 18004:2024 conformance.`;
 3. verify the README names Nelson Dominguez as maintainer and includes the DENSO WAVE QR Code trademark notice;
 4. add the topics `zig`, `zig-package`, `qr-code`, `qrcode`, and
    `micro-qr`;
 5. enable GitHub Actions;
-6. enable private vulnerability reporting so `SECURITY.md` has a private
+6. under Settings -> Actions -> General -> Workflow permissions, enable
+   **Allow GitHub Actions to create and approve pull requests** so the
+   repository-scoped `GITHUB_TOKEN` can maintain `release/next`;
+7. enable private vulnerability reporting so `SECURITY.md` has a private
    reporting path;
-7. enable **release immutability** under repository Settings -> General ->
+8. enable **release immutability** under repository Settings -> General ->
    Releases. This is required for GitHub's automatic release attestation;
-8. verify the package contains `LICENSE`, `LICENSE-MIT`, and
+9. verify the package contains `LICENSE`, `LICENSE-MIT`, and
    `LICENSE-APACHE` and documents `MIT OR Apache-2.0`;
-9. mark the release-candidate PR ready only after the local structural qualification passes;
-10. let the staged CI workflow pass on the public repository;
-11. protect `main` and require the CI checks before merge.
+10. mark the release-candidate PR ready only after the local structural qualification passes;
+11. let the staged CI workflow pass on the public repository;
+12. protect `main` and require the CI checks before merge.
 
 Do not create `v1.0.0` merely to test the release workflow.
 
