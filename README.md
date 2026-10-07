@@ -250,7 +250,8 @@ Zymbol is created and maintained by [Nelson Dominguez][nelson].
 
 ## License
 
-Zymbol is released under the [MIT License][license].
+Zymbol is dual-licensed under either the [MIT License][mit-license] or the
+[Apache License 2.0][apache-license], at your option. See [LICENSE][license].
 
 ## Trademark
 
@@ -269,7 +270,9 @@ QR Code is a registered trademark of DENSO WAVE INCORPORATED.
 [fuzz]: docs/v1-fuzz.md
 [interop]: tests/INTEROP.md
 [license]: LICENSE
-[license-badge]: https://img.shields.io/badge/license-MIT-blue.svg
+[mit-license]: LICENSE-MIT
+[apache-license]: LICENSE-APACHE
+[license-badge]: https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg
 [performance]: docs/v1-performance.md
 [security]: SECURITY.md
 [version-badge]: https://img.shields.io/badge/version-0.1.0-555.svg

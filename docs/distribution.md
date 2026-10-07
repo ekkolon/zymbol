@@ -13,7 +13,7 @@ optimization mode.
 | Minimum Zig | `0.17.0` |
 | Runtime package dependencies | None |
 | Author and maintainer | Nelson Dominguez |
-| License | MIT |
+| License | `MIT OR Apache-2.0` |
 | Canonical source | `github.com/ekkolon/zymbol` |
 
 Zig's `build.zig.zon` manifest carries Zig package identity and dependency
@@ -72,6 +72,25 @@ coverage-guided fuzzing runs in parallel with publication and feeds regression
 tests and patch releases if it discovers a defect.
 
 See the [release checklist][release-checklist] for the authoritative sequence.
+
+## Release integrity
+
+The stable release line requires GitHub Immutable Releases. Once release
+immutability is enabled, publishing a release locks its tag and release assets
+and GitHub automatically generates a cryptographic release attestation covering
+the release identity.
+
+The tag-publish workflow verifies that attestation after creating the release.
+A missing or invalid attestation fails the workflow.
+
+Consumers can verify a published release with GitHub CLI:
+
+```sh
+gh release verify v1.0.0 --repo ekkolon/zymbol
+```
+
+The Zig package fetch adds a second integrity layer: Zig records the fetched
+package content hash in the consumer's `build.zig.zon`.
 
 ## Discovery
 
