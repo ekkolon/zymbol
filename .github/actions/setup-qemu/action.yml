@@ -1,0 +1,40 @@
+name: Setup QEMU
+description: Install QEMU user-mode emulators from Ubuntu's signed archive
+
+runs:
+  using: composite
+  steps:
+    - name: Install QEMU
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if ! command -v qemu-i386 >/dev/null || ! command -v qemu-ppc64 >/dev/null; then
+          apt_dir="$(mktemp -d)"
+          chmod 755 "$apt_dir"
+          mkdir "$apt_dir/lists"
+
+          cat > "$apt_dir/ubuntu.sources" <<'SOURCES'
+        Types: deb
+        URIs: https://archive.ubuntu.com/ubuntu
+        Suites: noble noble-updates noble-security
+        Components: main universe
+        Architectures: amd64
+        Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+        SOURCES
+
+          apt_options=(
+            -o "Dir::Etc::sourcelist=$apt_dir/ubuntu.sources"
+            -o "Dir::Etc::sourceparts=-"
+            -o "Dir::State::lists=$apt_dir/lists"
+            -o Acquire::Retries=1
+            -o Acquire::http::Timeout=20
+            -o Acquire::https::Timeout=20
+            -o Acquire::Languages=none
+          )
+          sudo apt-get "${apt_options[@]}" update --error-on=any
+          sudo apt-get "${apt_options[@]}" install --yes --no-install-recommends qemu-user
+        fi
+
+        qemu-i386 --version
+        qemu-ppc64 --version

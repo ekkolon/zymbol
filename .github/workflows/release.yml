@@ -124,9 +124,8 @@ jobs:
           fi
 
       - name: Install QEMU
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes qemu-user
+        timeout-minutes: 5
+        uses: ./.github/actions/setup-qemu
 
       - name: Qualify
         run: zig build qualify
