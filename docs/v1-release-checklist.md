@@ -44,9 +44,13 @@ zig build fuzz
 (cd tests/consumer && zig build test)
 ```
 
-Run ZXing-cpp interoperability in its prepared Python environment:
+Runtime portability requires QEMU user-mode interpreters for the configured
+cross targets. On Ubuntu/WSL, install `qemu-user` before running the QEMU gate.
+
+ZXing-cpp interoperability uses the pinned Python dependency:
 
 ```sh
+python3 -m pip install -r tests/interop-requirements.txt
 zig build interop
 ```
 
