@@ -311,6 +311,11 @@ def main() -> None:
             for commit in commits
             if (entry := parse_entry(commit)) is not None
         ]
+        if not entries and args.version is None:
+            print(f"no releasable changes since {tag}")
+            write_outputs(args.github_output, changed=False)
+            return
+
         target = (
             parse_version(args.version)
             if args.version
