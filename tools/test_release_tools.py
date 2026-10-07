@@ -239,6 +239,38 @@ Initial project baseline.
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("version badge does not match", result.stderr)
 
+    def test_release_workflow_stages_tag_before_draft_publication(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+            encoding="utf-8"
+        )
+
+        create_tag = workflow.index("- name: Create release tag")
+        validate_archive = workflow.index("- name: Validate canonical tag archive")
+        create_draft = workflow.index("- name: Create draft GitHub Release")
+        cleanup = workflow.index("- name: Clean up failed release preparation")
+        publish = workflow.index("- name: Publish immutable GitHub Release")
+        verify_immutable = workflow.index("- name: Verify immutable release state")
+        verify_attestation = workflow.index("- name: Verify GitHub release attestation")
+
+        self.assertLess(create_tag, validate_archive)
+        self.assertLess(validate_archive, create_draft)
+        self.assertLess(create_draft, cleanup)
+        self.assertLess(cleanup, publish)
+        self.assertLess(publish, verify_immutable)
+        self.assertLess(verify_immutable, verify_attestation)
+
+        self.assertIn('ref="refs/tags/$RELEASE_TAG"', workflow)
+        self.assertIn("--verify-tag", workflow)
+        self.assertIn('RELEASE_TAG_CLEANUP=true', workflow)
+        self.assertIn('RELEASE_DRAFT_CLEANUP=true', workflow)
+
+        cleanup_block = workflow[cleanup:publish]
+        self.assertIn('gh release delete "$RELEASE_TAG"', cleanup_block)
+        self.assertIn(
+            '"repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG"',
+            cleanup_block,
+        )
+
     def test_pull_request_title_policy(self) -> None:
         valid = self.run_cmd(
             sys.executable,
