@@ -1,0 +1,170 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Optional explicit version; required for the initial v1 release
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-prepare
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare release PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: main
+
+      - name: Fetch release tags
+        run: git fetch --tags --force
+
+      - name: Prepare metadata
+        id: prepare
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          args=()
+          if [[ -n "$REQUESTED_VERSION" ]]; then
+            args+=(--version "$REQUESTED_VERSION")
+          fi
+
+          python3 tools/prepare_release.py "${args[@]}" --github-output "$GITHUB_OUTPUT"
+
+      - name: Create verified release candidate
+        id: candidate
+        if: steps.prepare.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          base_sha="$(git rev-parse HEAD)"
+          short_sha="${base_sha:0:12}"
+          branch="release/v$VERSION-$short_sha"
+          ref="refs/heads/$branch"
+
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" >/dev/null 2>&1; then
+            echo "::error::Release candidate branch already exists: $branch"
+            exit 1
+          fi
+
+          gh api \
+            --method POST \
+            "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="$ref" \
+            -f sha="$base_sha" \
+            >/dev/null
+
+          query='mutation($input: CreateCommitOnBranchInput!) {
+            createCommitOnBranch(input: $input) {
+              commit {
+                oid
+                signature {
+                  isValid
+                  state
+                  wasSignedByGitHub
+                }
+              }
+            }
+          }'
+
+          request="$RUNNER_TEMP/release-commit-request.json"
+          response="$RUNNER_TEMP/release-commit-response.json"
+
+          jq -n \
+            --arg query "$query" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg branch "$branch" \
+            --arg head "$base_sha" \
+            --arg headline "release: prepare Zymbol v$VERSION" \
+            --arg changelog "$(base64 -w0 CHANGELOG.md)" \
+            --arg readme "$(base64 -w0 README.md)" \
+            --arg manifest "$(base64 -w0 build.zig.zon)" \
+            --arg distribution "$(base64 -w0 docs/distribution.md)" \
+            '{
+              query: $query,
+              variables: {
+                input: {
+                  branch: {
+                    repositoryNameWithOwner: $repo,
+                    branchName: $branch
+                  },
+                  expectedHeadOid: $head,
+                  message: {
+                    headline: $headline
+                  },
+                  fileChanges: {
+                    additions: [
+                      {path: "CHANGELOG.md", contents: $changelog},
+                      {path: "README.md", contents: $readme},
+                      {path: "build.zig.zon", contents: $manifest},
+                      {path: "docs/distribution.md", contents: $distribution}
+                    ]
+                  }
+                }
+              }
+            }' > "$request"
+
+          if ! gh api graphql --input "$request" > "$response"; then
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch" || true
+            exit 1
+          fi
+
+          commit_oid="$(jq -er '.data.createCommitOnBranch.commit.oid' "$response")"
+          valid="$(jq -r '.data.createCommitOnBranch.commit.signature.isValid // false' "$response")"
+          state="$(jq -r '.data.createCommitOnBranch.commit.signature.state // "MISSING"' "$response")"
+          github_signed="$(jq -r '.data.createCommitOnBranch.commit.signature.wasSignedByGitHub // false' "$response")"
+
+          if [[ "$valid" != "true" || "$state" != "VALID" || "$github_signed" != "true" ]]; then
+            echo "::error::Release commit was not verified as GitHub-signed."
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch" || true
+            exit 1
+          fi
+
+          rest_verified="$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit_oid" --jq '.commit.verification.verified')"
+          rest_reason="$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit_oid" --jq '.commit.verification.reason')"
+
+          if [[ "$rest_verified" != "true" || "$rest_reason" != "valid" ]]; then
+            echo "::error::Release commit failed REST signature verification."
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch" || true
+            exit 1
+          fi
+
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit_oid" >> "$GITHUB_OUTPUT"
+
+      - name: Open release PR
+        if: steps.prepare.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.prepare.outputs.version }}
+          RELEASE_BRANCH: ${{ steps.candidate.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          gh pr create \
+            --head "$RELEASE_BRANCH" \
+            --base main \
+            --draft \
+            --title "release: Zymbol v$VERSION" \
+            --body "Generated release candidate for Zymbol v$VERSION. Review the changelog and version metadata, then mark this PR ready to run release CI."

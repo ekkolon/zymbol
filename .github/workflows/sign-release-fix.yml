@@ -1,0 +1,104 @@
+name: Sign release workflow fix
+
+on:
+  pull_request:
+    types:
+      - synchronize
+
+permissions:
+  contents: write
+
+jobs:
+  sign:
+    if: >-
+      ${{
+        github.event.pull_request.draft == true &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.head.ref == 'fix/signed-release-bot-commit'
+      }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout temporary payload
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Create verified replacement commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: fix/signed-release-bot-commit-v2
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          query='mutation($input: CreateCommitOnBranchInput!) {
+            createCommitOnBranch(input: $input) {
+              commit {
+                oid
+                signature {
+                  isValid
+                  state
+                  wasSignedByGitHub
+                }
+              }
+            }
+          }'
+
+          request="$RUNNER_TEMP/sign-fix-request.json"
+          response="$RUNNER_TEMP/sign-fix-response.json"
+
+          jq -n \
+            --arg query "$query" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg branch "$TARGET_BRANCH" \
+            --arg head "$BASE_SHA" \
+            --arg prepare "$(base64 -w0 .release-fix/prepare-release.yml)" \
+            --arg release "$(base64 -w0 .release-fix/release.yml)" \
+            --arg distribution "$(base64 -w0 .release-fix/distribution.md)" \
+            --arg checklist "$(base64 -w0 .release-fix/checklist.md)" \
+            '{
+              query: $query,
+              variables: {
+                input: {
+                  branch: {
+                    repositoryNameWithOwner: $repo,
+                    branchName: $branch
+                  },
+                  expectedHeadOid: $head,
+                  message: {
+                    headline: "fix(release): create verified release commits"
+                  },
+                  fileChanges: {
+                    additions: [
+                      {path: ".github/workflows/prepare-release.yml", contents: $prepare},
+                      {path: ".github/workflows/release.yml", contents: $release},
+                      {path: "docs/distribution.md", contents: $distribution},
+                      {path: "docs/v1-release-checklist.md", contents: $checklist}
+                    ]
+                  }
+                }
+              }
+            }' > "$request"
+
+          gh api graphql --input "$request" > "$response"
+
+          commit_oid="$(jq -er '.data.createCommitOnBranch.commit.oid' "$response")"
+          valid="$(jq -r '.data.createCommitOnBranch.commit.signature.isValid // false' "$response")"
+          state="$(jq -r '.data.createCommitOnBranch.commit.signature.state // "MISSING"' "$response")"
+          github_signed="$(jq -r '.data.createCommitOnBranch.commit.signature.wasSignedByGitHub // false' "$response")"
+
+          if [[ "$valid" != "true" || "$state" != "VALID" || "$github_signed" != "true" ]]; then
+            echo "::error::Replacement commit was not verified as GitHub-signed."
+            exit 1
+          fi
+
+          verified="$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit_oid" --jq '.commit.verification.verified')"
+          reason="$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit_oid" --jq '.commit.verification.reason')"
+
+          if [[ "$verified" != "true" || "$reason" != "valid" ]]; then
+            echo "::error::Replacement commit failed REST signature verification."
+            exit 1
+          fi
