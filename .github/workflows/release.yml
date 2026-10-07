@@ -153,7 +153,26 @@ jobs:
             exit 1
           fi
 
+          echo "RELEASE_DRAFT_CREATED=true" >> "$GITHUB_ENV"
+
+      - name: Validate canonical tag archive
+        if: env.PUBLISH_RELEASE == 'true'
+        run: |
+          python3 tools/package_smoke.py \
+            "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz"
+
+      - name: Clean up failed draft release
+        if: failure() && env.RELEASE_DRAFT_CREATED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --cleanup-tag \
+            --yes || true
+
       - name: Publish immutable GitHub Release
+        if: success() && env.PUBLISH_RELEASE == 'true'
         if: env.PUBLISH_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
