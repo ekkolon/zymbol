@@ -1,8 +1,7 @@
 # v1 fuzz qualification
 
-Zymbol uses Zig 0.17's coverage-guided test fuzzer for release qualification. Zig
-0.16 remains the minimum supported compiler for ordinary builds, tests, and
-portability checks; sustained fuzzing is a release-tooling exception.
+Zymbol requires Zig 0.17.0. The same compiler baseline is used for ordinary
+builds, tests, portability checks, release qualification, and sustained fuzzing.
 
 ## Targets
 
