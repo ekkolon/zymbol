@@ -51,19 +51,19 @@ builds the fetched package.
 
 ## Release validation
 
-Merged feature and fix pull requests feed an automated release train. After the
-first stable tag, conventional squash-commit titles determine the next semantic
-version and populate an automatically maintained release PR.
+Run `python3 tools/prepare_release_candidate.py` when a release is intended.
+The command derives the next semantic version from conventional squash-commit
+titles since the latest tag, updates the changelog and version metadata, and
+creates a fresh release branch from the current `main`.
 
-The release PR updates `CHANGELOG.md`, `build.zig.zon`, the README version,
-and distribution metadata before publication. It remains a draft while changes
-accumulate. Marking it ready is the explicit release-intent step; merging it
-runs the full release pipeline against the exact merged commit. GitHub creates
-the tag and release only after every gate passes.
+The release metadata commit is signed with Nelson Dominguez's configured GPG
+key and verified locally before it is pushed. The command then opens a draft
+release PR. Marking that PR ready runs normal CI; merging it runs the full
+release pipeline against the exact merged commit. GitHub creates the tag and
+release only after every gate passes.
 
-The same Release workflow can be run manually with publishing disabled. On a
-private repository it builds a local source archive and exercises the package
-smoke test without making the repository or a release public.
+The Release workflow can also be run manually with publishing disabled to
+exercise the full release pipeline without creating a tag or GitHub Release.
 
 The workflow checks:
 
