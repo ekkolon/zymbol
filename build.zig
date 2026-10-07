@@ -103,9 +103,20 @@ pub fn build(b: *std.Build) void {
     const python = b.option(
         []const u8,
         "python",
-        "Python executable for optional interoperability/validation gates",
+        "Python executable for validation and benchmark support",
     ) orelse "python3";
-    const run_interop = b.addSystemCommand(&.{ python, "tests/interop_zxing.py" });
+    const uv = b.option(
+        []const u8,
+        "uv",
+        "uv executable for ZXing interoperability",
+    ) orelse "uv";
+    const run_interop = b.addSystemCommand(&.{
+        uv,
+        "run",
+        "--managed-python",
+        "--script",
+        "tests/interop_zxing.py",
+    });
     run_interop.addArtifactArg(interop_driver);
 
     const interop_step = b.step(

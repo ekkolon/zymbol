@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = "==3.14.8"
+# dependencies = [
+#   "zxing-cpp==3.1.1",
+# ]
+#
+# [tool.uv]
+# exclude-newer = "2026-07-30T00:00:00Z"
+# ///
+
 import os
 import subprocess
 import sys
@@ -7,7 +17,7 @@ try:
     import zxingcpp
 except ImportError as exc:
     raise SystemExit(
-        "missing zxing-cpp 3.1.1; install tests/interop-requirements.txt"
+        "missing zxing-cpp 3.1.1; run this script through pinned uv"
     ) from exc
 
 
@@ -102,7 +112,7 @@ def external_cases():
         ("Q", "QR Code Symbol", q, {"version": 1, "ec_level": "M"}),
         ("Q", "12345678901234567890", q, {"version": 1, "ec_level": "M"}),
         ("Q", "https://example.com/zymbol", q, {"version": 2, "ec_level": "M"}),
-        ("Q", "QRZ VERSION 7 CONFORMANCE", q, {"version": 7, "ec_level": "Q"}),
+        ("Q", "ZYMBOL VERSION 7 CONFORMANCE", q, {"version": 7, "ec_level": "Q"}),
         ("M", "12345", m, {"version": 1, "ec_level": "L"}),
         ("M", "01234567", m, {"version": 2, "ec_level": "L"}),
         ("M", "12345678901234567890123", m, {"version": 3, "ec_level": "L"}),
@@ -111,7 +121,7 @@ def external_cases():
     ]
 
 
-def check_zxing_to_qrz(driver):
+def check_zxing_to_zymbol(driver):
     checked = 0
 
     for family, payload, barcode_format, options in external_cases():
@@ -141,7 +151,7 @@ def main():
 
     driver = sys.argv[1]
     forward = check_zymbol_to_zxing(driver)
-    reverse = check_zxing_to_qrz(driver)
+    reverse = check_zxing_to_zymbol(driver)
     print(
         f"interop success: {forward} Zymbol->ZXing-cpp, "
         f"{reverse} ZXing-cpp->Zymbol"

@@ -47,10 +47,15 @@ zig build fuzz
 Runtime portability requires QEMU user-mode interpreters for the configured
 cross targets. On Ubuntu/WSL, install `qemu-user` before running the QEMU gate.
 
-ZXing-cpp interoperability uses the pinned Python dependency:
+ZXing-cpp interoperability is isolated through Astral uv. `uv.toml` pins the
+uv release; the script metadata pins CPython 3.14.8, `zxing-cpp==3.1.1`, and
+an artifact cutoff so later uploads cannot alter the environment.
+
+Install the repository-pinned uv release when needed, then run the normal gate:
 
 ```sh
-python3 -m pip install -r tests/interop-requirements.txt
+curl -LsSf https://astral.sh/uv/0.12.23/install.sh | sh
+uv --version
 zig build interop
 ```
 
