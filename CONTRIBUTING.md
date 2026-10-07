@@ -27,6 +27,20 @@ Keep a pull request focused on one coherent change. Zymbol uses squash merges,
 so intermediate commits can remain practical while the final change stays
 traceable.
 
+Pull request titles use a Conventional Commits-style prefix because the squash
+title is also release metadata:
+
+- `feat:` for user-visible backwards-compatible functionality;
+- `fix:` for bug fixes;
+- `perf:`, `refactor:`, `revert:`, or `security:` for releasable
+  non-feature changes;
+- `docs:`, `test:`, `build:`, `ci:`, or `chore:` for changes that do
+  not create a release on their own;
+- append `!` before the colon for an intentionally breaking change.
+
+The automated release train derives semantic-version bumps and changelog
+entries from those squash titles.
+
 Draft pull requests do not run hosted CI. Qualify changes locally before
 marking a pull request ready for review.
 

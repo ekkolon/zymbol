@@ -3,29 +3,45 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: Release version to validate
+      publish:
+        description: Publish after validation; keep false for a dry run
         required: true
-        default: v1.0.0
-  push:
-    tags:
-      - "v*.*.*"
+        default: false
+        type: boolean
+  pull_request:
+    types:
+      - closed
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
-    if: ${{ github.event.repository.private == false }}
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.pull_request.merged == true &&
+          github.event.pull_request.base.ref == 'main' &&
+          github.event.pull_request.head.ref == 'release/next' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        )
+      }}
     name: Validate and publish
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 50
+
     steps:
-      - name: Checkout
+      - name: Checkout release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
 
       - name: Install Zig
         uses: ./.github/actions/setup-zig
@@ -39,38 +55,72 @@ jobs:
           python-version: "3.14.8"
           enable-cache: false
 
-      - name: Resolve release tag
+      - name: Resolve release identity
         shell: bash
+        env:
+          MANUAL_PUBLISH: ${{ inputs.publish }}
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            echo "RELEASE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
-          else
-            echo "RELEASE_TAG=${{ inputs.tag }}" >> "$GITHUB_ENV"
+          tag="$(python3 tools/release.py --print-manifest-tag)"
+          sha="$(git rev-parse HEAD)"
+
+          publish=false
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" && "${{ github.event.repository.private }}" == "false" ]]; then
+            publish=true
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$MANUAL_PUBLISH" == "true" ]]; then
+            if [[ "${{ github.event.repository.private }}" == "true" ]]; then
+              echo "::error::A private dry run cannot publish a stable release."
+              exit 1
+            fi
+            publish=true
           fi
+
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          echo "RELEASE_SHA=$sha" >> "$GITHUB_ENV"
+          echo "PUBLISH_RELEASE=$publish" >> "$GITHUB_ENV"
 
       - name: Validate release metadata
         run: python3 tools/release.py "$RELEASE_TAG" --notes-out release-notes.md
 
-      - name: Format
-        run: zig fmt --check build.zig src tests examples benchmarks
-
-      - name: Check API docs
-        run: python3 tools/check_api_docs.py
+      - name: Repository checks
+        shell: bash
+        run: |
+          git diff --check
+          zig fmt --check build.zig src tests examples benchmarks
+          python3 tools/check_api_docs.py
+          python3 tools/test_release_tools.py
 
       - name: Consumer smoke
         working-directory: tests/consumer
         run: zig build test
 
-      - name: Remote package smoke
+      - name: Package smoke
         shell: bash
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            ref="refs/tags/$RELEASE_TAG"
+          if [[ "${{ github.event.repository.private }}" == "true" ]]; then
+            archive_dir="$(mktemp -d)"
+            archive="$archive_dir/zymbol.tar.gz"
+
+            git archive \
+              --format=tar.gz \
+              --prefix="zymbol-$RELEASE_SHA/" \
+              --output="$archive" \
+              "$RELEASE_SHA"
+
+            python3 -m http.server \
+              8765 \
+              --bind 127.0.0.1 \
+              --directory "$archive_dir" \
+              >"$RUNNER_TEMP/zymbol-package-server.log" 2>&1 &
+            server_pid=$!
+            trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+            sleep 1
+
+            python3 tools/package_smoke.py \
+              "http://127.0.0.1:8765/zymbol.tar.gz"
           else
-            ref="$GITHUB_SHA"
+            python3 tools/package_smoke.py \
+              "https://github.com/$GITHUB_REPOSITORY/archive/$RELEASE_SHA.tar.gz"
           fi
-          python3 tools/package_smoke.py \
-            "https://github.com/$GITHUB_REPOSITORY/archive/$ref.tar.gz"
 
       - name: Install QEMU
         run: |
@@ -89,21 +139,72 @@ jobs:
       - name: Validate SVG
         run: zig build svg-validate
 
+      - name: Benchmark
+        run: zig build benchmark
+
+      - name: Deterministic fuzz replay
+        run: zig build fuzz
+
       - name: ZXing interoperability
         run: zig build interop
 
-      - name: Publish GitHub Release
-        if: github.event_name == 'push'
+      - name: Create draft GitHub Release
+        if: env.PUBLISH_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release $RELEASE_TAG already exists."
+            exit 1
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
+            --draft \
+            --title "Zymbol $RELEASE_TAG" \
+            --notes-file release-notes.md
+
+          actual="$(gh api \
+            "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+            --jq '.object.sha')"
+
+          if [[ "$actual" != "$RELEASE_SHA" ]]; then
+            echo "::error::Release tag points to $actual instead of $RELEASE_SHA."
+            exit 1
+          fi
+
+          echo "RELEASE_DRAFT_CREATED=true" >> "$GITHUB_ENV"
+
+      - name: Validate canonical tag archive
+        if: env.PUBLISH_RELEASE == 'true'
+        run: |
+          python3 tools/package_smoke.py \
+            "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz"
+
+      - name: Clean up failed draft release
+        if: failure() && env.RELEASE_DRAFT_CREATED == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" \
-            --verify-tag \
-            --title "$RELEASE_TAG" \
-            --notes-file release-notes.md
+          gh release delete "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --cleanup-tag \
+            --yes || true
+
+      - name: Publish immutable GitHub Release
+        if: success() && env.PUBLISH_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --latest
 
       - name: Verify GitHub release attestation
-        if: github.event_name == 'push'
+        if: success() && env.PUBLISH_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
