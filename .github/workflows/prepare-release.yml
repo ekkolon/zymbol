@@ -7,9 +7,9 @@ on:
         description: Optional explicit version; required for the initial v1 release
         required: false
         type: string
-  push:
-    branches:
-      - main
+  pull_request:
+    types:
+      - closed
 
 permissions:
   contents: write
@@ -21,15 +21,32 @@ concurrency:
 
 jobs:
   prepare:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.repository.private == false }}
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.repository.private == false &&
+          github.event.pull_request.merged == true &&
+          github.event.pull_request.base.ref == 'main' &&
+          (
+            startsWith(github.event.pull_request.title, 'feat') ||
+            startsWith(github.event.pull_request.title, 'fix') ||
+            startsWith(github.event.pull_request.title, 'perf') ||
+            startsWith(github.event.pull_request.title, 'refactor') ||
+            startsWith(github.event.pull_request.title, 'revert') ||
+            startsWith(github.event.pull_request.title, 'security')
+          )
+        )
+      }}
     name: Prepare release PR
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          ref: main
 
       - name: Fetch release tags
         run: git fetch --tags --force
