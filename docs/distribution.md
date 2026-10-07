@@ -51,9 +51,18 @@ builds the fetched package.
 
 ## Release validation
 
-The Release workflow supports a manual dry run against the exact release
-commit. A version-tag push repeats the same validation before GitHub creates the
-release.
+Merged feature and fix pull requests feed an automated release train. After the
+first stable tag, conventional squash-commit titles determine the next semantic
+version and populate an automatically maintained release PR.
+
+The release PR updates `CHANGELOG.md`, `build.zig.zon`, the README version,
+and distribution metadata before publication. Merging that PR runs the full
+release pipeline against the exact merged commit. GitHub creates the tag and
+release only after every gate passes.
+
+The same Release workflow can be run manually with publishing disabled. On a
+private repository it builds a local source archive and exercises the package
+smoke test without making the repository or a release public.
 
 The workflow checks:
 
@@ -103,8 +112,9 @@ developers can find it without changing the package's source of truth.
 
 The recommended GitHub repository description is:
 
-> Dependency-free QR Code Model 2 and Micro QR library for Zig with
-> allocation-free encoding/decoding and PNG/SVG rendering.
+> Standards-conformant QR Code Model 2 and Micro QR library for Zig with an
+> allocation-free core, zero package dependencies, and built-in PNG/SVG
+> rendering.
 
 [readme]: ../README.md
 [release-checklist]: v1-release-checklist.md
