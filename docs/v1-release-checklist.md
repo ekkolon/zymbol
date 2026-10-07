@@ -67,7 +67,8 @@ affected qualification and must be retested.
 Before creating the first public release:
 
 1. make the repository public;
-2. set the repository description to a concise statement of the package scope;
+2. set the repository description to:
+   `Dependency-free QR Code Model 2 and Micro QR library for Zig with allocation-free encoding/decoding and PNG/SVG rendering.`;
 3. verify the README names Nelson Dominguez as maintainer and includes the DENSO WAVE QR Code trademark notice;
 4. add the topics `zig`, `zig-package`, `qr-code`, `qrcode`, and
    `micro-qr`;
@@ -104,8 +105,8 @@ The repository conformance ledger is supporting evidence. It is not a
 substitute for the normative standard.
 
 The normative review was completed against ISO/IEC 18004:2024 on 2026-10-07.
-The fixes produced by that review must pass structural qualification before the
-claim is published.
+The resulting fixes passed structural qualification, closing the v1 normative
+review within the documented component boundary.
 
 ## 5. Release metadata
 
@@ -115,7 +116,8 @@ After the preceding gates pass:
 2. replace `Unreleased` in `CHANGELOG.md` with
    `1.0.0 - YYYY-MM-DD`;
 3. change the README version badge and status from `0.1.0` release candidate to stable `v1.0.0`;
-4. run:
+4. update the version row in `docs/distribution.md` to `1.0.0`;
+5. run:
    ```sh
    python3 tools/release.py v1.0.0
    zig fmt --check build.zig src tests examples benchmarks
@@ -124,8 +126,8 @@ After the preceding gates pass:
    zig build conformance
    zig build qualify
    ```
-5. commit only those release-metadata changes;
-6. run the `Release` workflow manually with `tag=v1.0.0`. This is a dry run: it validates the exact release commit and its remote source archive but does not create a tag or GitHub Release.
+6. commit only those release-metadata changes;
+7. run the `Release` workflow manually with `tag=v1.0.0`. This is a dry run: it validates the exact release commit and its remote source archive but does not create a tag or GitHub Release.
 
 ## 6. Tag and publish
 

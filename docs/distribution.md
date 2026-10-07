@@ -78,9 +78,14 @@ See the [release checklist][release-checklist] for the authoritative sequence.
 GitHub is the canonical package location. Zymbol does not require a separate
 registry publication. Community package indexes are discovery layers only.
 
-The public repository should advertise the `zig-package`, `qr-code`,
-`qrcode`, and `micro-qr` topics so Zig package indexes and developers can
-find it without changing the package's source of truth.
+The public repository should advertise the `zig`, `zig-package`,
+`qr-code`, `qrcode`, and `micro-qr` topics so Zig package indexes and
+developers can find it without changing the package's source of truth.
+
+The recommended GitHub repository description is:
+
+> Dependency-free QR Code Model 2 and Micro QR library for Zig with
+> allocation-free encoding/decoding and PNG/SVG rendering.
 
 [readme]: ../README.md
 [release-checklist]: v1-release-checklist.md
