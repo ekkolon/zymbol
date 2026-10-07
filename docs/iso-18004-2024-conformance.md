@@ -54,7 +54,7 @@ QR Code Model 1 is not implemented.
 
 ## Normative review
 
-### Clause 5 — Symbol description
+### Clause 5: Symbol description
 
 **Covered.** QR Code versions 1-40 and Micro QR M1-M4 have the required
 dimensions and function-pattern geometry. Finder, separator, timing and QR
@@ -62,12 +62,12 @@ alignment patterns are independently checked. Renderer defaults use 4X QR and
 2X Micro QR quiet zones. Mirror and reflectance-reversal behavior is covered by
 decode and renderer tests.
 
-### Clause 6 — Conformance
+### Clause 6: Conformance
 
 **Scoped as above.** Zymbol is a symbol-format and sampled-grid component. The
 claim does not extend to the external production/acquisition system.
 
-### Clause 7 — Requirements
+### Clause 7: Requirements
 
 **Covered within the high-level API boundary.**
 
@@ -93,21 +93,21 @@ The normative review found and corrected one header-order defect: initial ECI
 headers precede FNC1, while FNC1 remains immediately before the first payload
 mode. Structured Append remains the first header when present.
 
-### Clause 8 — Structured Append
+### Clause 8: Structured Append
 
 **Covered for symbol-level encoding and per-symbol decoding.** Sequence index,
 sequence length and parity are encoded and reported. Parity helpers XOR the
 caller-supplied original message bytes. Zymbol does not buffer and reconstruct
 a multi-symbol message automatically.
 
-### Clauses 9-10 — Symbol production and quality
+### Clauses 9-10: Symbol production and quality
 
 **External.** Zymbol supplies square digital module geometry and conforming
 default quiet zones. Physical dimensions, marking processes, reflectance
 measurements and ISO/IEC 15415 quality grading belong to the output medium and
 scanner.
 
-### Clauses 11-12 — Decoding
+### Clauses 11-12: Decoding
 
 **Covered from the sampled-grid boundary.** Zymbol receives the binary module
 matrix after acquisition. It recovers format/version data, removes masking,
@@ -115,13 +115,13 @@ reconstructs/interleaves blocks, performs bounded Reed-Solomon correction and
 parses the data stream. Optical location, sampling-grid construction and
 rotation recovery occur before this API boundary.
 
-### Clause 13 — Autodiscrimination
+### Clause 13: Autodiscrimination
 
 **Partial by design.** `decodeAny` discriminates QR from Micro QR using their
 non-overlapping sampled-grid dimensions. Autodiscrimination against unrelated
 barcode symbologies belongs to the acquisition/reader layer.
 
-### Clause 14 — Transmitted data
+### Clause 14: Transmitted data
 
 **Transport framing is outside the API boundary.** Zymbol does not emit the
 Clause 14 host byte stream. QR decode returns payload bytes plus ECI state,
@@ -204,11 +204,11 @@ It is not a publication blocker. Any defect found during or after publication
 must be reduced into a durable regression and fixed in the appropriate patch
 release.
 
-## Sign-off rule
+## Sign-off
 
-The normative text review is complete. The ISO blocker closes when the
-post-review conformance changes pass the candidate qualification suite on the
-exact commit intended for release.
+The normative text review is complete. The post-review implementation changes
+passed the candidate qualification suite on 2026-10-07, closing the v1 ISO
+review within the claim boundary documented above.
 
-A later production-code change affecting the reviewed behavior invalidates the
+A later production-code change affecting reviewed behavior invalidates the
 corresponding part of this sign-off and requires requalification.

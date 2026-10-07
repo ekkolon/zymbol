@@ -28,4 +28,4 @@ For the QR Figure 1 fixture, mask 5 is pinned as part of the external matrix. An
 
 ZXing-cpp reference streams cover ECI assignment 2 plus FNC1 first- and second-position decoding semantics.
 
-The conformance gate now includes independent QR geometry/block-layout sweeps, all QR byte/numeric/alphanumeric/Kanji capacity edges, Annex A generator checks, Annex B RS correction/rejection behavior, BCH recovery, special-header vectors, and a separately executable bidirectional ZXing-cpp differential campaign. Remaining release work is outside this fixture set: rendering, output-format qualification, portability runtime evidence, fuzz closure, and final clause audit.
+The conformance gate includes independent QR geometry and block-layout sweeps, all QR byte/numeric/alphanumeric/Kanji capacity edges, Annex A generator checks, Annex B RS correction/rejection behavior, BCH recovery, special-header vectors, and a separately executable bidirectional ZXing-cpp differential campaign. Rendering, output-format validation, portability, fuzzing, and the normative clause review are documented separately in the repository documentation index.
