@@ -56,9 +56,10 @@ first stable tag, conventional squash-commit titles determine the next semantic
 version and populate an automatically maintained release PR.
 
 The release PR updates `CHANGELOG.md`, `build.zig.zon`, the README version,
-and distribution metadata before publication. Merging that PR runs the full
-release pipeline against the exact merged commit. GitHub creates the tag and
-release only after every gate passes.
+and distribution metadata before publication. It remains a draft while changes
+accumulate. Marking it ready is the explicit release-intent step; merging it
+runs the full release pipeline against the exact merged commit. GitHub creates
+the tag and release only after every gate passes.
 
 The same Release workflow can be run manually with publishing disabled. On a
 private repository it builds a local source archive and exercises the package
