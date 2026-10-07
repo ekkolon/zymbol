@@ -43,7 +43,7 @@ jobs:
           if [[ -n "$REQUESTED_VERSION" ]]; then
             args+=(--version "$REQUESTED_VERSION")
           fi
-          python3 tools/prepare_release.py             "${args[@]}"             --github-output "$GITHUB_OUTPUT"
+          python3 tools/prepare_release.py "${args[@]}" --github-output "$GITHUB_OUTPUT"
 
       - name: Create or update release PR
         if: steps.prepare.outputs.changed == 'true'
@@ -56,7 +56,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git switch -C release/next
-          git add             CHANGELOG.md             README.md             build.zig.zon             docs/distribution.md
+          git add CHANGELOG.md README.md build.zig.zon docs/distribution.md
           git commit -m "release: prepare Zymbol v$VERSION"
 
           git fetch origin release/next:refs/remotes/origin/release/next || true
@@ -67,10 +67,11 @@ jobs:
 
 This PR is intentionally kept as a draft while changes accumulate. Mark it ready to run normal CI, then merge it to trigger the full release validation pipeline. A public repository publishes only after every release gate passes. The same pipeline can be run manually with publishing disabled while the repository is private."
 
-          number="$(gh pr list             --head release/next             --base main             --state open             --json number             --jq '.[0].number // empty')"
+          number="$(gh pr list --head release/next --base main --state open --json number --jq '.[0].number // empty')"
 
           if [[ -z "$number" ]]; then
-            gh pr create               --head release/next               --base main               --title "$title"               --body "$body"
+            gh pr create --head release/next --base main --draft --title "$title" --body "$body"
           else
-            gh pr edit "$number"               --title "$title"               --body "$body"
+            gh pr edit "$number" --title "$title" --body "$body"
+            gh pr ready "$number" --undo || true
           fi
