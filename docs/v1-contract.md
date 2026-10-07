@@ -12,9 +12,11 @@ Zymbol core accepts and returns module grids. Image acquisition, finder detectio
 
 `encodeText` accepts valid UTF-8. Non-ASCII text is preceded by ECI assignment 26. Numeric, alphanumeric and byte segments are selected for minimum encoded bit length.
 
-`encodeBytes` preserves the supplied byte sequence and does not attach text-encoding semantics.
+`encodeBytes` preserves the supplied byte values and emits no ECI. The QR default interpretation remains in force; Zymbol performs no transcoding.
 
 `encodeRaw` is the low-level entry point. Its input must contain exactly the data-codeword count for the selected version and error-correction level.
+
+`mask = null` performs the normative automatic mask selection. Supplying a mask explicitly is a low-level/testing override and is outside the automatic-selection conformance claim unless that mask is also an optimum candidate.
 
 Encoding never requests an allocator. QR callers supply the module buffer and interleaved-codeword scratch buffer. Micro QR encoding requires only caller-owned module storage.
 
@@ -22,7 +24,7 @@ Encoding never requests an allocator. QR callers supply the module buffer and in
 
 Internally, rendering depends on the core module; the public `zymbol` facade exposes both without a dependency cycle.
 
-Raster rendering writes caller-selected pixel values into caller-owned buffers. Tightly packed and strided output are supported. Scaling is integral. The family default quiet zone is four modules for QR and two modules for Micro QR; callers may override it explicitly.
+Raster rendering writes caller-selected pixel values into caller-owned buffers. Tightly packed and strided output are supported. Scaling is integral. The family default quiet zone is four modules for QR and two modules for Micro QR. Callers may override it for composition, but a smaller final quiet zone is outside the ISO conformance claim.
 
 SVG and PNG are built-in output formats. Their low-level APIs write into caller-owned buffers without allocation. PNG is emitted directly from symbol modules as a 1-bit indexed image; no intermediate raster image is required.
 
@@ -36,7 +38,7 @@ No renderer performs file I/O. JPEG, WebP, AVIF and other codecs are outside the
 
 ## Decoding
 
-`decode` accepts a square, already sampled QR module grid. Symbol dimensions determine the version. Versions 7-40 additionally validate the redundant BCH version information.
+`decode` accepts a square, already sampled QR module grid in canonical rotational orientation. Symbol dimensions determine the version. Versions 7-40 additionally validate the redundant BCH version information. Rotation recovery belongs to the acquisition layer.
 
 `decodeMicro` accepts an already sampled 11, 13, 15, or 17 module Micro QR grid. `decodeAny` dispatches to QR or Micro QR from the non-overlapping symbol dimensions. Both decoders normalize mirrored and reversed-reflectance inputs and report the applied transform.
 
@@ -44,7 +46,7 @@ Format and version BCH recovery accept corruption within the QR correction radiu
 
 Reed-Solomon correction is performed one block at a time. Malformed streams, invalid geometry, insufficient caller buffers and unrecoverable blocks are returned as errors.
 
-Decoded output is bytes. QR `DecodeResult` reports ECI state, FNC1, Structured Append metadata, symbology modifier, mirror state and reversed-reflectance state. Micro QR returns its version, EC level, mask and transform metadata. Character-set interpretation remains the caller's responsibility.
+Decoded output is bytes. QR `DecodeResult` reports ECI state, FNC1, Structured Append metadata, symbology modifier, mirror state and reversed-reflectance state. Micro QR returns its version, EC level, mask and transform metadata. Character-set interpretation remains the caller's responsibility. Zymbol does not implement the Clause 14 host-transmission framing protocol.
 
 ## Buffer sizing
 

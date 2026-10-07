@@ -37,7 +37,7 @@ zymbol.encodeRaw(
 ```
 
 `encodeText` accepts UTF-8. Non-ASCII text is emitted with ECI assignment 26.
-`encodeBytes` preserves bytes without attaching character-set semantics.
+`encodeBytes` preserves byte values and emits no ECI; the QR default interpretation therefore remains in force. Zymbol does not transcode those bytes.
 `encodeRaw` expects exactly `dataCodewords(version, level)` data bytes.
 
 `EncodeOptions`:
@@ -78,8 +78,7 @@ zymbol.decodeAny(
 ) zymbol.DecodeAnyError!zymbol.AnyDecodeResult
 ```
 
-The decoder expects an already sampled square module grid. Image acquisition,
-thresholding, finder detection, and perspective correction are outside Zymbol.
+The decoder expects an already sampled square module grid in canonical rotational orientation. Image acquisition, thresholding, finder detection, perspective correction, and rotation recovery are outside Zymbol. Mirror imaging and reflectance reversal are normalized by the decoder.
 
 `DecodeResult` reports:
 
@@ -97,7 +96,7 @@ thresholding, finder detection, and perspective correction are outside Zymbol.
 .errors_corrected
 ```
 
-`DecodeResult.symbologyIdentifier()` returns the AIM `]Qn` identifier. Decoding returns payload bytes; Zymbol reports ECI metadata but does not transcode the payload.
+`DecodeResult.symbologyIdentifier()` returns the AIM `]Qn` identifier. Decoding returns payload bytes plus structured control metadata. Zymbol does not transcode ECI payloads or emit the ISO/IEC 18004 Clause 14 host-transmission byte stream.
 
 ### Micro QR
 
@@ -168,7 +167,8 @@ zymbol.finalizeSegments
 ```
 
 The finalized buffer passed to `encodeRaw` must contain exactly the selected
-version/EC-level data-codeword count.
+version/EC-level data-codeword count. Manual segment ordering and raw-stream
+validity are caller responsibilities.
 
 ### Sizing and symbol helpers
 

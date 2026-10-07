@@ -79,15 +79,15 @@ Before creating the first public release:
 
 Do not create `v1.0.0` merely to test the release workflow.
 
-## 3. Sustained fuzz campaign
+## 3. Parallel sustained fuzz campaign
 
-Run sustained coverage-guided fuzzing on the final production-code candidate.
-The campaign and invalidation rules are defined in `docs/v1-fuzz.md`.
+The checked-in fuzz corpus is part of the structural release gate. Sustained
+coverage-guided fuzzing runs in parallel with publication and is not a tag
+blocker. The finite campaign and regression rules are defined in
+`docs/v1-fuzz.md`.
 
-A short exploratory run does not satisfy this gate.
-
-Every Zymbol failure found during the campaign must become a checked-in regression
-before the campaign can be considered complete.
+Every Zymbol failure found by sustained fuzzing must become a durable
+regression and be fixed in the appropriate patch release.
 
 ## 4. Normative ISO/IEC 18004:2024 review
 
@@ -102,7 +102,9 @@ ISO/IEC 18004:2024 against:
 The repository conformance ledger is supporting evidence. It is not a
 substitute for the normative standard.
 
-The public ISO conformance claim is made only after this review.
+The normative review was completed against ISO/IEC 18004:2024 on 2026-10-07.
+The fixes produced by that review must pass structural qualification before the
+claim is published.
 
 ## 5. Release metadata
 

@@ -1,12 +1,14 @@
 # Independent interoperability gate
 
-The bidirectional interoperability gate uses the Python bindings for
-ZXing-cpp 3.1.1 as an external implementation.
+The bidirectional interoperability gate uses ZXing-cpp 3.1.1 through Astral
+uv. The uv version is pinned in `uv.toml`; the script pins its managed Python
+runtime and ZXing dependency in PEP 723 metadata.
 
-Install the pinned test dependency:
+Install the repository-required uv release if it is not already available:
 
 ```sh
-python3 -m pip install -r tests/interop-requirements.txt
+curl -LsSf https://astral.sh/uv/0.12.23/install.sh | sh
+uv --version
 ```
 
 Run the differential campaign:
@@ -15,18 +17,16 @@ Run the differential campaign:
 zig build interop
 ```
 
-If the Python executable is named differently:
+If uv is at a non-standard path:
 
 ```sh
-zig build interop -Dpython=python
+zig build interop -Duv=/path/to/uv
 ```
 
-The gate currently checks a representative QR Code Model 2 and Micro QR
-corpus in both directions:
+The gate checks representative QR Code and Micro QR cases in both directions:
 
 - Zymbol encoder -> ZXing-cpp decoder
 - ZXing-cpp encoder -> Zymbol decoder
 
-The dependency is intentionally test-only and the gate is not part of the
-default `test` or `qualify` steps. Release qualification records the
-external decoder version used for the final campaign.
+The dependency is test-only and the gate is not part of the default `test`
+or `qualify` steps.

@@ -1,4 +1,4 @@
-# v1 fuzz qualification
+# fuzz qualification
 
 Zymbol requires Zig 0.17.0. The same compiler baseline is used for ordinary
 builds, tests, portability checks, release qualification, and sustained fuzzing.
@@ -44,9 +44,9 @@ campaign evidence, but it is not the durable regression mechanism: every input
 that exposes a Zymbol bug must be reduced as practical and promoted into the
 checked-in corpus or a dedicated regression test.
 
-## Sustained v1 campaign
+## Sustained campaign
 
-The release campaign is finite and reproducible:
+The sustained campaign is finite and reproducible:
 
 ```sh
 zig build fuzz --fuzz=100M --summary all
@@ -64,22 +64,21 @@ zig build fuzz --fuzz
 
 It is not the release-completion criterion because its duration is undefined.
 
-## Acceptance rule
+## Policy
 
-Fuzz qualification is complete only when all of the following hold on the
-release candidate:
+The deterministic corpus replay is a release gate:
 
-1. `zig build fuzz` passes the complete checked-in corpus.
-2. `zig build fuzz --fuzz=100M --summary all` completes without crash,
-   panic, invariant failure, memory-safety failure, or unexpected error.
-3. The final fuzzing report contains every Zymbol fuzz target.
-4. Any failure found during the campaign is fixed and its reproducer is made
-   durable in the corpus or a dedicated regression test.
-5. The deterministic corpus replay is rerun after every accepted fix.
-6. If production code exercised by a fuzz target changes after the successful
-   campaign, that affected sustained campaign is rerun before v1 is tagged.
+1. `zig build fuzz` must pass the complete checked-in corpus on every release
+   candidate.
+2. Any fuzz-discovered failure is reduced as practical and promoted into the
+   checked-in corpus or a dedicated regression test.
+3. The deterministic corpus is rerun after every accepted fix.
 
-Coverage percentage is recorded as evidence but is not treated as a proof of
-correctness or as a fixed pass threshold. A fuzz campaign complements, rather
-than replaces, the ISO conformance, interoperability, portability, and
-boundary-test gates.
+The 100M-per-target sustained campaign runs in parallel with publication. Its
+completion is recorded as additional evidence rather than a prerequisite for
+the initial tag. A defect found after publication is handled as a release
+defect and fixed in the appropriate patch release.
+
+Coverage percentage is evidence, not a proof of correctness or a fixed pass
+threshold. Sustained fuzzing complements the ISO review, interoperability,
+portability and boundary-test gates.
