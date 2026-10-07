@@ -38,6 +38,3 @@ and releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Corrected the normative initial ECI/FNC1 header ordering.
 - Included every file required by declared build steps in published source packages.
 
-## [0.1.0]
-
-Initial project baseline and v1 stabilization work.
