@@ -75,10 +75,10 @@ See the [release checklist][release-checklist] for the authoritative sequence.
 
 ## Release integrity
 
-Zymbol uses GitHub Immutable Releases for the stable release line. Once
-release immutability is enabled, publishing a release locks its tag and release
-assets and GitHub automatically generates a cryptographic release attestation
-covering the release identity.
+The stable release line requires GitHub Immutable Releases. Once release
+immutability is enabled, publishing a release locks its tag and release assets
+and GitHub automatically generates a cryptographic release attestation covering
+the release identity.
 
 The tag-publish workflow verifies that attestation after creating the release.
 A missing or invalid attestation fails the workflow.
