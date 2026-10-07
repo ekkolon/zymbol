@@ -11,8 +11,8 @@ pub fn size(version: u6) u16 {
 }
 
 pub const EcLevel = enum(u2) {
-    // The backing values are the actual 2-bit field ISO/IEC 18004 Table 25
-    // packs into the 15-bit format codeword, so turning a level into its
+    // The backing values are the actual 2-bit error-correction field used
+    // in QR format information, so turning a level into its
     // format-info contribution is a plain cast rather than a lookup.
     m = 0b00,
     l = 0b01,

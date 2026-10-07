@@ -62,7 +62,7 @@ The unlimited form remains useful for exploratory or overnight work:
 zig build fuzz --fuzz
 ```
 
-It is not the release-completion criterion because its duration is undefined.
+It is not used as a finite campaign record because its duration is undefined.
 
 ## Policy
 
