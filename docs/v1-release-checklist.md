@@ -68,7 +68,7 @@ Before creating the first public release:
 
 1. make the repository public;
 2. set the repository description to:
-   `QR Code Model 2 and Micro QR for Zig, with an allocation-free core, zero package dependencies, built-in PNG/SVG rendering, and ISO/IEC 18004:2024 conformance.`;
+   `QR Code Model 2 and Micro QR for Zig. Allocation-free core, zero package dependencies, built-in PNG/SVG, ISO/IEC 18004:2024 conformance.`;
 3. verify the README names Nelson Dominguez as maintainer and includes the DENSO WAVE QR Code trademark notice;
 4. add the topics `zig`, `zig-package`, `qr-code`, `qrcode`, and
    `micro-qr`;
