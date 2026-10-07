@@ -72,6 +72,36 @@ test "independent QR geometry matches versions 1 through 40" {
     }
 }
 
+test "ISO Table 9 protection codewords reduce small-symbol correction radii" {
+    const cases = [_]struct {
+        version: u6,
+        level: spec.EcLevel,
+        protection: u8,
+        correctable: u8,
+    }{
+        .{ .version = 1, .level = .l, .protection = 3, .correctable = 2 },
+        .{ .version = 1, .level = .m, .protection = 2, .correctable = 4 },
+        .{ .version = 1, .level = .q, .protection = 1, .correctable = 6 },
+        .{ .version = 1, .level = .h, .protection = 1, .correctable = 8 },
+        .{ .version = 2, .level = .l, .protection = 2, .correctable = 4 },
+        .{ .version = 3, .level = .l, .protection = 1, .correctable = 7 },
+    };
+
+    for (cases) |case| {
+        try std.testing.expectEqual(
+            case.protection,
+            spec.protectionCodewords(case.version, case.level),
+        );
+        try std.testing.expectEqual(
+            case.correctable,
+            spec.correctionCapacity(case.version, case.level),
+        );
+    }
+
+    try std.testing.expectEqual(@as(u8, 0), spec.protectionCodewords(3, .m));
+    try std.testing.expectEqual(@as(u8, 13), spec.correctionCapacity(3, .m));
+}
+
 test "independent QR ECC block tables match all version and level pairs" {
     const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
 

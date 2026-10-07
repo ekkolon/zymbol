@@ -11,8 +11,8 @@ pub fn size(version: u6) u16 {
 }
 
 pub const EcLevel = enum(u2) {
-    // The backing values are the actual 2-bit field ISO/IEC 18004 Table 25
-    // packs into the 15-bit format codeword, so turning a level into its
+    // The backing values are the actual 2-bit error-correction field used
+    // in QR format information, so turning a level into its
     // format-info contribution is a plain cast rather than a lookup.
     m = 0b00,
     l = 0b01,
@@ -78,6 +78,27 @@ pub fn blockLayout(version: u6, level: EcLevel) BlockLayout {
 /// Data codewords for one version/error-correction pair.
 pub fn dataCodewords(version: u6, level: EcLevel) u16 {
     return blockLayout(version, level).totalDataCodewords();
+}
+
+/// Misdecoded protection codewords reserved by ISO/IEC 18004:2024 Table 9.
+pub fn protectionCodewords(version: u6, level: EcLevel) u8 {
+    return switch (version) {
+        1 => switch (level) {
+            .l => 3,
+            .m => 2,
+            .q, .h => 1,
+        },
+        2 => if (level == .l) 2 else 0,
+        3 => if (level == .l) 1 else 0,
+        else => 0,
+    };
+}
+
+/// Maximum unknown-codeword errors the standard permits the decoder to correct.
+pub fn correctionCapacity(version: u6, level: EcLevel) u8 {
+    const ec = ecc_codewords_per_block[level.tableRow()][version];
+    const protection = protectionCodewords(version, level);
+    return (ec - protection) / 2;
 }
 
 /// Raw data-module count, derived from Model 2 geometry.
@@ -287,6 +308,17 @@ test "format info codewords match Annex C for every level and mask" {
             if (mask == 7) break;
         }
     }
+}
+
+test "small-symbol correction capacities honor protection codewords" {
+    const testing = std.testing;
+    try testing.expectEqual(@as(u8, 2), correctionCapacity(1, .l));
+    try testing.expectEqual(@as(u8, 4), correctionCapacity(1, .m));
+    try testing.expectEqual(@as(u8, 6), correctionCapacity(1, .q));
+    try testing.expectEqual(@as(u8, 8), correctionCapacity(1, .h));
+    try testing.expectEqual(@as(u8, 4), correctionCapacity(2, .l));
+    try testing.expectEqual(@as(u8, 7), correctionCapacity(3, .l));
+    try testing.expectEqual(@as(u8, 13), correctionCapacity(3, .m));
 }
 
 test "block layout accounts for every raw codeword at every version and level" {

@@ -1,4 +1,14 @@
+# Zig
 .zig-cache/
 zig-out/
 zig-pkg/
 *.o
+
+# Python tooling
+.venv/
+.venv-*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

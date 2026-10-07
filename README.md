@@ -19,7 +19,7 @@ Zymbol encodes and decodes QR module grids and renders them as raster pixels, SV
 - no file I/O or image-acquisition dependency
 - `wasm32-freestanding` support
 
-Zymbol decodes already sampled module grids. Camera input, thresholding, finder detection, perspective correction, and image scanning are outside the library.
+Zymbol decodes already sampled module grids in canonical rotational orientation. Camera input, thresholding, finder detection, perspective correction, rotation recovery, and image scanning are outside the library. Mirror imaging and reflectance reversal are normalized by the decoder.
 
 ## Requirements
 
@@ -83,7 +83,7 @@ const symbol = try zymbol.encodeText(
 );
 ```
 
-`encodeText` accepts UTF-8 and emits ECI 26 when non-ASCII text is present. `encodeBytes` preserves arbitrary bytes without attaching character-set semantics.
+`encodeText` accepts UTF-8 and emits ECI 26 when non-ASCII text is present. `encodeBytes` preserves arbitrary byte values without transcoding and emits no ECI.
 
 ## Decoding
 

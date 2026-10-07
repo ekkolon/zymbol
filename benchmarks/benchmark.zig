@@ -41,7 +41,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     std.debug.print(
-        "# qrz v1 benchmark; version={}; payload_bytes={}; cell_bytes={}; encode_scratch={}; decode_scratch={}\n",
+        "# zymbol v1 benchmark; version={}; payload_bytes={}; cell_bytes={}; encode_scratch={}; decode_scratch={}\n",
         .{
             version,
             mixed_payload.len,

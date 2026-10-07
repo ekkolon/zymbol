@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Corrected the ISO/IEC 18004:2024 FNC1/ECI header ordering and added direct regression coverage.
+- Enforced Table 9 misdecoded-protection-codeword correction limits, including error-detection-only Micro QR M1.
+- Completed the normative ISO/IEC 18004:2024 component review and tightened the documented conformance boundary.
+- Replaced the ad-hoc Python interoperability environment with repository-pinned Astral uv and managed Python.
+
 - Tightened the pre-1.0 public surface by removing accidental raw `Symbol` mutators and the non-semantic reserved `Cell` field.
 - Added staged public CI and a dry-run release workflow so expensive validation runs only after local preflight passes.
 

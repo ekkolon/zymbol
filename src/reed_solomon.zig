@@ -68,7 +68,16 @@ pub const DecodeResult = struct {
 
 /// Corrects one data+EC block in place.
 pub fn decode(block: []u8, ec_len: usize) DecodeError!DecodeResult {
+    return decodeWithLimit(block, ec_len, ec_len / 2);
+}
+
+pub fn decodeWithLimit(
+    block: []u8,
+    ec_len: usize,
+    max_errors: usize,
+) DecodeError!DecodeResult {
     std.debug.assert(ec_len >= 1 and ec_len <= max_ec_codewords);
+    std.debug.assert(max_errors <= ec_len / 2);
 
     var syndromes: [max_ec_codewords]u8 = undefined;
     var has_error = false;
@@ -95,7 +104,7 @@ pub fn decode(block: []u8, ec_len: usize) DecodeError!DecodeResult {
     var locations: [max_ec_codewords]u8 = undefined;
     var positions: [max_ec_codewords]usize = undefined;
     const num_errors = sigma.degree();
-    if (num_errors == 0 or num_errors > ec_len / 2) return DecodeError.UnrecoverableBlock;
+    if (num_errors == 0 or num_errors > max_errors) return DecodeError.UnrecoverableBlock;
 
     var found: usize = 0;
     var x: u16 = 1;
@@ -334,6 +343,26 @@ test "decode corrects every QR block layout at its guaranteed limit" {
             }
         }
     }
+}
+
+test "limited decode rejects algebraically correctable errors beyond policy radius" {
+    var data: [16]u8 = undefined;
+    for (&data, 0..) |*byte, index| byte.* = @truncate(index * 29 + 7);
+
+    const degree = 10;
+    var ec: [degree]u8 = undefined;
+    encode(&data, degree, &ec);
+
+    var block: [data.len + degree]u8 = undefined;
+    @memcpy(block[0..data.len], &data);
+    @memcpy(block[data.len..], &ec);
+
+    for (0..5) |index| block[index * 3] ^= @intCast(index + 1);
+
+    try std.testing.expectError(
+        DecodeError.UnrecoverableBlock,
+        decodeWithLimit(&block, degree, 4),
+    );
 }
 
 test "generator polynomials are monic products of the right roots" {

@@ -1,5 +1,5 @@
 const std = @import("std");
-const rs = @import("qrz_rs");
+const rs = @import("zymbol_rs");
 
 const samples = 5;
 const data_len = 120;

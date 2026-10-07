@@ -445,7 +445,7 @@ test "round trip all versions and EC levels" {
     while (version <= max_version) : (version += 1) {
         for (levels) |level| {
             try roundTrip(
-                "qrz",
+                "zymbol",
                 .{
                     .min_version = version,
                     .max_version = version,
@@ -496,7 +496,7 @@ test "round trip arbitrary binary payload" {
 
 test "round trip UTF-8 with ECI" {
     try roundTrip(
-        "QRz — Grüße aus Marburg",
+        "Zymbol — Grüße aus Marburg",
         .{ .ec_level = .q, .boost_ec_level = false },
     );
 }
