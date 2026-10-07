@@ -3,12 +3,21 @@ const zymbol = @import("zymbol");
 const render = zymbol.render;
 
 const release_corpus = [_][]const u8{
-    "\\x00",
-    "\\xff",
+    "\x00",
+    "\xff",
     "QRZ",
-    "\\xaa\\x55\\xaa\\x55\\xaa\\x55\\xaa\\x55",
-    "\\x00\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08\\x09\\x0a\\x0b\\x0c\\x0d\\x0e\\x0f",
+    "\xaa\x55\xaa\x55\xaa\x55\xaa\x55",
+    "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f",
 };
+
+test "release corpus contains binary seeds" {
+    try std.testing.expectEqualSlices(u8, &.{0}, release_corpus[0]);
+    try std.testing.expectEqualSlices(u8, &.{255}, release_corpus[1]);
+    try std.testing.expectEqualStrings("QRZ", release_corpus[2]);
+    try std.testing.expectEqualSlices(u8, &.{ 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55 }, release_corpus[3]);
+    try std.testing.expectEqual(@as(usize, 16), release_corpus[4].len);
+    for (release_corpus[4], 0..) |byte, index| try std.testing.expectEqual(@as(u8, @intCast(index)), byte);
+}
 
 const max_cells = zymbol.requiredCells(zymbol.max_version);
 const max_encode_scratch = zymbol.requiredEncodeScratch(zymbol.max_version);

@@ -47,6 +47,12 @@ zig build fuzz
 Runtime portability requires QEMU user-mode interpreters for the configured
 cross targets. On Ubuntu/WSL, install `qemu-user` before running the QEMU gate.
 
+`portability` cross-compiles an exported smoke function that calls QR and Micro
+QR encoding/decoding, PNG/SVG rendering, raster and writer generics, and owned
+helpers with a caller-owned allocator. The same smoke function is a dependency
+of `wasm` and the WASM qualification gate. These checks compile function bodies;
+native tests and the QEMU gate provide runtime coverage.
+
 ZXing-cpp interoperability is isolated through Astral uv. `uv.toml` pins the
 uv release; the script metadata pins CPython 3.14.8, `zxing-cpp==3.1.1`, and
 an artifact cutoff so later uploads cannot alter the environment.

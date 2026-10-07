@@ -341,54 +341,77 @@ fn finderPenaltyLine(symbol: *const Symbol, line: usize, horizontal: bool) i32 {
     const side: usize = symbol.size;
     if (side < 11) return 0;
 
-    const core = [_]bool{ true, false, true, true, true, false, true };
+    // Seven consecutive runs: light, dark, light, dark, light, dark, light.
+    // Edge runs contain only modules inside the symbol, excluding the quiet zone.
+    var runs: [7]usize = @splat(0);
+    var run_dark = false;
+    var run_len: usize = 0;
     var result: i32 = 0;
-    var start: usize = 0;
 
-    while (start + core.len <= side) : (start += 1) {
-        var matches = true;
-        for (core, 0..) |expected, offset| {
-            const x = if (horizontal) start + offset else line;
-            const y = if (horizontal) line else start + offset;
-            if (isDarkUnchecked(symbol, x, y) != expected) {
-                matches = false;
-                break;
-            }
+    for (0..side) |index| {
+        const x = if (horizontal) index else line;
+        const y = if (horizontal) line else index;
+        const dark = isDarkUnchecked(symbol, x, y);
+        if (dark == run_dark) {
+            run_len += 1;
+        } else {
+            pushPenaltyRun(&runs, run_len);
+            if (!run_dark) result += finderPenaltyRuns(runs);
+            run_dark = dark;
+            run_len = 1;
         }
-        if (!matches) continue;
-
-        var before_light = false;
-        if (start >= 4) {
-            before_light = true;
-            var index = start - 4;
-            while (index < start) : (index += 1) {
-                const x = if (horizontal) index else line;
-                const y = if (horizontal) line else index;
-                if (isDarkUnchecked(symbol, x, y)) {
-                    before_light = false;
-                    break;
-                }
-            }
-        }
-
-        var after_light = false;
-        if (start + core.len + 4 <= side) {
-            after_light = true;
-            var index = start + core.len;
-            while (index < start + core.len + 4) : (index += 1) {
-                const x = if (horizontal) index else line;
-                const y = if (horizontal) line else index;
-                if (isDarkUnchecked(symbol, x, y)) {
-                    after_light = false;
-                    break;
-                }
-            }
-        }
-
-        if (before_light or after_light) result += penalty_n3;
     }
-
+    pushPenaltyRun(&runs, run_len);
+    if (run_dark) pushPenaltyRun(&runs, 0);
+    result += finderPenaltyRuns(runs);
     return result;
+}
+
+fn pushPenaltyRun(runs: *[7]usize, length: usize) void {
+    for (0..6) |index| runs[index] = runs[index + 1];
+    runs[6] = length;
+}
+
+fn finderPenaltyRuns(runs: [7]usize) i32 {
+    const unit = runs[2];
+    if (unit == 0 or runs[3] != 3 * unit or runs[4] != unit) return 0;
+    const before = runs[0] >= 4 and runs[1] == unit and runs[5] >= unit;
+    const after = runs[6] >= 4 and runs[5] == unit and runs[1] >= unit;
+    return if (before or after) penalty_n3 else 0;
+}
+
+test "N3 counts scaled ratios in both directions with in-symbol light areas" {
+    var cells: [61 * 61]Cell = @splat(.{});
+    const symbol = Symbol{ .cells = &cells, .size = 61, .version = 11, .ec_level = .m, .mask = 0 };
+    for ([_]usize{ 1, 2, 3, 5 }) |unit| {
+        for ([_]bool{ true, false }) |horizontal| {
+            for ([_]usize{ 0, 3, 4, 8 }) |before| {
+                for ([_]usize{ 0, 3, 4, 8 }) |after| {
+                    @memset(&cells, Cell{ .dark = true });
+                    const lengths = [_]usize{ before, unit, unit, 3 * unit, unit, unit, after };
+                    var position: usize = 0;
+                    for (lengths, 0..) |length, run| {
+                        for (0..length) |_| {
+                            const x = if (horizontal) position else 0;
+                            const y = if (horizontal) 0 else position;
+                            cells[y * symbol.size + x].dark = run % 2 != 0;
+                            position += 1;
+                        }
+                    }
+                    const expected: i32 = if (before >= 4 or after >= 4) penalty_n3 else 0;
+                    try std.testing.expectEqual(expected, finderPenaltyLine(&symbol, 0, horizontal));
+                }
+            }
+        }
+    }
+}
+
+test "N3 scaled-grid regression has the independently calculated score" {
+    var cells: [25 * 25]Cell = @splat(.{});
+    for ("0000000011001111110011000", 0..) |bit, index| cells[index].dark = bit == '1';
+    const symbol = Symbol{ .cells = &cells, .size = 25, .version = 2, .ec_level = .m, .mask = 0 };
+    // N1 = 1127, N2 = 1689, N3 = 40, N4 = 90.
+    try std.testing.expectEqual(@as(i32, 2946), penaltyScore(&symbol));
 }
 
 pub fn penaltyScore(symbol: *const Symbol) i32 {

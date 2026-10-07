@@ -552,6 +552,48 @@ test "decode corrects damaged data modules" {
     try testing.expect(result.errors_corrected > 0);
 }
 
+test "QR and Micro QR preserve Kanji range boundaries" {
+    const payload = [_]u8{ 0x81, 0x40, 0x81, 0x7E, 0x81, 0x80, 0x81, 0xFC, 0x9F, 0xFC, 0xE0, 0x40, 0xE0, 0x7E, 0xE0, 0x80, 0xEB, 0xBF };
+    var data: [dataCodewords(2, .m)]u8 = undefined;
+    var writer = BitWriter.init(&data);
+    try appendKanji(&writer, 2, &payload);
+    try finalizeSegments(&writer);
+    var cells: [requiredCells(2)]Cell = undefined;
+    var scratch: [requiredEncodeScratch(2)]u8 = undefined;
+    const symbol = try encodeRaw(&data, 2, .m, 0, &cells, &scratch);
+    var bits: [requiredCells(2)]bool = undefined;
+    for (&bits, 0..) |*bit, index| bit.* = symbol.cells[index].dark;
+    var decode_cells: [requiredCells(2)]Cell = undefined;
+    var decode_scratch: [requiredDecodeScratch(2)]u8 = undefined;
+    var output: [32]u8 = undefined;
+    const decoded = try decode(&bits, symbol.size, &decode_cells, &decode_scratch, &output);
+    try std.testing.expectEqualSlices(u8, &payload, output[0..decoded.len]);
+
+    const micro_symbol = try encodeMicroKanji(&payload, .{ .min_version = .m4, .ec_level = .l, .boost_ec_level = false }, &cells);
+    var micro_bits: [requiredMicroCells(.m4)]bool = undefined;
+    for (&micro_bits, 0..) |*bit, index| bit.* = micro_symbol.cells[index].dark;
+    const micro_decoded = try decodeMicro(&micro_bits, micro_symbol.size, &decode_cells, &output);
+    try std.testing.expectEqualSlices(u8, &payload, output[0..micro_decoded.len]);
+}
+
+test "QR decoder rejects malformed Kanji carried by a valid raw symbol" {
+    var data: [dataCodewords(1, .m)]u8 = undefined;
+    var writer = BitWriter.init(&data);
+    try writer.append(8, 4);
+    try writer.append(1, 8);
+    try writer.append(63, 13);
+    try finalizeSegments(&writer);
+    var cells: [requiredCells(1)]Cell = undefined;
+    var scratch: [requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try encodeRaw(&data, 1, .m, 0, &cells, &scratch);
+    var bits: [requiredCells(1)]bool = undefined;
+    for (&bits, 0..) |*bit, index| bit.* = symbol.cells[index].dark;
+    var decode_cells: [requiredCells(1)]Cell = undefined;
+    var decode_scratch: [requiredDecodeScratch(1)]u8 = undefined;
+    var output: [8]u8 = undefined;
+    try std.testing.expectError(DecodeError.MalformedDataStream, decode(&bits, symbol.size, &decode_cells, &decode_scratch, &output));
+}
+
 test "HELLO WORLD mask penalties match the reference vector" {
     const expected = [_]i32{ 347, 470, 506, 441, 539, 516, 314, 558 };
 

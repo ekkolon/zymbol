@@ -1,6 +1,7 @@
 const std = @import("std");
 const spec = @import("spec.zig");
 const bitstream = @import("bitstream.zig");
+const kanji = @import("kanji.zig");
 
 pub const Error = bitstream.Error || error{
     InvalidCharacter,
@@ -114,6 +115,7 @@ pub fn appendKanji(writer: *bitstream.Writer, version: u6, sjis: []const u8) Err
     var index: usize = 0;
     while (index < sjis.len) : (index += 2) {
         var value: u32 = (@as(u32, sjis[index]) << 8) | sjis[index + 1];
+        if (!kanji.isValid(value)) return Error.InvalidKanjiByte;
         if (value >= 0x8140 and value <= 0x9FFC) {
             value -= 0x8140;
         } else if (value >= 0xE040 and value <= 0xEBBF) {
@@ -277,6 +279,40 @@ fn runPlanner(
         return total;
     }
 
+    var byte_only = true;
+    var nonnumeric_alphanumeric = true;
+    for (text) |character| {
+        if (alphanumericValue(character) != null) {
+            byte_only = false;
+        } else {
+            nonnumeric_alphanumeric = false;
+        }
+        if (canEncode(.numeric, character)) nonnumeric_alphanumeric = false;
+    }
+    const uniform_class: ?Class = if (byte_only)
+        .byte
+    else if (nonnumeric_alphanumeric and text.len <= maxCharacterCount(.alphanumeric, version))
+        .alphanumeric
+    else
+        null;
+    if (uniform_class) |class| {
+        const max_count = maxCharacterCount(class.mode(), version);
+        const header_bits = 4 + @as(usize, spec.charCountBits(class.mode(), version));
+        var total: usize = 0;
+        var start: usize = 0;
+        while (start < text.len) {
+            const end = @min(text.len, start + max_count);
+            total += header_bits + payloadBits(class, end - start);
+            if (trace) |storage| {
+                const predecessor: u16 = (@as(u16, @intCast(start)) << 2) |
+                    @as(u16, @backingInt(class));
+                writeU16(storage, end, predecessor);
+            }
+            start = end;
+        }
+        return total;
+    }
+
     const unreachable_cost = std.math.maxInt(u16);
     for (0..text.len + 1) |index| writeU16(costs, index, unreachable_cost);
     writeU16(costs, 0, 0);
@@ -372,6 +408,41 @@ pub fn finalize(writer: *bitstream.Writer) Error!void {
     while (writer.bit_len < capacity_bits) {
         try writer.append(pad_byte, 8);
         pad_byte ^= 0xFD;
+    }
+}
+
+test "Kanji appender rejects invalid byte pairs" {
+    var data: [8]u8 = undefined;
+    for ([_]u16{ 0x8200, 0x823F, 0x817F, 0x81FD, 0x9FFD, 0xE07F, 0xEBC0, 0xEC40 }) |pair| {
+        var writer = bitstream.Writer.init(&data);
+        try std.testing.expectError(Error.InvalidKanjiByte, appendKanji(&writer, 1, &.{ @intCast(pair >> 8), @truncate(pair) }));
+    }
+    var writer = bitstream.Writer.init(&data);
+    try std.testing.expectError(Error.OddKanjiLength, appendKanji(&writer, 1, &.{0x81}));
+}
+
+test "uniform planner paths preserve costs and character-count boundaries" {
+    var input: [1024]u8 = undefined;
+    var costs: [optimalScratchBytes(input.len)]u8 = undefined;
+    var trace: [optimalScratchBytes(input.len)]u8 = undefined;
+    var data: [1100]u8 = undefined;
+    for ([_]u6{ 1, 10, 27, 40 }) |version| {
+        for ([_]u8{ 'a', 'A', 0xFF }) |character| {
+            @memset(&input, character);
+            for ([_]usize{ 1, 2, 254, 255, 256, 510, 511, 512, 1022, 1024 }) |length| {
+                const class: Class = if (character == 'A') .alphanumeric else .byte;
+                const count_limit = maxCharacterCount(class.mode(), version);
+                const segments = (length + count_limit - 1) / count_limit;
+                const header = 4 + @as(usize, spec.charCountBits(class.mode(), version));
+                const expected = segments * header + payloadBits(class, length) +
+                    @as(usize, if (class == .alphanumeric and length == 1022 and version == 1) 1 else 0);
+                const planned = try optimalBitLength(version, input[0..length], &costs);
+                try std.testing.expectEqual(expected, planned);
+                var writer = bitstream.Writer.init(&data);
+                try writeOptimal(&writer, version, input[0..length], &costs, &trace);
+                try std.testing.expectEqual(planned, writer.bitLength());
+            }
+        }
     }
 }
 

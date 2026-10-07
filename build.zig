@@ -26,6 +26,14 @@ pub fn build(b: *std.Build) void {
     });
 
     const test_step = b.step("test", "Run the test suite");
+    const portability_smoke_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("tests/compile_portability.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
+    }) });
+    const run_portability_smoke_tests = b.addRunArtifact(portability_smoke_tests);
+    test_step.dependOn(&run_portability_smoke_tests.step);
     const core_tests = b.addTest(.{ .root_module = zymbol_core });
     const render_tests = b.addTest(.{ .root_module = zymbol_render });
 
@@ -257,6 +265,7 @@ pub fn build(b: *std.Build) void {
     const wasm_step = b.step("wasm", "Compile Zymbol for wasm32-freestanding");
     wasm_step.dependOn(&b.addInstallArtifact(wasm_library, .{}).step);
     wasm_step.dependOn(&wasm_render_library.step);
+    wasm_step.dependOn(addPortabilitySmoke(b, "zymbol-wasm-smoke", wasm_target, optimize, wasm_module));
 
     const benchmark_core_module = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
@@ -317,6 +326,23 @@ pub fn build(b: *std.Build) void {
         "Run the reproducible ReleaseFast v1 performance suite",
     );
     benchmark_step.dependOn(&run_png_compare.step);
+
+    const segment_benchmark = b.addExecutable(.{
+        .name = "zymbol-segment-benchmark",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benchmarks/segment_benchmark.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{.{ .name = "zymbol_segment", .module = b.createModule(.{
+                .root_source_file = b.path("src/segment.zig"),
+                .target = target,
+                .optimize = .ReleaseFast,
+            }) }},
+        }),
+    });
+    const run_segment_benchmark = b.addRunArtifact(segment_benchmark);
+    benchmark_step.dependOn(&run_segment_benchmark.step);
+    b.step("benchmark-segments", "Measure segmentation scaling by input length and mode").dependOn(&run_segment_benchmark.step);
 
     const terminal_example_module = b.createModule(.{
         .root_source_file = b.path("examples/terminal.zig"),
@@ -410,26 +436,12 @@ pub fn build(b: *std.Build) void {
             .target = portability_target,
             .optimize = .ReleaseSafe,
         });
-        const portability_core = b.addLibrary(.{
-            .name = b.fmt("zymbol-core-{s}", .{entry.name}),
-            .root_module = portability_core_module,
-            .linkage = .static,
-        });
-        portability_step.dependOn(&portability_core.step);
-
         const portability_render_module = b.createModule(.{
             .root_source_file = b.path("src/render/root.zig"),
             .target = portability_target,
             .optimize = .ReleaseSafe,
             .imports = &.{.{ .name = "zymbol_core", .module = portability_core_module }},
         });
-        const portability_render = b.addLibrary(.{
-            .name = b.fmt("zymbol-render-{s}", .{entry.name}),
-            .root_module = portability_render_module,
-            .linkage = .static,
-        });
-        portability_step.dependOn(&portability_render.step);
-
         const portability_zymbol_module = b.createModule(.{
             .root_source_file = b.path("src/zymbol.zig"),
             .target = portability_target,
@@ -439,12 +451,13 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "zymbol_render", .module = portability_render_module },
             },
         });
-        const portability_zymbol = b.addLibrary(.{
-            .name = b.fmt("zymbol-{s}", .{entry.name}),
-            .root_module = portability_zymbol_module,
-            .linkage = .static,
-        });
-        portability_step.dependOn(&portability_zymbol.step);
+        portability_step.dependOn(addPortabilitySmoke(
+            b,
+            b.fmt("zymbol-{s}", .{entry.name}),
+            portability_target,
+            .ReleaseSafe,
+            portability_zymbol_module,
+        ));
     }
 
     const runtime_portability_step = b.step(
@@ -502,6 +515,7 @@ pub fn build(b: *std.Build) void {
     }
 
     const qualify_step = b.step("qualify", "Run release qualification");
+    qualify_step.dependOn(&run_portability_smoke_tests.step);
     qualify_step.dependOn(&run_conformance_tests.step);
     qualify_step.dependOn(&run_bch_conformance_tests.step);
     qualify_step.dependOn(&run_rs_conformance_tests.step);
@@ -585,4 +599,25 @@ pub fn build(b: *std.Build) void {
         .linkage = .static,
     });
     qualify_step.dependOn(&qualification_wasm_render.step);
+    qualify_step.dependOn(addPortabilitySmoke(b, "zymbol-qualification-smoke", wasm_target, .ReleaseFast, qualification_wasm_module));
+}
+
+fn addPortabilitySmoke(
+    b: *std.Build,
+    name: []const u8,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    zymbol: *std.Build.Module,
+) *std.Build.Step {
+    const smoke = b.addObject(.{
+        .name = name,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/compile_portability.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "zymbol", .module = zymbol }},
+        }),
+    });
+    _ = smoke.getEmittedBin();
+    return &smoke.step;
 }

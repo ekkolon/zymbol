@@ -4,6 +4,8 @@ const raster = @import("raster.zig");
 const svg = @import("svg.zig");
 const Reflectance = @import("reflectance.zig").Reflectance;
 
+const max_png_integer: usize = 0x7FFF_FFFF;
+
 pub const Error = error{
     InvalidSymbol,
     InvalidVersion,
@@ -24,10 +26,12 @@ pub const Options = struct {
 const Sink = struct {
     buffer: ?[]u8,
     position: usize = 0,
+    limit: usize = std.math.maxInt(usize),
 
     fn write(self: *Sink, bytes: []const u8) Error!void {
         if (bytes.len > std.math.maxInt(usize) - self.position) return Error.SizeOverflow;
         const end = self.position + bytes.len;
+        if (end > self.limit) return Error.SizeOverflow;
         if (self.buffer) |buffer| {
             if (end > buffer.len) return Error.OutputTooSmall;
             @memcpy(buffer[self.position..end], bytes);
@@ -36,7 +40,7 @@ const Sink = struct {
     }
 
     fn writeByte(self: *Sink, byte: u8) Error!void {
-        if (self.position == std.math.maxInt(usize)) return Error.SizeOverflow;
+        if (self.position >= self.limit) return Error.SizeOverflow;
         if (self.buffer) |buffer| {
             if (self.position >= buffer.len) return Error.OutputTooSmall;
             buffer[self.position] = byte;
@@ -113,7 +117,7 @@ fn crc32(bytes: []const u8) u32 {
 }
 
 fn writeChunk(sink: *Sink, chunk_type: *const [4]u8, data: []const u8) Error!void {
-    if (data.len > std.math.maxInt(u32)) return Error.SizeOverflow;
+    if (data.len > max_png_integer) return Error.SizeOverflow;
 
     try sink.writeBe32(@intCast(data.len));
     const crc_start = sink.position;
@@ -144,7 +148,7 @@ fn dimensions(symbol: *const core.Symbol, options: Options) Error!raster.Dimensi
     };
 
     if (dims.width == 0 or dims.height == 0) return Error.InvalidDimensions;
-    if (dims.width > std.math.maxInt(u32) or dims.height > std.math.maxInt(u32)) {
+    if (dims.width > max_png_integer or dims.height > max_png_integer) {
         return Error.InvalidDimensions;
     }
     return dims;
@@ -167,6 +171,7 @@ fn maxZlibLength(raw_len: usize) Error!usize {
 }
 
 fn pngLength(zlib_len: usize, transparent: bool) Error!usize {
+    if (zlib_len > max_png_integer) return Error.SizeOverflow;
     const fixed: usize = 8 + (12 + 13) + (12 + 6) + 12;
     const transparency: usize = if (transparent) 14 else 0;
     const headers = try checkedAdd(fixed, transparency);
@@ -447,7 +452,7 @@ fn zlibLength(
     options: Options,
     dims: raster.Dimensions,
 ) Error!usize {
-    var sink = Sink{ .buffer = null };
+    var sink = Sink{ .buffer = null, .limit = max_png_integer };
     try emitZlib(symbol, options, dims, &sink);
     return sink.position;
 }
@@ -492,9 +497,11 @@ fn emit(symbol: *const core.Symbol, options: Options, sink: *Sink) Error!void {
     const crc_start = sink.position;
     try sink.write("IDAT");
     const zlib_start = sink.position;
+    sink.limit = try checkedAdd(zlib_start, max_png_integer);
     try emitZlib(symbol, options, dims, sink);
+    sink.limit = std.math.maxInt(usize);
     const zlib_len = sink.position - zlib_start;
-    if (zlib_len > std.math.maxInt(u32)) return Error.SizeOverflow;
+    if (zlib_len > max_png_integer) return Error.SizeOverflow;
     try sink.patchBe32(length_position, @intCast(zlib_len));
 
     if (sink.buffer) |buffer| {
@@ -519,7 +526,7 @@ fn requiredBytesForModules(
     const quiet = try checkedMul(@as(usize, quiet_zone), 2);
     const modules = try checkedAdd(@as(usize, module_side), quiet);
     const side = try checkedMul(modules, @as(usize, options.scale));
-    if (side == 0 or side > std.math.maxInt(u32)) return Error.InvalidDimensions;
+    if (side == 0 or side > max_png_integer) return Error.InvalidDimensions;
 
     const dims = raster.Dimensions{ .width = side, .height = side };
     const raw_len = try rawLength(dims);
@@ -558,6 +565,29 @@ pub fn render(symbol: *const core.Symbol, output: []u8, options: Options) Error!
     var sink = Sink{ .buffer = output };
     try emit(symbol, options, &sink);
     return output[0..sink.position];
+}
+
+test "PNG rejects illegal dimensions before sizing or writing" {
+    const options = Options{ .scale = 20_000, .quiet_zone = 65_535 };
+    try std.testing.expectError(Error.InvalidDimensions, maxBytesForVersion(1, options));
+    try std.testing.expectError(Error.InvalidDimensions, maxBytesForMicroVersion(.m4, options));
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try core.encodeText("A", .{ .max_version = 1 }, &cells, &scratch);
+    try std.testing.expectError(Error.InvalidDimensions, requiredBytes(&symbol, options));
+    var output: [33]u8 = @splat(0xAA);
+    try std.testing.expectError(Error.InvalidDimensions, render(&symbol, &output, options));
+    for (output) |byte| try std.testing.expectEqual(@as(u8, 0xAA), byte);
+}
+
+test "PNG chunk sizing and sinks enforce the 31-bit limit" {
+    _ = try pngLength(max_png_integer, false);
+    try std.testing.expectError(Error.SizeOverflow, pngLength(max_png_integer + 1, false));
+    try std.testing.expectError(Error.SizeOverflow, pngLength(max_png_integer + 1, true));
+    var sink = Sink{ .buffer = null, .position = max_png_integer - 1, .limit = max_png_integer };
+    try sink.writeByte(0);
+    try std.testing.expectError(Error.SizeOverflow, sink.writeByte(0));
+    try std.testing.expectError(Error.SizeOverflow, sink.write(&.{0}));
 }
 
 test "PNG required size exactly matches rendered size" {

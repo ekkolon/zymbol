@@ -20,11 +20,17 @@ The suite reports CSV-like output for:
 - QR v20 mixed-text encoding with automatic mask selection
 - the same encode with a fixed mask, isolating automatic mask-selection cost
 - clean QR v20 decoding
+- segmentation planning by input length for byte-only, alphanumeric and numeric input
 - Reed-Solomon correction at 15 errors with 30 EC codewords
 - PNG rendering at scale 4
 - SVG rendering
 - end-to-end automatic QR encoding plus PNG sizing/rendering
 - Zymbol PNG IDAT size versus Python zlib levels 6 and 9 on identical scanlines
+
+`zig build benchmark-segments` runs just the segmentation benchmark. Byte-only
+inputs and nonnumeric alphanumeric inputs that fit one character-count field
+use linear fast paths. Mixed-mode planning still searches segment endpoints;
+numeric runs within otherwise alphanumeric input retain the optimal planner.
 
 Each timed Zig benchmark records five samples and reports the median
 nanoseconds per operation and derived operations per second. Inputs and
