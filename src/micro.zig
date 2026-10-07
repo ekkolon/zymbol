@@ -132,6 +132,24 @@ pub fn capacity(version: Version, level: spec.EcLevel) ?Capacity {
     };
 }
 
+fn protectionCodewords(version: Version, level: spec.EcLevel) u8 {
+    return switch (version) {
+        .m1 => if (level == .l) 2 else 0,
+        .m2 => switch (level) {
+            .l => 3,
+            .m => 2,
+            else => 0,
+        },
+        .m3 => if (level == .l) 2 else 0,
+        .m4 => if (level == .l) 2 else 0,
+    };
+}
+
+fn correctionCapacity(version: Version, level: spec.EcLevel) ?u8 {
+    const cap = capacity(version, level) orelse return null;
+    return (cap.ec_codewords - protectionCodewords(version, level)) / 2;
+}
+
 fn versionFromNumber(number: u3) ?Version {
     return switch (number) {
         1 => .m1,
@@ -1239,9 +1257,10 @@ fn decodeTransformed(
 
     const total_codewords =
         @as(usize, cap.data_codewords) + @as(usize, cap.ec_codewords);
-    const corrected = reed_solomon.decode(
+    const corrected = reed_solomon.decodeWithLimit(
         block[0..total_codewords],
         @as(usize, cap.ec_codewords),
+        correctionCapacity(version, format.level).?,
     ) catch return Error.UnrecoverableBlock;
 
     const len = try parseData(
@@ -1341,6 +1360,17 @@ test "Micro QR rejects empty input and empty explicit segments" {
         Error.EmptyInput,
         encodeSegments(&segments, .{}, &cells),
     );
+}
+
+test "Micro QR correction capacities honor protection codewords" {
+    try std.testing.expectEqual(@as(?u8, 0), correctionCapacity(.m1, .l));
+    try std.testing.expectEqual(@as(?u8, 1), correctionCapacity(.m2, .l));
+    try std.testing.expectEqual(@as(?u8, 2), correctionCapacity(.m2, .m));
+    try std.testing.expectEqual(@as(?u8, 2), correctionCapacity(.m3, .l));
+    try std.testing.expectEqual(@as(?u8, 4), correctionCapacity(.m3, .m));
+    try std.testing.expectEqual(@as(?u8, 3), correctionCapacity(.m4, .l));
+    try std.testing.expectEqual(@as(?u8, 5), correctionCapacity(.m4, .m));
+    try std.testing.expectEqual(@as(?u8, 7), correctionCapacity(.m4, .q));
 }
 
 test "Micro QR data padding matches independent codeword vectors" {

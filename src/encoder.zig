@@ -223,8 +223,8 @@ fn encodePayload(
     var data_buf: [max_data_codewords]u8 = undefined;
     var writer = bitstream.Writer.init(data_buf[0..data_len]);
     if (options.structured_append) |value| try segment.appendStructuredAppend(&writer, value);
-    try segment.appendFnc1(&writer, options.fnc1);
     if (utf8_eci) try segment.appendEci(&writer, 26);
+    try segment.appendFnc1(&writer, options.fnc1);
     if (options.fnc1.isNone()) {
         try segment.writeOptimal(&writer, version, payload, costs, trace);
     } else {

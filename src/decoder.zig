@@ -165,7 +165,11 @@ fn decodeTransformed(
             block_buf[block_data_len + index] = codeword_scratch[source];
         }
 
-        const corrected = reed_solomon.decode(block_buf[0..block_len], ec_len) catch {
+        const corrected = reed_solomon.decodeWithLimit(
+            block_buf[0..block_len],
+            ec_len,
+            spec.correctionCapacity(version, format.level),
+        ) catch {
             return Error.UnrecoverableBlock;
         };
         errors_corrected += @as(u32, corrected.errors);
@@ -482,7 +486,7 @@ fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream 
     var fnc1: spec.Fnc1 = .none;
     var structured_append: ?spec.StructuredAppend = null;
     var saw_any_mode = false;
-    var data_or_eci_started = false;
+    var data_started = false;
 
     while (reader.bitsRemaining() >= 4) {
         const mode_bits = try readBits(&reader, 4);
@@ -505,12 +509,12 @@ fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream 
                 saw_any_mode = true;
             },
             .fnc1_first_position => {
-                if (data_or_eci_started or !fnc1.isNone()) return Error.MalformedDataStream;
+                if (data_started or !fnc1.isNone()) return Error.MalformedDataStream;
                 fnc1 = .first_position;
                 saw_any_mode = true;
             },
             .fnc1_second_position => {
-                if (data_or_eci_started or !fnc1.isNone()) return Error.MalformedDataStream;
+                if (data_started or !fnc1.isNone()) return Error.MalformedDataStream;
                 const encoded: u8 = @intCast(try readBits(&reader, 8));
                 const indicator = spec.ApplicationIndicator.fromEncoded(encoded) orelse
                     return Error.MalformedDataStream;
@@ -519,6 +523,10 @@ fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream 
                 saw_any_mode = true;
             },
             .eci => {
+                // Initial ECI headers precede FNC1. Once FNC1 has been seen,
+                // its mode indicator must remain immediately adjacent to the
+                // first payload mode. Later ECI changes are legal after data.
+                if (!fnc1.isNone() and !data_started) return Error.MalformedDataStream;
                 const assignment = try readEciDesignator(&reader);
                 eci = switch (eci) {
                     .none => .{ .assignment = assignment },
@@ -529,7 +537,6 @@ fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream 
                     .multiple => .multiple,
                 };
                 saw_any_mode = true;
-                data_or_eci_started = true;
             },
             .numeric, .alphanumeric, .byte, .kanji => {
                 const count_bits: u6 = @intCast(spec.charCountBits(mode, version));
@@ -551,7 +558,7 @@ fn parseDataStream(data: []const u8, version: u6, out: []u8) Error!ParsedStream 
                 }
 
                 saw_any_mode = true;
-                data_or_eci_started = true;
+                data_started = true;
             },
         }
     }
@@ -897,11 +904,29 @@ test "structured append must be the first mode" {
     );
 }
 
-test "FNC1 must precede ECI and payload modes" {
+test "initial ECI precedes FNC1 and the first payload mode" {
     var bytes: [16]u8 = undefined;
     var writer = bitstream.Writer.init(&bytes);
     try segment.appendEci(&writer, 26);
     try segment.appendFnc1(&writer, .first_position);
+    try segment.appendByte(&writer, 1, "A");
+    try segment.finalize(&writer);
+
+    var out: [8]u8 = undefined;
+    const parsed = try parseDataStream(&bytes, 1, &out);
+    try std.testing.expectEqualSlices(u8, "A", out[0..parsed.len]);
+    try std.testing.expect(!parsed.fnc1.isNone());
+    try std.testing.expect(switch (parsed.eci) {
+        .assignment => |value| value == 26,
+        else => false,
+    });
+}
+
+test "ECI cannot separate FNC1 from the first payload mode" {
+    var bytes: [16]u8 = undefined;
+    var writer = bitstream.Writer.init(&bytes);
+    try segment.appendFnc1(&writer, .first_position);
+    try segment.appendEci(&writer, 26);
     try segment.appendByte(&writer, 1, "A");
     try segment.finalize(&writer);
 
