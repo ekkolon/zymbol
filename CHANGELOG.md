@@ -1,58 +1,43 @@
 # Changelog
 
-## Unreleased
+All notable changes to Zymbol are documented here.
 
-- Dual-licensed Zymbol under MIT or Apache-2.0, at the user's option.
-- Added GitHub immutable-release attestation verification to the tag-publish workflow.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-- Corrected the ISO/IEC 18004:2024 FNC1/ECI header ordering and added direct regression coverage.
-- Enforced Table 9 misdecoded-protection-codeword correction limits, including error-detection-only Micro QR M1.
-- Completed the normative ISO/IEC 18004:2024 component review and tightened the documented conformance boundary.
-- Replaced the ad-hoc Python interoperability environment with repository-pinned Astral uv and managed Python.
+## [Unreleased]
 
-- Tightened the pre-1.0 public surface by removing accidental raw `Symbol` mutators and the non-semantic reserved `Cell` field.
-- Added staged public CI and a dry-run release workflow so expensive validation runs only after local preflight passes.
+### Added
 
-- Froze the v1 exported root declaration surface with a release qualification test and completed the repository evidence audit with no remaining `missing` or `verify` ledger entries.
-- Fixed package contents so every declared build step, including benchmarks, is present in published source packages.
+- QR Code Model 2 versions 1 through 40 with L/M/Q/H error correction.
+- Micro QR M1 through M4 with legal mode and error-correction combinations.
+- Numeric, alphanumeric, byte, Kanji, ECI, FNC1, Structured Append, and mixed QR streams.
+- QR and Micro QR decoding with mirrored and reversed-reflectance normalization.
+- Caller-owned raster, SVG, and deterministic PNG rendering, plus allocator-backed convenience APIs.
+- `wasm32-freestanding` and cross-target portability qualification.
+- Independent ISO-derived conformance fixtures and bidirectional ZXing-cpp interoperability.
+- QEMU runtime qualification for 32-bit little-endian and 64-bit big-endian targets.
+- Deterministic fuzz regression corpora and sustained coverage-guided fuzz targets.
+- ReleaseFast benchmarks for encoding, decoding, Reed-Solomon correction, rendering, memory requirements, and PNG compression.
+- Public API snapshots and a documented v1 compatibility contract.
+- Reproducible Python interoperability through pinned Astral uv.
+- Dual licensing under MIT or Apache-2.0, at the user's option.
+- Immutable-release attestation verification in the release pipeline.
 
-- Added a reproducible ReleaseFast v1 benchmark suite covering encode/mask selection, decode, Reed-Solomon correction, PNG/SVG rendering, working-set size, and PNG compression baselines.
-- Reduced direct PNG render latency by eliminating redundant compression passes and per-byte Adler divisions; a measured PNG Up-filter alternative was rejected because it regressed both speed and size.
+### Changed
 
-- Added independent SVG structural validation for QR and Micro QR geometry, colors, transparency, sizing, and reversed reflectance.
+- Standardized the v1 toolchain on Zig 0.17.0.
+- Tightened the pre-1.0 public surface by removing accidental raw symbol mutators and non-semantic reserved fields.
+- Replaced stored-DEFLATE PNG output with deterministic fixed-Huffman compression and bounded LZ77 matching.
+- Reduced PNG rendering work by removing redundant compression passes and expensive per-byte Adler divisions.
+- Refactored the public package to expose one `zymbol` module with rendering under `zymbol.render`.
 
-- Added an opt-in QEMU runtime portability gate covering 32-bit little-endian x86 and 64-bit big-endian PowerPC64 execution.
+### Fixed
 
-- Expanded coverage-guided fuzzing to raw segment parsing, Reed-Solomon correction, BCH damage, decodeAny/buffer boundaries, Micro QR legal modes, SVG, and renderer boundary cases.
-- Added checked-in fuzz seed corpora and a finite v1 sustained-fuzz criterion of 100M executions per target with deterministic replay in ordinary test runs.
+- Enforced ISO/IEC 18004:2024 Table 9 protection-codeword limits, including error-detection-only Micro QR M1.
+- Corrected the normative initial ECI/FNC1 header ordering.
+- Included every file required by declared build steps in published source packages.
 
-- Replaced PNG stored-DEFLATE output with deterministic fixed-Huffman compression and bounded LZ77 matching; added an independent PNG CRC/Adler/inflate validation gate.
-
-- Added explicit normal/reversed reflectance rendering across raster, SVG, and PNG, including quiet-zone inversion and decode-backed regression coverage.
-
-- Added Micro QR M1-M4 encoding, decoding, legal EC/mode handling, all four masks, independent vectors, autodiscrimination, and two-module rendering defaults.
-- Added Micro QR PNG/SVG owned and caller-buffer helpers.
-- Added FNC1 first/second position, Structured Append, transmitted metadata, and AIM QR symbology modifiers.
-- Added mirror and reversed-reflectance normalization for QR and Micro QR decoding.
-- Added an independent `zig build conformance` gate with pinned ISO-derived QR/Micro reference matrices and bidirectional fixture checks.
-
-- Added automatic mirrored and reversed-reflectance QR normalization with decode metadata.
-
-- Added an ISO/IEC 18004:2024 conformance ledger and made unresolved normative coverage a v1 blocker.
-- Added a cross-architecture ReleaseSafe portability matrix for core and rendering modules.
-- Added coverage-guided `std.testing.Smith` fuzz targets for decoding, binary round trips, and PNG encoding.
-- Forced LLVM for the fuzz executable to avoid the upstream empty coverage-entry-point crash in affected Zig toolchains.
-
-- Added isolated `zymbol.render` raster rendering and built-in PNG/SVG codecs.
-- Added one-call owned PNG/SVG helpers plus allocation-free buffer APIs for WASM and freestanding targets.
-- Added responsive centered SVG output, optional intrinsic sizing, and direct `std.Io.Writer` streaming.
-- Added clean `png`, `svg`, and `terminal` examples; generated files live under gitignored `zig-out/examples`, and supported terminals display the QR inline through Kitty, iTerm2-compatible, or SIXEL image protocols.
-
-- Added a one-command local release qualification step covering Debug, ReleaseSafe, ReleaseFast, ReleaseSmall, and wasm32-freestanding.
-- Added the v1 public compatibility contract.
-- Added exhaustive format-BCH correction-radius coverage.
-- Added hostile structurally valid decoder inputs and public decoder boundary tests.
-
-## 0.1.0
+## [0.1.0]
 
 Initial project baseline and v1 stabilization work.
