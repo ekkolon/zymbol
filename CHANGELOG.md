@@ -7,17 +7,11 @@ and releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-07
+
 ### Fixed
 
-- Reject invalid Shift-JIS byte pairs in QR and Micro QR Kanji encoding and decoding.
-- Score scaled finder-like patterns during QR mask selection.
-- Cross-compile actual API calls in the portability and WASM gates.
-- Enforce PNG's 31-bit dimension and chunk-length limits.
-- Replay the intended binary seeds in the main fuzz corpus.
-
-### Changed
-
-- Plan byte-only and nonnumeric alphanumeric inputs without quadratic endpoint searches where a uniform mode is optimal.
+- Correct Kanji validation, QR mask scoring and portability checks (#37).
 
 ## [1.0.0] - 2026-10-07
 
