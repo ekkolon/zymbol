@@ -9,7 +9,7 @@ optimization mode.
 | Field | Value |
 | --- | --- |
 | Package | `zymbol` |
-| Version | `0.1.0` release candidate |
+| Version | `1.0.0` |
 | Minimum Zig | `0.17.0` |
 | Runtime package dependencies | None |
 | Author and maintainer | Nelson Dominguez |

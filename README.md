@@ -11,9 +11,7 @@ Zymbol is a QR library for applications that need control over memory, portabili
 and the symbol itself. It encodes and decodes sampled module grids and renders
 them directly to raster pixels, SVG, or PNG.
 
-> **Status:** `0.1.0`, v1 release candidate. The public surface is frozen for
-> the first stable release. Semantic-versioning guarantees begin with
-> `v1.0.0`.
+> **Release:** `v1.0.0`. Semantic versioning applies to the documented public API.
 
 ## Highlights
 
@@ -275,6 +273,6 @@ QR Code is a registered trademark of DENSO WAVE INCORPORATED.
 [license-badge]: https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg
 [performance]: docs/v1-performance.md
 [security]: SECURITY.md
-[version-badge]: https://img.shields.io/badge/version-0.1.0-555.svg
+[version-badge]: https://img.shields.io/badge/version-1.0.0-555.svg
 [zig]: https://ziglang.org/
 [zig-badge]: https://img.shields.io/badge/Zig-0.17.0-f7a41d.svg?logo=zig&logoColor=white
