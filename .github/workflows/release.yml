@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish after validation; keep false for a private or public dry run
+        description: Publish after validation; keep false for a dry run
         required: true
         default: false
         type: boolean
@@ -26,12 +26,15 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (
           github.event.pull_request.merged == true &&
-          github.event.pull_request.head.ref == 'release/next'
+          github.event.pull_request.base.ref == 'main' &&
+          github.event.pull_request.head.ref == 'release/next' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         )
       }}
     name: Validate and publish
     runs-on: ubuntu-24.04
     timeout-minutes: 50
+
     steps:
       - name: Checkout release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -96,16 +99,27 @@ jobs:
           if [[ "${{ github.event.repository.private }}" == "true" ]]; then
             archive_dir="$(mktemp -d)"
             archive="$archive_dir/zymbol.tar.gz"
-            git archive               --format=tar.gz               --prefix="zymbol-$RELEASE_SHA/"               --output="$archive"               "$RELEASE_SHA"
 
-            python3 -m http.server               8765               --bind 127.0.0.1               --directory "$archive_dir"               >"$RUNNER_TEMP/zymbol-package-server.log" 2>&1 &
+            git archive \
+              --format=tar.gz \
+              --prefix="zymbol-$RELEASE_SHA/" \
+              --output="$archive" \
+              "$RELEASE_SHA"
+
+            python3 -m http.server \
+              8765 \
+              --bind 127.0.0.1 \
+              --directory "$archive_dir" \
+              >"$RUNNER_TEMP/zymbol-package-server.log" 2>&1 &
             server_pid=$!
             trap 'kill "$server_pid" 2>/dev/null || true' EXIT
             sleep 1
 
-            python3 tools/package_smoke.py               "http://127.0.0.1:8765/zymbol.tar.gz"
+            python3 tools/package_smoke.py \
+              "http://127.0.0.1:8765/zymbol.tar.gz"
           else
-            python3 tools/package_smoke.py               "https://github.com/$GITHUB_REPOSITORY/archive/$RELEASE_SHA.tar.gz"
+            python3 tools/package_smoke.py \
+              "https://github.com/$GITHUB_REPOSITORY/archive/$RELEASE_SHA.tar.gz"
           fi
 
       - name: Install QEMU
@@ -145,9 +159,17 @@ jobs:
             exit 1
           fi
 
-          gh release create "$RELEASE_TAG"             --repo "$GITHUB_REPOSITORY"             --target "$RELEASE_SHA"             --draft             --title "Zymbol $RELEASE_TAG"             --notes-file release-notes.md
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
+            --draft \
+            --title "Zymbol $RELEASE_TAG" \
+            --notes-file release-notes.md
 
-          actual="$(gh api             "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG"             --jq '.object.sha')"
+          actual="$(gh api \
+            "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+            --jq '.object.sha')"
+
           if [[ "$actual" != "$RELEASE_SHA" ]]; then
             echo "::error::Release tag points to $actual instead of $RELEASE_SHA."
             exit 1
@@ -173,14 +195,16 @@ jobs:
 
       - name: Publish immutable GitHub Release
         if: success() && env.PUBLISH_RELEASE == 'true'
-        if: env.PUBLISH_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release edit "$RELEASE_TAG"             --repo "$GITHUB_REPOSITORY"             --draft=false             --latest
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --latest
 
       - name: Verify GitHub release attestation
-        if: env.PUBLISH_RELEASE == 'true'
+        if: success() && env.PUBLISH_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
