@@ -190,6 +190,20 @@ Initial project baseline.
         self.assertEqual(output.read_text(encoding="utf-8"), "changed=false\n")
         self.assertIn('.version = "1.0.0"', (self.root / "build.zig.zon").read_text())
 
+    def test_fix_only_selects_patch_release(self) -> None:
+        self.commit_stable_v1()
+
+        (self.root / "fix.txt").write_text("fix\n", encoding="utf-8")
+        self.git("add", "fix.txt")
+        self.git("commit", "-m", "fix: harden malformed input handling (#106)")
+
+        self.prepare("--date", "2026-10-08")
+        self.assertIn('.version = "1.0.1"', (self.root / "build.zig.zon").read_text())
+        self.assertIn(
+            "## [1.0.1] - 2026-10-08",
+            (self.root / "CHANGELOG.md").read_text(),
+        )
+
     def test_breaking_change_selects_next_major(self) -> None:
         self.commit_stable_v1()
 
