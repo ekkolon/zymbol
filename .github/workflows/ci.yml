@@ -39,6 +39,12 @@ jobs:
       - name: Format
         run: zig fmt --check build.zig src tests examples benchmarks
 
+      - name: Check PR title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: python3 tools/check_pr_title.py "$PR_TITLE"
+
       - name: Check API docs
         run: python3 tools/check_api_docs.py
 
