@@ -68,7 +68,7 @@ Before creating the first public release:
 
 1. make the repository public;
 2. set the repository description to:
-   `Dependency-free QR Code Model 2 and Micro QR library for Zig with allocation-free encoding/decoding and PNG/SVG rendering.`;
+   `Standards-conformant QR Code Model 2 and Micro QR library for Zig with an allocation-free core, zero package dependencies, and built-in PNG/SVG rendering.`;
 3. verify the README names Nelson Dominguez as maintainer and includes the DENSO WAVE QR Code trademark notice;
 4. add the topics `zig`, `zig-package`, `qr-code`, `qrcode`, and
    `micro-qr`;
@@ -112,40 +112,42 @@ The normative review was completed against ISO/IEC 18004:2024 on 2026-10-07.
 The resulting fixes passed structural qualification, closing the v1 normative
 review within the documented component boundary.
 
-## 5. Release metadata
+## 5. Automated release preparation
 
-After the preceding gates pass:
+For the initial stable release, run **Prepare Release** manually with
+`version=1.0.0`. After `v1.0.0` exists, the workflow maintains
+`release/next` automatically from conventional squash-commit titles:
 
-1. change `build.zig.zon` from `0.1.0` to `1.0.0`;
-2. replace `Unreleased` in `CHANGELOG.md` with
-   `1.0.0 - YYYY-MM-DD`;
-3. change the README version badge and status from `0.1.0` release candidate to stable `v1.0.0`;
-4. update the version row in `docs/distribution.md` to `1.0.0`;
-5. run:
-   ```sh
-   python3 tools/release.py v1.0.0
-   zig fmt --check build.zig src tests examples benchmarks
-   python3 tools/check_api_docs.py
-   zig build test
-   zig build conformance
-   zig build qualify
-   ```
-6. commit only those release-metadata changes;
-7. run the `Release` workflow manually with `tag=v1.0.0`. This is a dry run: it validates the exact release commit and its remote source archive but does not create a tag or GitHub Release.
+- `feat:` selects a minor release;
+- `fix:`, `perf:`, `refactor:`, `revert:`, and `security:` select a
+  patch release;
+- a conventional `!` or `BREAKING CHANGE:` selects a major release;
+- docs/test/build/CI/chore-only changes do not create a release.
+
+The generated release PR updates the semantic version, Keep a Changelog release
+section, README version/status, and distribution metadata. The changelog is
+therefore part of the reviewed release commit rather than being mutated after
+publication.
+
+Before the repository becomes public, run the **Release** workflow manually on
+`release/next` with `publish=false`. The private dry run executes the same
+qualification gates and package smoke using a locally served source archive.
 
 ## 6. Tag and publish
 
-Only after the manual release dry run passes, create `v1.0.0` on the exact release commit.
+Merging the generated `release/next` PR triggers the Release workflow. On a
+public repository, the workflow:
 
-The tag-triggered workflow repeats the release checks before the GitHub Release
-is created. It verifies release metadata, deterministic qualification, QEMU
-runtime portability, PNG/SVG validation, the local external-consumer fixture,
-ZXing-cpp interoperability, and a real `zig fetch --save` against the tagged
-GitHub archive.
+1. validates release metadata and the exact source tree;
+2. runs consumer/package smoke, qualification, QEMU runtime portability,
+   PNG/SVG validation, benchmarks, deterministic fuzz replay, and ZXing
+   interoperability;
+3. creates a draft release and the semantic tag at the validated commit;
+4. publishes it as **Zymbol vX.Y.Z**;
+5. verifies the immutable GitHub release attestation.
 
-After publication, the workflow runs `gh release verify`. With release
-immutability enabled, GitHub automatically creates the cryptographic release
-attestation. The workflow fails if that attestation cannot be verified.
+The GitHub Release body is taken from the matching version section of
+`CHANGELOG.md`. No release is published if any preceding gate fails.
 
 The GitHub tag/archive is the canonical Zig package source. See
 `docs/distribution.md`.
