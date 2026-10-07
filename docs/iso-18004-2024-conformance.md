@@ -223,6 +223,14 @@ evidence alone had not exposed:
 
 Both findings have direct regression coverage.
 
+A subsequent audit exposed invalid Shift-JIS trail-byte acceptance in Kanji
+encoding and decoding, and missing N3 penalties for scaled finder-like ratios.
+The corrected paths share a byte-pair predicate, with exhaustive checks over
+all 65,536 pairs and all 8,192 encoded values. N3 tests cover scaled ratios,
+horizontal and vertical lines, in-symbol light areas, and an independently
+calculated complete-grid score. The existing eight-mask reference vector is
+retained.
+
 ## Fuzzing
 
 The checked-in corpus is a deterministic release gate and is replayed by

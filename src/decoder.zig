@@ -5,6 +5,7 @@ const segment = @import("segment.zig");
 const reed_solomon = @import("reed_solomon.zig");
 const matrix = @import("matrix.zig");
 const encoder = @import("encoder.zig");
+const kanji = @import("kanji.zig");
 
 pub const Error = error{
     InvalidSize,
@@ -731,12 +732,32 @@ fn decodeKanji(
         var value: u32 = (encoded / 0xC0) << 8 | (encoded % 0xC0);
         value += if (value < 0x1F00) @as(u32, 0x8140) else @as(u32, 0xC140);
 
-        const valid = (value >= 0x8140 and value <= 0x9FFC) or
-            (value >= 0xE040 and value <= 0xEBBF);
-        if (!valid) return Error.MalformedDataStream;
+        if (!kanji.isValid(value)) return Error.MalformedDataStream;
 
         try push(out, written, @intCast(value >> 8));
         try push(out, written, @intCast(value & 0xFF));
+    }
+}
+
+test "Kanji decoder rejects every forbidden 13-bit mapping" {
+    for (0..8192) |encoded| {
+        var bytes: [2]u8 = undefined;
+        var writer = bitstream.Writer.init(&bytes);
+        try writer.append(@intCast(encoded), 13);
+        var reader = bitstream.Reader.init(&bytes);
+        var out: [2]u8 = undefined;
+        var written: usize = 0;
+        const unpacked = ((encoded / 0xC0) << 8) | (encoded % 0xC0);
+        const pair = unpacked + @as(usize, if (unpacked < 0x1F00) 0x8140 else 0xC140);
+        if (kanji.isValid(@intCast(pair))) {
+            try decodeKanji(&reader, 1, &out, &written);
+            try std.testing.expectEqual(@as(usize, 2), written);
+            try std.testing.expectEqual(@as(u8, @intCast(pair >> 8)), out[0]);
+            try std.testing.expectEqual(@as(u8, @truncate(pair)), out[1]);
+        } else {
+            try std.testing.expectError(Error.MalformedDataStream, decodeKanji(&reader, 1, &out, &written));
+            try std.testing.expectEqual(@as(usize, 0), written);
+        }
     }
 }
 

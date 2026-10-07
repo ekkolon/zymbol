@@ -3,6 +3,7 @@ const spec = @import("spec.zig");
 const bitstream = @import("bitstream.zig");
 const matrix = @import("matrix.zig");
 const reed_solomon = @import("reed_solomon.zig");
+const kanji = @import("kanji.zig");
 
 pub const Version = enum(u3) {
     m1 = 1,
@@ -369,6 +370,7 @@ fn appendKanji(writer: *bitstream.Writer, version: Version, sjis: []const u8) !v
     var index: usize = 0;
     while (index < sjis.len) : (index += 2) {
         var value: u32 = (@as(u32, sjis[index]) << 8) | sjis[index + 1];
+        if (!kanji.isValid(value)) return Error.InvalidKanjiByte;
         if (value >= 0x8140 and value <= 0x9FFC) {
             value -= 0x8140;
         } else if (value >= 0xE040 and value <= 0xEBBF) {
@@ -388,11 +390,7 @@ fn validateKanji(sjis: []const u8) Error!usize {
     var index: usize = 0;
     while (index < sjis.len) : (index += 2) {
         const value = (@as(u16, sjis[index]) << 8) | sjis[index + 1];
-        if (!((value >= 0x8140 and value <= 0x9FFC) or
-            (value >= 0xE040 and value <= 0xEBBF)))
-        {
-            return Error.InvalidKanjiByte;
-        }
+        if (!kanji.isValid(value)) return Error.InvalidKanjiByte;
     }
     return sjis.len / 2;
 }
@@ -1155,11 +1153,7 @@ fn decodeKanji(reader: *DataReader, count: usize, out: []u8, written: *usize) Er
         const encoded = try reader.read(13);
         var value: u32 = (encoded / 0xC0) << 8 | (encoded % 0xC0);
         value += if (value < 0x1F00) @as(u32, 0x8140) else @as(u32, 0xC140);
-        if (!((value >= 0x8140 and value <= 0x9FFC) or
-            (value >= 0xE040 and value <= 0xEBBF)))
-        {
-            return Error.MalformedDataStream;
-        }
+        if (!kanji.isValid(value)) return Error.MalformedDataStream;
         try push(out, written, @intCast(value >> 8));
         try push(out, written, @intCast(value & 0xFF));
     }
@@ -1862,6 +1856,55 @@ test "M1 through M4 round trip legal modes" {
         try std.testing.expectEqualSlices(u8, sample.data, out[0..result.len]);
         try std.testing.expectEqual(sample.min, result.version);
         try std.testing.expectEqual(sample.level, result.ec_level);
+    }
+}
+
+test "Micro Kanji rejects invalid byte pairs at both encoding entry points" {
+    var cells: [max_cells]matrix.Cell = undefined;
+    for ([_]u16{ 0x8200, 0x823F, 0x817F, 0x81FD, 0x9FFD, 0xE07F, 0xEBC0, 0xEC40 }) |pair| {
+        const bytes = [_]u8{ @intCast(pair >> 8), @truncate(pair) };
+        try std.testing.expectError(Error.InvalidKanjiByte, encodeKanji(&bytes, .{}, &cells));
+        try std.testing.expectError(Error.InvalidKanjiByte, encodeSegments(&.{.{ .kanji = &bytes }}, .{}, &cells));
+    }
+}
+
+test "Micro Kanji appender and decoder exhaust the byte-pair space" {
+    var bytes: [8]u8 = undefined;
+    for (0..65536) |pair| {
+        const input = [_]u8{ @intCast(pair >> 8), @truncate(pair) };
+        var writer = bitstream.Writer.init(&bytes);
+        if (!kanji.isValid(@intCast(pair))) {
+            try std.testing.expectError(Error.InvalidKanjiByte, validateKanji(&input));
+            try std.testing.expectError(Error.InvalidKanjiByte, appendKanji(&writer, .m3, &input));
+            continue;
+        }
+        _ = try validateKanji(&input);
+        try appendKanji(&writer, .m3, &input);
+        var reader = DataReader{ .bytes = writer.filled(), .bit_len = writer.bitLength(), .position = modeBits(.m3) + countBits(.m3, .kanji) };
+        var out: [2]u8 = undefined;
+        var written: usize = 0;
+        try decodeKanji(&reader, 1, &out, &written);
+        try std.testing.expectEqualSlices(u8, &input, out[0..written]);
+    }
+}
+
+test "Micro Kanji decoder rejects every forbidden 13-bit mapping" {
+    for (0..8192) |encoded| {
+        var bytes: [2]u8 = undefined;
+        var writer = bitstream.Writer.init(&bytes);
+        try writer.append(@intCast(encoded), 13);
+        var reader = DataReader{ .bytes = &bytes, .bit_len = 13 };
+        var out: [2]u8 = undefined;
+        var written: usize = 0;
+        const unpacked = ((encoded / 0xC0) << 8) | (encoded % 0xC0);
+        const pair = unpacked + @as(usize, if (unpacked < 0x1F00) 0x8140 else 0xC140);
+        if (kanji.isValid(@intCast(pair))) {
+            try decodeKanji(&reader, 1, &out, &written);
+            try std.testing.expectEqual(@as(usize, 2), written);
+        } else {
+            try std.testing.expectError(Error.MalformedDataStream, decodeKanji(&reader, 1, &out, &written));
+            try std.testing.expectEqual(@as(usize, 0), written);
+        }
     }
 }
 
