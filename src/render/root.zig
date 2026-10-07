@@ -138,7 +138,7 @@ test "raster projection is exact across representative versions" {
 
     for (versions) |version| {
         const symbol = try core.encodeText(
-            "qrz",
+            "zymbol",
             .{
                 .min_version = version,
                 .max_version = version,

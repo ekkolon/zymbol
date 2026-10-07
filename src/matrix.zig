@@ -26,7 +26,7 @@ pub const Cell = packed struct {
 
 comptime {
     if (@sizeOf(Cell) != 1) {
-        @compileError("qrz.Cell must remain exactly one byte");
+        @compileError("zymbol.Cell must remain exactly one byte");
     }
 }
 

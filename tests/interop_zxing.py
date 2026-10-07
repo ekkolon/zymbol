@@ -101,7 +101,7 @@ def external_cases():
         ("Q", "HELLO WORLD", q, {"version": 1, "ec_level": "Q"}),
         ("Q", "QR Code Symbol", q, {"version": 1, "ec_level": "M"}),
         ("Q", "12345678901234567890", q, {"version": 1, "ec_level": "M"}),
-        ("Q", "https://example.com/qrz", q, {"version": 2, "ec_level": "M"}),
+        ("Q", "https://example.com/zymbol", q, {"version": 2, "ec_level": "M"}),
         ("Q", "QRZ VERSION 7 CONFORMANCE", q, {"version": 7, "ec_level": "Q"}),
         ("M", "12345", m, {"version": 1, "ec_level": "L"}),
         ("M", "01234567", m, {"version": 2, "ec_level": "L"}),
