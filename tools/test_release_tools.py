@@ -75,7 +75,7 @@ Initial project baseline.
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def run(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    def run_cmd(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             args,
             cwd=self.root,
@@ -86,10 +86,10 @@ Initial project baseline.
         )
 
     def git(self, *args: str) -> subprocess.CompletedProcess[str]:
-        return self.run("git", *args)
+        return self.run_cmd("git", *args)
 
     def prepare(self, *args: str) -> subprocess.CompletedProcess[str]:
-        return self.run(
+        return self.run_cmd(
             sys.executable,
             "tools/prepare_release.py",
             *args,
@@ -160,7 +160,7 @@ Initial project baseline.
         self.assertNotIn("Clarify usage", changelog)
 
         notes = self.root / "notes.md"
-        result = self.run(
+        result = self.run_cmd(
             sys.executable,
             "tools/release.py",
             "v1.1.0",
@@ -205,14 +205,14 @@ Initial project baseline.
         )
 
     def test_pull_request_title_policy(self) -> None:
-        valid = self.run(
+        valid = self.run_cmd(
             sys.executable,
             "tools/check_pr_title.py",
             "fix(decoder): reject malformed format data",
         )
         self.assertIn("pull request title valid", valid.stdout)
 
-        invalid = self.run(
+        invalid = self.run_cmd(
             sys.executable,
             "tools/check_pr_title.py",
             "Improve decoder",
