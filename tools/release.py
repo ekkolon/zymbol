@@ -43,12 +43,6 @@ def release_section(version: str) -> str:
 
 def validate_project_metadata(version: str) -> None:
     readme = README.read_text(encoding="utf-8")
-    expected_status = f"> **Release:** `v{version}`."
-    if expected_status not in readme:
-        raise SystemExit(
-            f"README.md does not declare Zymbol v{version} as the release"
-        )
-
     expected_badge = (
         "[version-badge]: "
         f"https://img.shields.io/badge/version-{version}-555.svg"

@@ -28,13 +28,13 @@ class ReleaseToolsTest(unittest.TestCase):
         (self.root / "README.md").write_text(
             """# zymbol
 
-> **Status:** `0.1.0`, v1 release candidate. The public surface is frozen for
-> the first stable release. Semantic-versioning guarantees begin with
-> `v1.0.0`.
+Zymbol is a QR code library for Zig.
 
-## Highlights
+## Installation
 
-Test fixture.
+```sh
+zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v0.1.0.tar.gz
+```
 
 [version-badge]: https://img.shields.io/badge/version-0.1.0-555.svg
 """,
@@ -110,10 +110,16 @@ Initial project baseline.
         )
         self.assertIn("prepared Zymbol v1.0.0", result.stdout)
         self.assertIn('.version = "1.0.0"', (self.root / "build.zig.zon").read_text())
+        readme = (self.root / "README.md").read_text()
         self.assertIn(
-            "> **Release:** `v1.0.0`.",
-            (self.root / "README.md").read_text(),
+            "[version-badge]: https://img.shields.io/badge/version-1.0.0-555.svg",
+            readme,
         )
+        self.assertIn("refs/tags/v1.0.0.tar.gz", readme)
+        self.assertNotIn("refs/tags/v0.1.0.tar.gz", readme)
+        self.assertIn("Zymbol is a QR code library for Zig.", readme)
+        self.assertNotIn("**Release:**", readme)
+        self.assertNotIn("## Highlights", readme)
         self.assertIn(
             "| Version | `1.0.0` |",
             (self.root / "docs" / "distribution.md").read_text(),
@@ -158,6 +164,10 @@ Initial project baseline.
         self.assertIn("### Added\n\n- Add structured payload helper (#101).", changelog)
         self.assertIn("### Fixed\n\n- Reject malformed payload earlier (#102).", changelog)
         self.assertNotIn("Clarify usage", changelog)
+
+        readme = (self.root / "README.md").read_text()
+        self.assertIn("refs/tags/v1.1.0.tar.gz", readme)
+        self.assertNotIn("refs/tags/v1.0.0.tar.gz", readme)
 
         notes = self.root / "notes.md"
         result = self.run_cmd(

@@ -216,19 +216,6 @@ def update_metadata(version: str) -> None:
     )
 
     readme = README.read_text(encoding="utf-8")
-    status_pattern = re.compile(
-        r"> \*\*(?:Status|Release):\*\*.*?(?=\n\n## Highlights)",
-        re.DOTALL,
-    )
-    tick = chr(96)
-    status = (
-        f"> **Release:** {tick}v{version}{tick}. Semantic versioning applies "
-        "to the documented public API."
-    )
-    readme, count = status_pattern.subn(status, readme, count=1)
-    if count != 1:
-        raise SystemExit("could not update README release status")
-
     readme, count = re.subn(
         r"\[version-badge\]:\s+https://img\.shields\.io/badge/version-[^-\s]+-555\.svg",
         f"[version-badge]: https://img.shields.io/badge/version-{version}-555.svg",
@@ -237,12 +224,21 @@ def update_metadata(version: str) -> None:
     )
     if count != 1:
         raise SystemExit("could not update README version badge")
+
+    readme, count = re.subn(
+        r"https://github\.com/ekkolon/zymbol/archive/refs/tags/v\d+\.\d+\.\d+\.tar\.gz",
+        f"https://github.com/ekkolon/zymbol/archive/refs/tags/v{version}.tar.gz",
+        readme,
+        count=1,
+    )
+    if count != 1:
+        raise SystemExit("could not update README installation URL")
     README.write_text(readme, encoding="utf-8")
 
     replace_once(
         DISTRIBUTION,
         r"\| Version \| \x60[^\x60]+\x60(?: release candidate)? \|",
-        f"| Version | {tick}{version}{tick} |",
+        f"| Version | `{version}` |",
     )
 
 
