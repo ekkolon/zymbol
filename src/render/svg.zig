@@ -1,5 +1,5 @@
 const std = @import("std");
-const qrz = @import("qrz");
+const core = @import("zymbol_core");
 const Reflectance = @import("reflectance.zig").Reflectance;
 
 pub const Error = error{
@@ -87,15 +87,15 @@ fn writeColor(sink: anytype, color: Rgb) !void {
     try sink.write(&bytes);
 }
 
-fn validateSymbol(symbol: *const qrz.Symbol) Error!void {
-    if (!qrz.isValidSymbol(symbol)) return Error.InvalidSymbol;
+fn validateSymbol(symbol: *const core.Symbol) Error!void {
+    if (!core.isValidSymbol(symbol)) return Error.InvalidSymbol;
 }
 
-fn quietZone(symbol: *const qrz.Symbol, options: Options) u16 {
-    return options.quiet_zone orelse qrz.defaultQuietZone(symbol.family);
+fn quietZone(symbol: *const core.Symbol, options: Options) u16 {
+    return options.quiet_zone orelse core.defaultQuietZone(symbol.family);
 }
 
-fn emit(symbol: *const qrz.Symbol, options: Options, sink: anytype) !void {
+fn emit(symbol: *const core.Symbol, options: Options, sink: anytype) !void {
     try validateSymbol(symbol);
 
     const quiet = @as(usize, quietZone(symbol, options));
@@ -224,34 +224,34 @@ fn maxBytesForModules(
     return paths + 256;
 }
 
-pub fn maxBytesForVersion(version: qrz.Version, options: Options) Error!usize {
-    if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
+pub fn maxBytesForVersion(version: core.Version, options: Options) Error!usize {
+    if (!core.isValidVersion(version)) return Error.InvalidVersion;
     return maxBytesForModules(
-        qrz.size(version),
+        core.size(version),
         options.quiet_zone orelse 4,
         options,
     );
 }
 
 pub fn maxBytesForMicroVersion(
-    version: qrz.MicroVersion,
+    version: core.MicroVersion,
     options: Options,
 ) Error!usize {
     return maxBytesForModules(
-        qrz.microSize(version),
+        core.microSize(version),
         options.quiet_zone orelse 2,
         options,
     );
 }
 
-pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
+pub fn requiredBytes(symbol: *const core.Symbol, options: Options) Error!usize {
     var sink = BufferSink{ .buffer = null };
     try emit(symbol, options, &sink);
     return sink.position;
 }
 
 pub fn render(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     output: []u8,
     options: Options,
 ) Error![]const u8 {
@@ -261,7 +261,7 @@ pub fn render(
 }
 
 pub fn write(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     writer: *std.Io.Writer,
     options: Options,
 ) WriteError!void {
@@ -269,15 +269,15 @@ pub fn write(
     try emit(symbol, options, &sink);
 }
 
-fn testSymbol(cells: *[qrz.requiredCells(1)]qrz.Cell) qrz.Symbol {
-    @memset(cells[0..], qrz.Cell{});
+fn testSymbol(cells: *[core.requiredCells(1)]core.Cell) core.Symbol {
+    @memset(cells[0..], core.Cell{});
     cells[0].dark = true;
-    const side: usize = qrz.size(1);
+    const side: usize = core.size(1);
     cells[side + 1].dark = true;
 
     return .{
         .cells = cells,
-        .size = qrz.size(1),
+        .size = core.size(1),
         .version = 1,
         .ec_level = .m,
         .mask = 0,
@@ -285,7 +285,7 @@ fn testSymbol(cells: *[qrz.requiredCells(1)]qrz.Cell) qrz.Symbol {
 }
 
 test "SVG size query exactly matches rendered bytes" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     const expected =
@@ -302,7 +302,7 @@ test "SVG size query exactly matches rendered bytes" {
 }
 
 test "SVG can render with transparent background" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     var output: [512]u8 = undefined;
@@ -317,7 +317,7 @@ test "SVG can render with transparent background" {
 }
 
 test "SVG explicit size stays square and centered" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     var output: [512]u8 = undefined;
@@ -340,7 +340,7 @@ test "SVG explicit size stays square and centered" {
 }
 
 test "SVG writes directly to std Io Writer" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     var expected_buffer: [512]u8 = undefined;
@@ -354,7 +354,7 @@ test "SVG writes directly to std Io Writer" {
 }
 
 test "SVG rejects zero explicit size" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
     var output: [512]u8 = undefined;
 
@@ -365,7 +365,7 @@ test "SVG rejects zero explicit size" {
 }
 
 test "SVG rejects malformed symbols and undersized output" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     const original_size = symbol.size;
@@ -381,9 +381,8 @@ test "SVG rejects malformed symbols and undersized output" {
     );
 }
 
-
 test "SVG reversed reflectance swaps full symbol polarity" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
 
     var output: [512]u8 = undefined;
@@ -405,7 +404,7 @@ test "SVG reversed reflectance swaps full symbol polarity" {
 }
 
 test "SVG reversed reflectance rejects transparent background" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
     var symbol = testSymbol(&cells);
     var output: [512]u8 = undefined;
 

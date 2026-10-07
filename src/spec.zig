@@ -214,7 +214,7 @@ pub fn charCountBits(mode: Mode, version: u6) u5 {
 
 /// BCH-encodes the 5-bit format payload and applies the fixed format mask.
 pub fn formatInfoBits(level: EcLevel, mask: u3) u15 {
-    const data: u15 = (@as(u15, @intFromEnum(level)) << 3) | mask;
+    const data: u15 = (@as(u15, @backingInt(level)) << 3) | mask;
     var rem: u15 = data;
     var i: usize = 0;
     while (i < 10) : (i += 1) {

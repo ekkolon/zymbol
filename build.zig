@@ -4,29 +4,49 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const qrz = b.addModule("qrz", .{
+    const zymbol_core = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
-    const qrz_render = b.addModule("qrz_render", .{
+    const zymbol_render = b.createModule(.{
         .root_source_file = b.path("src/render/root.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz", .module = qrz }},
+        .imports = &.{.{ .name = "zymbol_core", .module = zymbol_core }},
+    });
+    const zymbol = b.addModule("zymbol", .{
+        .root_source_file = b.path("src/zymbol.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "zymbol_core", .module = zymbol_core },
+            .{ .name = "zymbol_render", .module = zymbol_render },
+        },
     });
 
     const test_step = b.step("test", "Run the test suite");
-    const core_tests = b.addTest(.{ .root_module = qrz });
-    const render_tests = b.addTest(.{ .root_module = qrz_render });
+    const core_tests = b.addTest(.{ .root_module = zymbol_core });
+    const render_tests = b.addTest(.{ .root_module = zymbol_render });
+
+    const public_api_module = b.createModule(.{
+        .root_source_file = b.path("tests/public_api.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
+    });
+    const public_api_tests = b.addTest(.{ .root_module = public_api_module });
+    const run_public_api_tests = b.addRunArtifact(public_api_tests);
+
     test_step.dependOn(&b.addRunArtifact(core_tests).step);
     test_step.dependOn(&b.addRunArtifact(render_tests).step);
+    test_step.dependOn(&run_public_api_tests.step);
 
     const conformance_module = b.createModule(.{
         .root_source_file = b.path("tests/conformance.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz", .module = qrz }},
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
     });
     const conformance_tests = b.addTest(.{ .root_module = conformance_module });
     const run_conformance_tests = b.addRunArtifact(conformance_tests);
@@ -46,7 +66,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/ecc_conformance.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz_spec", .module = conformance_spec }},
+        .imports = &.{.{ .name = "zymbol_spec", .module = conformance_spec }},
     });
     const bch_conformance_tests = b.addTest(.{ .root_module = bch_conformance_module });
     const run_bch_conformance_tests = b.addRunArtifact(bch_conformance_tests);
@@ -56,7 +76,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/rs_conformance.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz_rs", .module = conformance_rs }},
+        .imports = &.{.{ .name = "zymbol_rs", .module = conformance_rs }},
     });
     const rs_conformance_tests = b.addTest(.{ .root_module = rs_conformance_module });
     const run_rs_conformance_tests = b.addRunArtifact(rs_conformance_tests);
@@ -74,10 +94,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/interop_driver.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz", .module = qrz }},
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
     });
     const interop_driver = b.addExecutable(.{
-        .name = "qrz-interop-driver",
+        .name = "zymbol-interop-driver",
         .root_module = interop_module,
     });
     const python = b.option(
@@ -98,13 +118,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/png_driver.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{
-            .{ .name = "qrz", .module = qrz },
-            .{ .name = "qrz_render", .module = qrz_render },
-        },
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
     });
     const png_validation_driver = b.addExecutable(.{
-        .name = "qrz-png-validation-driver",
+        .name = "zymbol-png-validation-driver",
         .root_module = png_validation_module,
     });
     const run_png_validation = b.addSystemCommand(&.{ python, "tests/png_validate.py" });
@@ -120,13 +137,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/svg_driver.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{
-            .{ .name = "qrz", .module = qrz },
-            .{ .name = "qrz_render", .module = qrz_render },
-        },
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
     });
     const svg_validation_driver = b.addExecutable(.{
-        .name = "qrz-svg-validation-driver",
+        .name = "zymbol-svg-validation-driver",
         .root_module = svg_validation_module,
     });
     const run_svg_validation = b.addSystemCommand(&.{ python, "tests/svg_validate.py" });
@@ -142,10 +156,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/fuzz.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{
-            .{ .name = "qrz", .module = qrz },
-            .{ .name = "qrz_render", .module = qrz_render },
-        },
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
     });
     const fuzz_tests = b.addTest(.{
         .root_module = fuzz_module,
@@ -166,7 +177,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/fuzz_parser.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz_decoder", .module = fuzz_decoder_module }},
+        .imports = &.{.{ .name = "zymbol_decoder", .module = fuzz_decoder_module }},
     });
     const fuzz_parser_tests = b.addTest(.{
         .root_module = fuzz_parser_module,
@@ -184,7 +195,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("tests/fuzz_rs.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz_rs", .module = fuzz_rs_module }},
+        .imports = &.{.{ .name = "zymbol_rs", .module = fuzz_rs_module }},
     });
     const fuzz_rs_tests = b.addTest(.{
         .root_module = fuzz_rs_root,
@@ -193,7 +204,7 @@ pub fn build(b: *std.Build) void {
     const run_fuzz_rs_tests = b.addRunArtifact(fuzz_rs_tests);
     test_step.dependOn(&run_fuzz_rs_tests.step);
 
-    const fuzz_step = b.step("fuzz", "Run QRz coverage-guided fuzz targets");
+    const fuzz_step = b.step("fuzz", "Run Zymbol coverage-guided fuzz targets");
     fuzz_step.dependOn(&run_fuzz_tests.step);
     fuzz_step.dependOn(&run_fuzz_parser_tests.step);
     fuzz_step.dependOn(&run_fuzz_rs_tests.step);
@@ -202,30 +213,39 @@ pub fn build(b: *std.Build) void {
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
     });
-    const wasm_module = b.createModule(.{
+    const wasm_core_module = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = wasm_target,
         .optimize = optimize,
-    });
-    const wasm_library = b.addLibrary(.{
-        .name = "qrz",
-        .root_module = wasm_module,
-        .linkage = .static,
     });
     const wasm_render_module = b.createModule(.{
         .root_source_file = b.path("src/render/root.zig"),
         .target = wasm_target,
         .optimize = optimize,
-        .imports = &.{.{ .name = "qrz", .module = wasm_module }},
+        .imports = &.{.{ .name = "zymbol_core", .module = wasm_core_module }},
+    });
+    const wasm_module = b.createModule(.{
+        .root_source_file = b.path("src/zymbol.zig"),
+        .target = wasm_target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "zymbol_core", .module = wasm_core_module },
+            .{ .name = "zymbol_render", .module = wasm_render_module },
+        },
+    });
+    const wasm_library = b.addLibrary(.{
+        .name = "zymbol",
+        .root_module = wasm_module,
+        .linkage = .static,
     });
     const wasm_render_library = b.addLibrary(.{
-        .name = "qrz_render",
+        .name = "zymbol-render-internal",
         .root_module = wasm_render_module,
         .linkage = .static,
     });
-    const wasm_step = b.step("wasm", "Compile qrz and qrz_render for wasm32-freestanding");
+    const wasm_step = b.step("wasm", "Compile Zymbol for wasm32-freestanding");
     wasm_step.dependOn(&b.addInstallArtifact(wasm_library, .{}).step);
-    wasm_step.dependOn(&b.addInstallArtifact(wasm_render_library, .{}).step);
+    wasm_step.dependOn(&wasm_render_library.step);
 
     const benchmark_core_module = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
@@ -236,19 +256,25 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/render/root.zig"),
         .target = target,
         .optimize = .ReleaseFast,
-        .imports = &.{.{ .name = "qrz", .module = benchmark_core_module }},
+        .imports = &.{.{ .name = "zymbol_core", .module = benchmark_core_module }},
+    });
+    const benchmark_zymbol_module = b.createModule(.{
+        .root_source_file = b.path("src/zymbol.zig"),
+        .target = target,
+        .optimize = .ReleaseFast,
+        .imports = &.{
+            .{ .name = "zymbol_core", .module = benchmark_core_module },
+            .{ .name = "zymbol_render", .module = benchmark_render_module },
+        },
     });
     const benchmark_module = b.createModule(.{
         .root_source_file = b.path("benchmarks/benchmark.zig"),
         .target = target,
         .optimize = .ReleaseFast,
-        .imports = &.{
-            .{ .name = "qrz", .module = benchmark_core_module },
-            .{ .name = "qrz_render", .module = benchmark_render_module },
-        },
+        .imports = &.{.{ .name = "zymbol", .module = benchmark_zymbol_module }},
     });
     const benchmark_exe = b.addExecutable(.{
-        .name = "qrz-benchmark",
+        .name = "zymbol-benchmark",
         .root_module = benchmark_module,
     });
     const run_benchmark = b.addRunArtifact(benchmark_exe);
@@ -262,10 +288,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("benchmarks/rs_benchmark.zig"),
         .target = target,
         .optimize = .ReleaseFast,
-        .imports = &.{.{ .name = "qrz_rs", .module = benchmark_rs_module }},
+        .imports = &.{.{ .name = "zymbol_rs", .module = benchmark_rs_module }},
     });
     const benchmark_rs_exe = b.addExecutable(.{
-        .name = "qrz-rs-benchmark",
+        .name = "zymbol-rs-benchmark",
         .root_module = benchmark_rs_root,
     });
     const run_rs_benchmark = b.addRunArtifact(benchmark_rs_exe);
@@ -285,10 +311,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("examples/terminal.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{
-            .{ .name = "qrz", .module = qrz },
-            .{ .name = "qrz_render", .module = qrz_render },
-        },
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
     });
     const terminal_example = b.addExecutable(.{
         .name = "terminal",
@@ -308,10 +331,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("examples/terminal.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{
-            .{ .name = "qrz", .module = qrz },
-            .{ .name = "qrz_render", .module = qrz_render },
-        },
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
     });
     const terminal_tests = b.addTest(.{ .root_module = terminal_test_module });
 
@@ -319,10 +339,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("examples/svg.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{
-            .{ .name = "qrz", .module = qrz },
-            .{ .name = "qrz_render", .module = qrz_render },
-        },
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
     });
     const svg_example = b.addExecutable(.{
         .name = "svg",
@@ -330,17 +347,14 @@ pub fn build(b: *std.Build) void {
     });
     const run_svg_example = b.addRunArtifact(svg_example);
 
-    const svg_example_step = b.step("example-svg", "Write zig-out/examples/qrz.svg");
+    const svg_example_step = b.step("example-svg", "Write zig-out/examples/zymbol.svg");
     svg_example_step.dependOn(&run_svg_example.step);
 
     const png_example_module = b.createModule(.{
         .root_source_file = b.path("examples/png.zig"),
         .target = target,
         .optimize = optimize,
-        .imports = &.{
-            .{ .name = "qrz", .module = qrz },
-            .{ .name = "qrz_render", .module = qrz_render },
-        },
+        .imports = &.{.{ .name = "zymbol", .module = zymbol }},
     });
     const png_example = b.addExecutable(.{
         .name = "png",
@@ -348,7 +362,7 @@ pub fn build(b: *std.Build) void {
     });
     const run_png_example = b.addRunArtifact(png_example);
 
-    const png_example_step = b.step("example-png", "Write zig-out/examples/qrz.png");
+    const png_example_step = b.step("example-png", "Write zig-out/examples/zymbol.png");
     png_example_step.dependOn(&run_png_example.step);
 
     const portability_step = b.step(
@@ -386,7 +400,7 @@ pub fn build(b: *std.Build) void {
             .optimize = .ReleaseSafe,
         });
         const portability_core = b.addLibrary(.{
-            .name = b.fmt("qrz-{s}", .{entry.name}),
+            .name = b.fmt("zymbol-core-{s}", .{entry.name}),
             .root_module = portability_core_module,
             .linkage = .static,
         });
@@ -396,14 +410,30 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/render/root.zig"),
             .target = portability_target,
             .optimize = .ReleaseSafe,
-            .imports = &.{.{ .name = "qrz", .module = portability_core_module }},
+            .imports = &.{.{ .name = "zymbol_core", .module = portability_core_module }},
         });
         const portability_render = b.addLibrary(.{
-            .name = b.fmt("qrz-render-{s}", .{entry.name}),
+            .name = b.fmt("zymbol-render-{s}", .{entry.name}),
             .root_module = portability_render_module,
             .linkage = .static,
         });
         portability_step.dependOn(&portability_render.step);
+
+        const portability_zymbol_module = b.createModule(.{
+            .root_source_file = b.path("src/zymbol.zig"),
+            .target = portability_target,
+            .optimize = .ReleaseSafe,
+            .imports = &.{
+                .{ .name = "zymbol_core", .module = portability_core_module },
+                .{ .name = "zymbol_render", .module = portability_render_module },
+            },
+        });
+        const portability_zymbol = b.addLibrary(.{
+            .name = b.fmt("zymbol-{s}", .{entry.name}),
+            .root_module = portability_zymbol_module,
+            .linkage = .static,
+        });
+        portability_step.dependOn(&portability_zymbol.step);
     }
 
     const runtime_portability_step = b.step(
@@ -436,19 +466,25 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/render/root.zig"),
             .target = runtime_target,
             .optimize = .ReleaseSafe,
-            .imports = &.{.{ .name = "qrz", .module = runtime_core_module }},
+            .imports = &.{.{ .name = "zymbol_core", .module = runtime_core_module }},
+        });
+        const runtime_zymbol_module = b.createModule(.{
+            .root_source_file = b.path("src/zymbol.zig"),
+            .target = runtime_target,
+            .optimize = .ReleaseSafe,
+            .imports = &.{
+                .{ .name = "zymbol_core", .module = runtime_core_module },
+                .{ .name = "zymbol_render", .module = runtime_render_module },
+            },
         });
         const runtime_test_module = b.createModule(.{
             .root_source_file = b.path("tests/runtime_portability.zig"),
             .target = runtime_target,
             .optimize = .ReleaseSafe,
-            .imports = &.{
-                .{ .name = "qrz", .module = runtime_core_module },
-                .{ .name = "qrz_render", .module = runtime_render_module },
-            },
+            .imports = &.{.{ .name = "zymbol", .module = runtime_zymbol_module }},
         });
         const runtime_exe = b.addExecutable(.{
-            .name = b.fmt("qrz-runtime-{s}", .{entry.name}),
+            .name = b.fmt("zymbol-runtime-{s}", .{entry.name}),
             .root_module = runtime_test_module,
         });
         runtime_portability_step.dependOn(&b.addRunArtifact(runtime_exe).step);
@@ -458,6 +494,7 @@ pub fn build(b: *std.Build) void {
     qualify_step.dependOn(&run_conformance_tests.step);
     qualify_step.dependOn(&run_bch_conformance_tests.step);
     qualify_step.dependOn(&run_rs_conformance_tests.step);
+    qualify_step.dependOn(&run_public_api_tests.step);
     qualify_step.dependOn(&terminal_example.step);
     qualify_step.dependOn(&svg_example.step);
     qualify_step.dependOn(&png_example.step);
@@ -482,34 +519,57 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/render/root.zig"),
             .target = target,
             .optimize = mode,
-            .imports = &.{.{ .name = "qrz", .module = qualification_module }},
+            .imports = &.{.{ .name = "zymbol_core", .module = qualification_module }},
         });
         const qualification_render_tests = b.addTest(.{
             .root_module = qualification_render_module,
         });
         qualify_step.dependOn(&b.addRunArtifact(qualification_render_tests).step);
+
+        const qualification_zymbol_module = b.createModule(.{
+            .root_source_file = b.path("src/zymbol.zig"),
+            .target = target,
+            .optimize = mode,
+            .imports = &.{
+                .{ .name = "zymbol_core", .module = qualification_module },
+                .{ .name = "zymbol_render", .module = qualification_render_module },
+            },
+        });
+        const qualification_zymbol_tests = b.addTest(.{
+            .root_module = qualification_zymbol_module,
+        });
+        qualify_step.dependOn(&b.addRunArtifact(qualification_zymbol_tests).step);
     }
 
-    const qualification_wasm_module = b.createModule(.{
+    const qualification_wasm_core_module = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = wasm_target,
         .optimize = .ReleaseFast,
     });
+    const qualification_wasm_render_module = b.createModule(.{
+        .root_source_file = b.path("src/render/root.zig"),
+        .target = wasm_target,
+        .optimize = .ReleaseFast,
+        .imports = &.{.{ .name = "zymbol_core", .module = qualification_wasm_core_module }},
+    });
+    const qualification_wasm_module = b.createModule(.{
+        .root_source_file = b.path("src/zymbol.zig"),
+        .target = wasm_target,
+        .optimize = .ReleaseFast,
+        .imports = &.{
+            .{ .name = "zymbol_core", .module = qualification_wasm_core_module },
+            .{ .name = "zymbol_render", .module = qualification_wasm_render_module },
+        },
+    });
     const qualification_wasm = b.addLibrary(.{
-        .name = "qrz-qualification",
+        .name = "zymbol-qualification",
         .root_module = qualification_wasm_module,
         .linkage = .static,
     });
     qualify_step.dependOn(&qualification_wasm.step);
 
-    const qualification_wasm_render_module = b.createModule(.{
-        .root_source_file = b.path("src/render/root.zig"),
-        .target = wasm_target,
-        .optimize = .ReleaseFast,
-        .imports = &.{.{ .name = "qrz", .module = qualification_wasm_module }},
-    });
     const qualification_wasm_render = b.addLibrary(.{
-        .name = "qrz-render-qualification",
+        .name = "zymbol-render-qualification",
         .root_module = qualification_wasm_render_module,
         .linkage = .static,
     });

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Tightened the pre-1.0 public surface by removing accidental raw `Symbol` mutators and the non-semantic reserved `Cell` field.
+- Added staged public CI and a dry-run release workflow so expensive validation runs only after local preflight passes.
+
+- Froze the v1 exported root declaration surface with a release qualification test and completed the repository evidence audit with no remaining `missing` or `verify` ledger entries.
+- Fixed package contents so every declared build step, including benchmarks, is present in published source packages.
+
 - Added a reproducible ReleaseFast v1 benchmark suite covering encode/mask selection, decode, Reed-Solomon correction, PNG/SVG rendering, working-set size, and PNG compression baselines.
 - Reduced direct PNG render latency by eliminating redundant compression passes and per-byte Adler divisions; a measured PNG Up-filter alternative was rejected because it regressed both speed and size.
 
@@ -29,7 +35,7 @@
 - Added coverage-guided `std.testing.Smith` fuzz targets for decoding, binary round trips, and PNG encoding.
 - Forced LLVM for the fuzz executable to avoid the upstream empty coverage-entry-point crash in affected Zig toolchains.
 
-- Added isolated `qrz_render` raster rendering and built-in PNG/SVG codecs.
+- Added isolated `zymbol.render` raster rendering and built-in PNG/SVG codecs.
 - Added one-call owned PNG/SVG helpers plus allocation-free buffer APIs for WASM and freestanding targets.
 - Added responsive centered SVG output, optional intrinsic sizing, and direct `std.Io.Writer` streaming.
 - Added clean `png`, `svg`, and `terminal` examples; generated files live under gitignored `zig-out/examples`, and supported terminals display the QR inline through Kitty, iTerm2-compatible, or SIXEL image protocols.

@@ -299,7 +299,6 @@ test "format BCH recovers every corruption within distance three" {
     }
 }
 
-
 test "format BCH never returns the original candidate beyond distance three" {
     const levels = [_]spec.EcLevel{ .l, .m, .q, .h };
 
@@ -812,14 +811,14 @@ test "truncated segment data is rejected" {
     var out: [16]u8 = undefined;
     try std.testing.expectError(
         Error.MalformedDataStream,
-        parseDataStream(&.{ 0b0100_0000 }, 1, &out),
+        parseDataStream(&.{0b0100_0000}, 1, &out),
     );
 }
 
 test "invalid alphanumeric values are rejected" {
     var bytes: [3]u8 = undefined;
     var writer = bitstream.Writer.init(&bytes);
-    try writer.append(@intFromEnum(spec.Mode.alphanumeric), 4);
+    try writer.append(@backingInt(spec.Mode.alphanumeric), 4);
     try writer.append(2, 9);
     try writer.append(2047, 11);
 
@@ -829,7 +828,6 @@ test "invalid alphanumeric values are rejected" {
         parseDataStream(writer.filled(), 1, &out),
     );
 }
-
 
 test "FNC1 first position applies alphanumeric percent semantics" {
     var bytes: [16]u8 = undefined;
@@ -912,4 +910,84 @@ test "FNC1 must precede ECI and payload modes" {
         Error.MalformedDataStream,
         parseDataStream(&bytes, 1, &out),
     );
+}
+
+test "symbology modifiers cover all QR FNC1 and ECI combinations" {
+    const cases = [_]struct {
+        fnc1: spec.Fnc1,
+        eci: EciState,
+        modifier: u3,
+    }{
+        .{ .fnc1 = .none, .eci = .none, .modifier = 1 },
+        .{ .fnc1 = .none, .eci = .{ .assignment = 26 }, .modifier = 2 },
+        .{ .fnc1 = .first_position, .eci = .none, .modifier = 3 },
+        .{ .fnc1 = .first_position, .eci = .{ .assignment = 26 }, .modifier = 4 },
+        .{
+            .fnc1 = .{ .second_position = .{ .numeric = 7 } },
+            .eci = .none,
+            .modifier = 5,
+        },
+        .{
+            .fnc1 = .{ .second_position = .{ .letter = 'A' } },
+            .eci = .multiple,
+            .modifier = 6,
+        },
+    };
+
+    for (cases) |case| {
+        try std.testing.expectEqual(
+            case.modifier,
+            symbologyModifier(case.fnc1, case.eci),
+        );
+
+        const result = Result{
+            .len = 0,
+            .version = 1,
+            .ec_level = .m,
+            .mask = 0,
+            .eci = case.eci,
+            .fnc1 = case.fnc1,
+            .structured_append = null,
+            .symbology_modifier = case.modifier,
+            .mirrored = false,
+            .reflectance_reversed = false,
+            .errors_corrected = 0,
+        };
+        const identifier = result.symbologyIdentifier();
+        try std.testing.expectEqualSlices(
+            u8,
+            &.{ ']', 'Q', '0' + @as(u8, case.modifier) },
+            &identifier,
+        );
+    }
+}
+
+test "Structured Append may precede FNC1 and ECI metadata" {
+    var bytes: [32]u8 = undefined;
+    var writer = bitstream.Writer.init(&bytes);
+    try segment.appendStructuredAppend(
+        &writer,
+        .{ .index = 1, .count = 3, .parity = 0x5A },
+    );
+    try segment.appendFnc1(&writer, .first_position);
+    try segment.appendEci(&writer, 26);
+    try segment.appendByte(&writer, 1, "A");
+    try segment.finalize(&writer);
+
+    var out: [8]u8 = undefined;
+    const parsed = try parseDataStream(&bytes, 1, &out);
+
+    try std.testing.expectEqualSlices(u8, "A", out[0..parsed.len]);
+    const structured = parsed.structured_append orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(u4, 1), structured.index);
+    try std.testing.expectEqual(@as(u5, 3), structured.count);
+    try std.testing.expectEqual(@as(u8, 0x5A), structured.parity);
+    switch (parsed.fnc1) {
+        .first_position => {},
+        else => return error.TestUnexpectedResult,
+    }
+    switch (parsed.eci) {
+        .assignment => |assignment| try std.testing.expectEqual(@as(u21, 26), assignment),
+        else => return error.TestUnexpectedResult,
+    }
 }

@@ -17,7 +17,7 @@ CASES = (
 
 def run_case(driver, case_name):
     env = os.environ.copy()
-    env["QRZ_PNG_CASE"] = case_name
+    env["ZYMBOL_PNG_CASE"] = case_name
     return subprocess.run(
         [driver],
         env=env,
@@ -47,20 +47,20 @@ def idat_stream(png):
 
 def main():
     if len(sys.argv) != 2:
-        raise SystemExit("usage: png_compare.py <qrz-png-driver>")
+        raise SystemExit("usage: png_compare.py <zymbol-png-driver>")
 
     driver = sys.argv[1]
-    print("png_case,qrz_zlib_bytes,zlib6_bytes,zlib9_bytes,qrz_vs_zlib9_pct")
+    print("png_case,zymbol_zlib_bytes,zlib6_bytes,zlib9_bytes,zymbol_vs_zlib9_pct")
 
     for case_name in CASES:
         png = run_case(driver, case_name)
-        qrz_stream = idat_stream(png)
-        raw = zlib.decompress(qrz_stream)
+        zymbol_stream = idat_stream(png)
+        raw = zlib.decompress(zymbol_stream)
         z6 = zlib.compress(raw, level=6)
         z9 = zlib.compress(raw, level=9)
-        ratio = (len(qrz_stream) / len(z9)) * 100.0
+        ratio = (len(zymbol_stream) / len(z9)) * 100.0
         print(
-            f"{case_name},{len(qrz_stream)},{len(z6)},{len(z9)},{ratio:.1f}"
+            f"{case_name},{len(zymbol_stream)},{len(z6)},{len(z9)},{ratio:.1f}"
         )
 
 

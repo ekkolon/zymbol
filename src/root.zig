@@ -1,6 +1,6 @@
 //! Allocation-free QR Code encoding and decoding for Zig.
 //!
-//! QRz operates on caller-owned buffers and module grids. It performs no
+//! Zymbol operates on caller-owned buffers and module grids. It performs no
 //! file I/O, image processing, or heap allocation.
 
 const std = @import("std");
@@ -623,7 +623,6 @@ test "decode accepts one destroyed format copy" {
     try testing.expectEqual(@as(u3, 5), result.mask);
 }
 
-
 test "decode rejects conflicting valid format copies" {
     var cells: [matrix.requiredCells(4)]Cell = undefined;
     var encode_scratch: [encoder.maxCodewords(4)]u8 = undefined;
@@ -672,7 +671,6 @@ test "decode rejects conflicting valid format copies" {
         ),
     );
 }
-
 
 test "decode uses redundant version information" {
     var cells: [matrix.requiredCells(7)]Cell = undefined;
@@ -762,7 +760,6 @@ test "decode rejects version information outside the BCH radius" {
     );
 }
 
-
 test "decoder handles random structurally valid symbols without trapping" {
     const cases = [_]struct {
         version: Version,
@@ -812,7 +809,6 @@ test "decoder handles random structurally valid symbols without trapping" {
         }
     }
 }
-
 
 test "high-level FNC1 first-position round trip preserves byte semantics" {
     const payload = [_]u8{ '0', '1', 0x1D, 'A', '%' };
@@ -975,7 +971,6 @@ test "FNC1 second position reports AIM indicator and transmitted prefix" {
     try std.testing.expectEqualSlices(u8, "]Q5", &identifier);
 }
 
-
 test "decoder normalizes mirrored and reversed reflectance symbols" {
     const message = "REFLECTION V7";
 
@@ -1041,7 +1036,6 @@ test "decoder normalizes mirrored and reversed reflectance symbols" {
         );
     }
 }
-
 
 test "decodeAny discriminates QR and Micro QR by symbol geometry" {
     var micro_cells: [requiredMicroCells(.m2)]Cell = undefined;

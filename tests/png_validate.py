@@ -68,7 +68,7 @@ CASES = {
 
 def run_case(driver, case_name):
     env = os.environ.copy()
-    env["QRZ_PNG_CASE"] = case_name
+    env["ZYMBOL_PNG_CASE"] = case_name
     return subprocess.run(
         [driver],
         env=env,
@@ -211,7 +211,7 @@ def validate_case(driver, case_name, expected):
 
 def main():
     if len(sys.argv) != 2:
-        raise SystemExit("usage: png_validate.py <qrz-png-driver>")
+        raise SystemExit("usage: png_validate.py <zymbol-png-driver>")
 
     driver = sys.argv[1]
     results = {}

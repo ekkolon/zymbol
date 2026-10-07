@@ -57,7 +57,7 @@ RUN_RE = re.compile(r"M(\d+) (\d+)H(\d+)V(\d+)H(\d+)Z")
 
 def run_case(driver, name):
     env = os.environ.copy()
-    env["QRZ_SVG_CASE"] = name
+    env["ZYMBOL_SVG_CASE"] = name
     return subprocess.run(
         [driver],
         env=env,
@@ -160,7 +160,7 @@ def validate(driver, name, expected):
 
 def main():
     if len(sys.argv) != 2:
-        raise SystemExit("usage: svg_validate.py <qrz-svg-driver>")
+        raise SystemExit("usage: svg_validate.py <zymbol-svg-driver>")
 
     driver = sys.argv[1]
     results = {}

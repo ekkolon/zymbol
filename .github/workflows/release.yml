@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release version to validate
+        required: true
+        default: v1.0.0
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: ${{ github.event.repository.private == false }}
+    name: Validate and publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Zig
+        uses: ./.github/actions/setup-zig
+        with:
+          version: 0.17.0
+
+      - name: Resolve release tag
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            echo "RELEASE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_TAG=${{ inputs.tag }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Validate release metadata
+        run: python3 tools/release.py "$RELEASE_TAG" --notes-out release-notes.md
+
+      - name: Format
+        run: zig fmt --check build.zig src tests examples benchmarks
+
+      - name: Check API docs
+        run: python3 tools/check_api_docs.py
+
+      - name: Consumer smoke
+        working-directory: tests/consumer
+        run: zig build test
+
+      - name: Remote package smoke
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            ref="refs/tags/$RELEASE_TAG"
+          else
+            ref="$GITHUB_SHA"
+          fi
+          python3 tools/package_smoke.py \
+            "https://github.com/$GITHUB_REPOSITORY/archive/$ref.tar.gz"
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes qemu-user python3-venv
+
+      - name: Qualify
+        run: zig build qualify
+
+      - name: Runtime portability
+        run: zig build runtime-portability -fqemu
+
+      - name: Validate PNG
+        run: zig build png-validate
+
+      - name: Validate SVG
+        run: zig build svg-validate
+
+      - name: ZXing interoperability
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --disable-pip-version-check -r tests/interop-requirements.txt
+          zig build interop -Dpython=.venv/bin/python
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --verify-tag \
+            --title "$RELEASE_TAG" \
+            --notes-file release-notes.md

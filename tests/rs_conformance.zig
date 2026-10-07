@@ -1,5 +1,5 @@
 const std = @import("std");
-const reed_solomon = @import("qrz_rs");
+const reed_solomon = @import("zymbol_rs");
 const reference = @import("reference/ecc_tables.zig");
 
 fn alphaPower(exponent: u8) u8 {

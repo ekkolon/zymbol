@@ -1,8 +1,9 @@
 const std = @import("std");
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
 const output_dir = "zig-out/examples";
-const output_path = output_dir ++ "/qrz.svg";
+const output_path = output_dir ++ "/zymbol.svg";
 
 pub fn main(init: std.process.Init) !void {
     try std.Io.Dir.cwd().createDirPath(init.io, output_dir);
@@ -16,7 +17,7 @@ pub fn main(init: std.process.Init) !void {
     try render.writeSvgText(
         init.gpa,
         &file_writer.interface,
-        "https://example.com/qrz",
+        "https://example.com/zymbol",
         .{
             .encode = .{
                 .min_version = 6,

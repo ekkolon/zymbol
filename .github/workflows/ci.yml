@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    if: ${{ github.event.repository.private == false && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    name: Preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Zig
+        uses: ./.github/actions/setup-zig
+        with:
+          version: 0.17.0
+
+      - name: Format
+        run: zig fmt --check build.zig src tests examples benchmarks
+
+      - name: Check API docs
+        run: python3 tools/check_api_docs.py
+
+  linux:
+    needs: preflight
+    name: Linux / Zig 0.17.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Zig
+        uses: ./.github/actions/setup-zig
+        with:
+          version: 0.17.0
+
+      - name: Qualify
+        run: zig build qualify
+
+      - name: Consumer smoke
+        working-directory: tests/consumer
+        run: zig build test
+
+      - name: Remote package smoke
+        shell: bash
+        run: |
+          python3 tools/package_smoke.py \
+            "https://github.com/$GITHUB_REPOSITORY/archive/$GITHUB_SHA.tar.gz"
+
+  host:
+    needs:
+      - preflight
+      - linux
+    name: ${{ matrix.os }} / Zig 0.17.0
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: true
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Zig
+        uses: ./.github/actions/setup-zig
+        with:
+          version: 0.17.0
+
+      - name: Test
+        run: zig build test
+
+      - name: Consumer smoke
+        working-directory: tests/consumer
+        run: zig build test
+
+  validation:
+    needs:
+      - preflight
+      - linux
+    name: Validation / Zig 0.17.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Zig
+        uses: ./.github/actions/setup-zig
+        with:
+          version: 0.17.0
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes qemu-user
+
+      - name: Runtime portability
+        run: zig build runtime-portability -fqemu
+
+      - name: Validate PNG
+        run: zig build png-validate
+
+      - name: Validate SVG
+        run: zig build svg-validate

@@ -11,7 +11,7 @@ pub const Version = enum(u3) {
     m4 = 4,
 
     pub fn number(self: Version) u3 {
-        return @intFromEnum(self);
+        return @backingInt(self);
     }
 };
 
@@ -280,7 +280,7 @@ fn plan(version: Version, data: []const u8, trace: ?*[max_input_len + 1]Trace) ?
 fn appendMode(writer: *bitstream.Writer, version: Version, mode: Mode) !void {
     const width = modeBits(version);
     if (width == 0) return;
-    try writer.append(@intFromEnum(mode), width);
+    try writer.append(@backingInt(mode), width);
 }
 
 fn appendCount(
@@ -1162,7 +1162,7 @@ fn parseData(
         else blk: {
             const raw = try reader.read(modeBits(version));
             if (raw > 3) return Error.MalformedDataStream;
-            break :blk @as(Mode, @enumFromInt(raw));
+            break :blk @as(Mode, @fromBackingInt(@intCast(raw)));
         };
 
         if (!modeAllowed(version, mode)) return Error.MalformedDataStream;
@@ -1811,7 +1811,7 @@ test "explicit Micro segments support mixed Kanji streams" {
         .{ .numeric = "12" },
         .{ .kanji = &.{ 0x93, 0x5F } },
         .{ .alphanumeric = "AB" },
-        .{ .byte = &.{ 0xFF } },
+        .{ .byte = &.{0xFF} },
     };
     const expected = [_]u8{ '1', '2', 0x93, 0x5F, 'A', 'B', 0xFF };
 

@@ -13,9 +13,9 @@ except ImportError as exc:
 
 def run_driver(driver, mode, **values):
     env = os.environ.copy()
-    env["QRZ_INTEROP_MODE"] = mode
+    env["ZYMBOL_INTEROP_MODE"] = mode
     for key, value in values.items():
-        env[f"QRZ_INTEROP_{key.upper()}"] = str(value)
+        env[f"ZYMBOL_INTEROP_{key.upper()}"] = str(value)
     return subprocess.run(
         [driver],
         env=env,
@@ -49,7 +49,7 @@ def render_modules(modules, side, quiet_zone, scale=4):
     return pixels, view
 
 
-def check_qrz_to_zxing(driver):
+def check_zymbol_to_zxing(driver):
     emitted = run_driver(driver, "emit").stdout.splitlines()
     checked = 0
 
@@ -74,10 +74,10 @@ def check_qrz_to_zxing(driver):
             return_errors=True,
         )
         if result is None:
-            raise AssertionError(f"ZXing-cpp found no QRz vector for {payload!r}")
+            raise AssertionError(f"ZXing-cpp found no Zymbol vector for {payload!r}")
         if not result.valid:
             raise AssertionError(
-                f"ZXing-cpp rejected QRz vector {payload!r}: "
+                f"ZXing-cpp rejected Zymbol vector {payload!r}: "
                 f"format={result.format!r}, error={result.error!r}, "
                 f"text={result.text!r}"
             )
@@ -137,14 +137,14 @@ def check_zxing_to_qrz(driver):
 
 def main():
     if len(sys.argv) != 2:
-        raise SystemExit("usage: interop_zxing.py <qrz-interop-driver>")
+        raise SystemExit("usage: interop_zxing.py <zymbol-interop-driver>")
 
     driver = sys.argv[1]
-    forward = check_qrz_to_zxing(driver)
+    forward = check_zymbol_to_zxing(driver)
     reverse = check_zxing_to_qrz(driver)
     print(
-        f"interop success: {forward} QRz->ZXing-cpp, "
-        f"{reverse} ZXing-cpp->QRz"
+        f"interop success: {forward} Zymbol->ZXing-cpp, "
+        f"{reverse} ZXing-cpp->Zymbol"
     )
 
 

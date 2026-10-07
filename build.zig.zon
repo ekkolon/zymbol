@@ -1,14 +1,15 @@
 .{
-    .name = .qrz,
+    .name = .zymbol,
     .version = "0.1.0",
-    .fingerprint = 0x7ab5823de4fe3d2,
-    .minimum_zig_version = "0.16.0",
+    .fingerprint = 0xcbc76731de4fe3d2,
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{},
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "src",
         "tests",
+        "benchmarks",
         "examples/terminal.zig",
         "examples/svg.zig",
         "examples/png.zig",

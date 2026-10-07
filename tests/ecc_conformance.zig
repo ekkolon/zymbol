@@ -1,12 +1,12 @@
 const std = @import("std");
-const spec = @import("qrz_spec");
+const spec = @import("zymbol_spec");
 const reference = @import("reference/ecc_tables.zig");
 const structure = @import("reference/qr_structure.zig");
 
 test "external Annex C format information matches all QR combinations" {
     var group: u2 = 0;
     while (true) : (group += 1) {
-        const level: spec.EcLevel = @enumFromInt(group);
+        const level: spec.EcLevel = @fromBackingInt(@intCast(group));
         var mask: u3 = 0;
         while (true) : (mask += 1) {
             const index = @as(usize, group) * 8 + mask;
@@ -43,7 +43,6 @@ test "external BCH tables retain minimum distance seven" {
         }
     }
 }
-
 
 fn independentRawDataModules(version: u6) u32 {
     var result: u32 = (@as(u32, 16) * version + 128) * version + 64;

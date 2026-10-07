@@ -1,12 +1,12 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const qrz = @import("qrz");
-const render = @import("qrz_render");
+const zymbol = @import("zymbol");
+const render = zymbol.render;
 
 comptime {
-    if (@bitSizeOf(u8) != 8) @compileError("QRz requires 8-bit bytes");
-    if (@bitSizeOf(u16) != 16) @compileError("QRz requires 16-bit u16");
-    if (@bitSizeOf(u32) != 32) @compileError("QRz requires 32-bit u32");
+    if (@bitSizeOf(u8) != 8) @compileError("Zymbol requires 8-bit bytes");
+    if (@bitSizeOf(u16) != 16) @compileError("Zymbol requires 16-bit u16");
+    if (@bitSizeOf(u32) != 32) @compileError("Zymbol requires 32-bit u32");
 }
 
 pub fn main() !void {
@@ -33,9 +33,9 @@ fn verifyArchitecture() !void {
 fn verifyQr() !void {
     const payload = [_]u8{ 0x00, 0x01, 0x7F, 0x80, 0xFE, 0xFF, 'Q', 'R', 'Z' };
 
-    var cells: [qrz.requiredCells(10)]qrz.Cell = undefined;
-    var encode_scratch: [qrz.requiredEncodeScratch(10)]u8 = undefined;
-    const symbol = try qrz.encodeBytes(
+    var cells: [zymbol.requiredCells(10)]zymbol.Cell = undefined;
+    var encode_scratch: [zymbol.requiredEncodeScratch(10)]u8 = undefined;
+    const symbol = try zymbol.encodeBytes(
         &payload,
         .{
             .min_version = 10,
@@ -48,13 +48,13 @@ fn verifyQr() !void {
         &encode_scratch,
     );
 
-    var bits: [qrz.requiredCells(10)]bool = undefined;
+    var bits: [zymbol.requiredCells(10)]bool = undefined;
     for (&bits, 0..) |*bit, index| bit.* = symbol.cells[index].dark;
 
-    var decode_cells: [qrz.requiredCells(10)]qrz.Cell = undefined;
-    var decode_scratch: [qrz.requiredDecodeScratch(10)]u8 = undefined;
+    var decode_cells: [zymbol.requiredCells(10)]zymbol.Cell = undefined;
+    var decode_scratch: [zymbol.requiredDecodeScratch(10)]u8 = undefined;
     var output: [64]u8 = undefined;
-    const decoded = try qrz.decode(
+    const decoded = try zymbol.decode(
         &bits,
         symbol.size,
         &decode_cells,
@@ -69,8 +69,8 @@ fn verifyQr() !void {
 }
 
 fn verifyMicro() !void {
-    var cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
-    const symbol = try qrz.encodeMicroText(
+    var cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
+    const symbol = try zymbol.encodeMicroText(
         "MICRO",
         .{
             .min_version = .m4,
@@ -82,12 +82,12 @@ fn verifyMicro() !void {
         &cells,
     );
 
-    var bits: [qrz.requiredMicroCells(.m4)]bool = undefined;
+    var bits: [zymbol.requiredMicroCells(.m4)]bool = undefined;
     for (&bits, 0..) |*bit, index| bit.* = !symbol.cells[index].dark;
 
-    var decode_cells: [qrz.requiredMicroCells(.m4)]qrz.Cell = undefined;
+    var decode_cells: [zymbol.requiredMicroCells(.m4)]zymbol.Cell = undefined;
     var output: [32]u8 = undefined;
-    const decoded = try qrz.decodeMicro(
+    const decoded = try zymbol.decodeMicro(
         &bits,
         symbol.size,
         &decode_cells,
@@ -102,9 +102,9 @@ fn verifyMicro() !void {
 }
 
 fn verifyRenderers() !void {
-    var cells: [qrz.requiredCells(2)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(2)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [zymbol.requiredCells(2)]zymbol.Cell = undefined;
+    var scratch: [zymbol.requiredEncodeScratch(2)]u8 = undefined;
+    const symbol = try zymbol.encodeText(
         "PORTABILITY",
         .{
             .min_version = 2,

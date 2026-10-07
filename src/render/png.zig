@@ -1,5 +1,5 @@
 const std = @import("std");
-const qrz = @import("qrz");
+const core = @import("zymbol_core");
 const raster = @import("raster.zig");
 const svg = @import("svg.zig");
 const Reflectance = @import("reflectance.zig").Reflectance;
@@ -128,7 +128,7 @@ fn writeChunk(sink: *Sink, chunk_type: *const [4]u8, data: []const u8) Error!voi
     }
 }
 
-fn dimensions(symbol: *const qrz.Symbol, options: Options) Error!raster.Dimensions {
+fn dimensions(symbol: *const core.Symbol, options: Options) Error!raster.Dimensions {
     if (options.reflectance == .reversed and options.background == null) {
         return Error.InvalidReflectance;
     }
@@ -175,13 +175,13 @@ fn pngLength(zlib_len: usize, transparent: bool) Error!usize {
 }
 
 fn pixelIsDark(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     pixel_x: usize,
     pixel_y: usize,
 ) bool {
     const scale: usize = options.scale;
-    const quiet_zone = options.quiet_zone orelse qrz.defaultQuietZone(symbol.family);
+    const quiet_zone = options.quiet_zone orelse core.defaultQuietZone(symbol.family);
     const quiet_pixels = @as(usize, quiet_zone) * scale;
     const symbol_pixels = @as(usize, symbol.size) * scale;
 
@@ -203,7 +203,7 @@ fn pixelIsDark(
 }
 
 fn scanlineByte(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
     raw_index: usize,
@@ -285,38 +285,34 @@ fn writeFixedSymbol(bits: *DeflateBits, symbol: u16) Error!void {
 }
 
 const length_base = [_]usize{
-    3, 4, 5, 6, 7, 8, 9, 10,
-    11, 13, 15, 17,
-    19, 23, 27, 31,
-    35, 43, 51, 59,
-    67, 83, 99, 115,
+    3,   4,   5,   6,   7,   8,  9,  10,
+    11,  13,  15,  17,  19,  23, 27, 31,
+    35,  43,  51,  59,  67,  83, 99, 115,
     131, 163, 195, 227, 258,
 };
 const length_extra = [_]u5{
     0, 0, 0, 0, 0, 0, 0, 0,
-    1, 1, 1, 1,
-    2, 2, 2, 2,
-    3, 3, 3, 3,
-    4, 4, 4, 4,
+    1, 1, 1, 1, 2, 2, 2, 2,
+    3, 3, 3, 3, 4, 4, 4, 4,
     5, 5, 5, 5, 0,
 };
 const distance_base = [_]usize{
-    1, 2, 3, 4,
-    5, 7, 9, 13,
-    17, 25, 33, 49,
-    65, 97, 129, 193,
-    257, 385, 513, 769,
-    1025, 1537, 2049, 3073,
-    4097, 6145, 8193, 12289,
+    1,     2,     3,    4,
+    5,     7,     9,    13,
+    17,    25,    33,   49,
+    65,    97,    129,  193,
+    257,   385,   513,  769,
+    1025,  1537,  2049, 3073,
+    4097,  6145,  8193, 12289,
     16385, 24577,
 };
 const distance_extra = [_]u5{
-    0, 0, 0, 0,
-    1, 1, 2, 2,
-    3, 3, 4, 4,
-    5, 5, 6, 6,
-    7, 7, 8, 8,
-    9, 9, 10, 10,
+    0,  0,  0,  0,
+    1,  1,  2,  2,
+    3,  3,  4,  4,
+    5,  5,  6,  6,
+    7,  7,  8,  8,
+    9,  9,  10, 10,
     11, 11, 12, 12,
     13, 13,
 };
@@ -359,7 +355,7 @@ fn writeLengthDistance(bits: *DeflateBits, length: usize, distance: usize) Error
 }
 
 fn matchLength(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
     raw_len: usize,
@@ -380,7 +376,7 @@ fn matchLength(
 }
 
 fn bestMatch(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
     raw_len: usize,
@@ -411,7 +407,7 @@ fn bestMatch(
 }
 
 fn emitZlib(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
     sink: *Sink,
@@ -447,7 +443,7 @@ fn emitZlib(
 }
 
 fn zlibLength(
-    symbol: *const qrz.Symbol,
+    symbol: *const core.Symbol,
     options: Options,
     dims: raster.Dimensions,
 ) Error!usize {
@@ -456,7 +452,7 @@ fn zlibLength(
     return sink.position;
 }
 
-fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
+fn emit(symbol: *const core.Symbol, options: Options, sink: *Sink) Error!void {
     const dims = try dimensions(symbol, options);
 
     try sink.write(&.{ 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A });
@@ -482,7 +478,7 @@ fn emit(symbol: *const qrz.Symbol, options: Options, sink: *Sink) Error!void {
     const background = options.background orelse svg.Rgb.white;
     const palette = [_]u8{
         options.foreground.r, options.foreground.g, options.foreground.b,
-        background.r, background.g, background.b,
+        background.r,         background.g,         background.b,
     };
     try writeChunk(sink, "PLTE", &palette);
 
@@ -530,27 +526,27 @@ fn requiredBytesForModules(
     return pngLength(try maxZlibLength(raw_len), options.background == null);
 }
 
-pub fn requiredBytesForVersion(version: qrz.Version, options: Options) Error!usize {
-    if (!qrz.isValidVersion(version)) return Error.InvalidVersion;
+pub fn maxBytesForVersion(version: core.Version, options: Options) Error!usize {
+    if (!core.isValidVersion(version)) return Error.InvalidVersion;
     return requiredBytesForModules(
-        qrz.size(version),
+        core.size(version),
         options.quiet_zone orelse 4,
         options,
     );
 }
 
-pub fn requiredBytesForMicroVersion(
-    version: qrz.MicroVersion,
+pub fn maxBytesForMicroVersion(
+    version: core.MicroVersion,
     options: Options,
 ) Error!usize {
     return requiredBytesForModules(
-        qrz.microSize(version),
+        core.microSize(version),
         options.quiet_zone orelse 2,
         options,
     );
 }
 
-pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
+pub fn requiredBytes(symbol: *const core.Symbol, options: Options) Error!usize {
     const dims = try dimensions(symbol, options);
     return pngLength(
         try zlibLength(symbol, options, dims),
@@ -558,16 +554,16 @@ pub fn requiredBytes(symbol: *const qrz.Symbol, options: Options) Error!usize {
     );
 }
 
-pub fn render(symbol: *const qrz.Symbol, output: []u8, options: Options) Error![]const u8 {
+pub fn render(symbol: *const core.Symbol, output: []u8, options: Options) Error![]const u8 {
     var sink = Sink{ .buffer = output };
     try emit(symbol, options, &sink);
     return output[0..sink.position];
 }
 
 test "PNG required size exactly matches rendered size" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ",
         .{
             .min_version = 1,
@@ -596,9 +592,9 @@ test "PNG required size exactly matches rendered size" {
 }
 
 test "PNG render accepts exact buffer without an internal sizing pass" {
-    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(4)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ SINGLE PASS PNG",
         .{
             .min_version = 4,
@@ -627,9 +623,9 @@ test "PNG render accepts exact buffer without an internal sizing pass" {
 }
 
 test "PNG version requirement bounds exact compressed size" {
-    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(4)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ BUFFER BOUND",
         .{
             .min_version = 4,
@@ -643,15 +639,15 @@ test "PNG version requirement bounds exact compressed size" {
     );
 
     const options = Options{ .scale = 4 };
-    const bound = try requiredBytesForVersion(4, options);
+    const bound = try maxBytesForVersion(4, options);
     const exact = try requiredBytes(&symbol, options);
     try std.testing.expect(bound >= exact);
 }
 
 test "PNG transparent background emits tRNS" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(1)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(1)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ",
         .{
             .min_version = 1,
@@ -672,11 +668,10 @@ test "PNG transparent background emits tRNS" {
     try std.testing.expect(std.mem.indexOf(u8, encoded, "tRNS") != null);
 }
 
-
 test "PNG fixed-Huffman output is deterministic and compressed" {
-    var cells: [qrz.requiredCells(4)]qrz.Cell = undefined;
-    var scratch: [qrz.requiredEncodeScratch(4)]u8 = undefined;
-    const symbol = try qrz.encodeText(
+    var cells: [core.requiredCells(4)]core.Cell = undefined;
+    var scratch: [core.requiredEncodeScratch(4)]u8 = undefined;
+    const symbol = try core.encodeText(
         "QRZ PNG COMPRESSION",
         .{
             .min_version = 1,
@@ -709,12 +704,12 @@ test "PNG fixed-Huffman output is deterministic and compressed" {
 }
 
 test "PNG reversed reflectance swaps palette usage across quiet zone and modules" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    @memset(cells[0..], qrz.Cell{});
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    @memset(cells[0..], core.Cell{});
     cells[0].dark = true;
-    var symbol = qrz.Symbol{
+    var symbol = core.Symbol{
         .cells = &cells,
-        .size = qrz.size(1),
+        .size = core.size(1),
         .version = 1,
         .ec_level = .m,
         .mask = 0,
@@ -738,11 +733,11 @@ test "PNG reversed reflectance swaps palette usage across quiet zone and modules
 }
 
 test "PNG reversed reflectance rejects transparent background" {
-    var cells: [qrz.requiredCells(1)]qrz.Cell = undefined;
-    @memset(cells[0..], qrz.Cell{});
-    const symbol = qrz.Symbol{
+    var cells: [core.requiredCells(1)]core.Cell = undefined;
+    @memset(cells[0..], core.Cell{});
+    const symbol = core.Symbol{
         .cells = &cells,
-        .size = qrz.size(1),
+        .size = core.size(1),
         .version = 1,
         .ec_level = .m,
         .mask = 0,

@@ -19,14 +19,13 @@ pub const SymbolFamily = enum {
     micro_qr,
 };
 
-pub const Cell = packed struct(u8) {
+pub const Cell = packed struct {
     dark: bool = false,
     kind: ModuleKind = .data,
-    _reserved: u4 = 0,
 };
 
 comptime {
-    if (@sizeOf(Cell) != 1 or @bitSizeOf(Cell) != 8) {
+    if (@sizeOf(Cell) != 1) {
         @compileError("qrz.Cell must remain exactly one byte");
     }
 }
@@ -44,7 +43,7 @@ pub const Symbol = struct {
     ec_level: spec.EcLevel,
     mask: u3,
 
-    pub const SetError = error{
+    const SetError = error{
         OutOfBounds,
         ProtectedModule,
     };
@@ -68,7 +67,7 @@ pub const Symbol = struct {
         return self.cells[self.index(x, y)].kind;
     }
 
-    pub fn setData(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
+    fn setData(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
         if (!self.contains(x, y)) return SetError.OutOfBounds;
 
         const cell_index = self.index(x, y);
@@ -76,7 +75,7 @@ pub const Symbol = struct {
         self.cells[cell_index].dark = dark;
     }
 
-    pub fn set(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
+    fn set(self: *Symbol, x: usize, y: usize, dark: bool) SetError!void {
         if (!self.contains(x, y)) return SetError.OutOfBounds;
         self.cells[self.index(x, y)].dark = dark;
     }
@@ -567,7 +566,6 @@ test "setData refuses to touch a function module but allows a data module" {
     try testing.expect(symbol.isDark(12, 12));
     try testing.expectError(Symbol.SetError.OutOfBounds, symbol.setData(21, 0, true));
 }
-
 
 test "data iterator matches codeword placement order" {
     const testing = std.testing;
