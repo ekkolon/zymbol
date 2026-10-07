@@ -124,7 +124,9 @@ For the initial stable release, run **Prepare Release** manually with
 - a conventional `!` or `BREAKING CHANGE:` selects a major release;
 - docs/test/build/CI/chore-only changes do not create a release.
 
-The generated release PR updates the semantic version, Keep a Changelog release
+The generated `release/next` PR stays in draft while new releasable changes
+accumulate. Marking it ready is the explicit release-intent step and triggers
+normal PR CI. The PR updates the semantic version, Keep a Changelog release
 section, README version/status, and distribution metadata. The changelog is
 therefore part of the reviewed release commit rather than being mutated after
 publication.
