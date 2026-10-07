@@ -71,11 +71,23 @@ jobs:
         working-directory: tests/consumer
         run: zig build test
 
-      - name: Remote package smoke
+      - name: Package smoke
         shell: bash
         run: |
-          python3 tools/package_smoke.py \
-            "https://github.com/$GITHUB_REPOSITORY/archive/$GITHUB_SHA.tar.gz"
+          if [[ "${{ github.event.repository.private }}" == "true" ]]; then
+            archive_dir="$(mktemp -d)"
+            archive="$archive_dir/zymbol.tar.gz"
+            git archive --format=tar.gz --prefix="zymbol-$GITHUB_SHA/" --output="$archive" "$GITHUB_SHA"
+
+            python3 -m http.server 8765 --bind 127.0.0.1 --directory "$archive_dir" >"$RUNNER_TEMP/zymbol-package-server.log" 2>&1 &
+            server_pid=$!
+            trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+            sleep 1
+
+            python3 tools/package_smoke.py "http://127.0.0.1:8765/zymbol.tar.gz"
+          else
+            python3 tools/package_smoke.py "https://github.com/$GITHUB_REPOSITORY/archive/$GITHUB_SHA.tar.gz"
+          fi
 
   host:
     needs:
