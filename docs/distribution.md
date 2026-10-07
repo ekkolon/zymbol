@@ -4,6 +4,24 @@ Zymbol is distributed as a Zig source package. There is no project-specific
 binary artifact; consumers compile the package for their own target and
 optimization mode.
 
+## Package identity
+
+| Field | Value |
+| --- | --- |
+| Package | `zymbol` |
+| Version | `0.1.0` release candidate |
+| Minimum Zig | `0.17.0` |
+| Runtime package dependencies | None |
+| Author and maintainer | Nelson Dominguez |
+| License | MIT |
+| Canonical source | `github.com/ekkolon/zymbol` |
+
+Zig's `build.zig.zon` manifest carries Zig package identity and dependency
+metadata. It does not define standard author, license, or description fields.
+Those project-level attributes are therefore carried by the repository,
+README, license file, and release metadata rather than by non-standard manifest
+keys.
+
 ## Release identity
 
 A stable release is identified by all of the following:
@@ -60,9 +78,14 @@ See the [release checklist][release-checklist] for the authoritative sequence.
 GitHub is the canonical package location. Zymbol does not require a separate
 registry publication. Community package indexes are discovery layers only.
 
-The public repository should advertise the `zig-package`, `qr-code`,
-`qrcode`, and `micro-qr` topics so Zig package indexes and developers can
-find it without changing the package's source of truth.
+The public repository should advertise the `zig`, `zig-package`,
+`qr-code`, `qrcode`, and `micro-qr` topics so Zig package indexes and
+developers can find it without changing the package's source of truth.
+
+The recommended GitHub repository description is:
+
+> Dependency-free QR Code Model 2 and Micro QR library for Zig with
+> allocation-free encoding/decoding and PNG/SVG rendering.
 
 [readme]: ../README.md
 [release-checklist]: v1-release-checklist.md

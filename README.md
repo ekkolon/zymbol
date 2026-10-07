@@ -246,11 +246,15 @@ the local qualification commands and pull-request expectations.
 Security issues should not be filed publicly. Follow the process in
 [SECURITY.md][security].
 
-Zymbol is maintained under the [Ekkolon][ekkolon] GitHub account.
+Zymbol is created and maintained by [Nelson Dominguez][nelson].
 
 ## License
 
 Zymbol is released under the [MIT License][license].
+
+## Trademark
+
+QR Code is a registered trademark of DENSO WAVE INCORPORATED.
 
 [api]: docs/api.md
 [changelog]: CHANGELOG.md
@@ -261,7 +265,7 @@ Zymbol is released under the [MIT License][license].
 [contributing]: CONTRIBUTING.md
 [distribution]: docs/distribution.md
 [docs]: docs/README.md
-[ekkolon]: https://github.com/ekkolon
+[nelson]: https://github.com/ekkolon
 [fuzz]: docs/v1-fuzz.md
 [interop]: tests/INTEROP.md
 [license]: LICENSE
