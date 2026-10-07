@@ -150,9 +150,8 @@ jobs:
           version: 0.17.0
 
       - name: Install QEMU
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes qemu-user
+        timeout-minutes: 5
+        uses: ./.github/actions/setup-qemu
 
       - name: Runtime portability
         run: zig build runtime-portability -fqemu
