@@ -113,9 +113,9 @@ developers can find it without changing the package's source of truth.
 
 The recommended GitHub repository description is:
 
-> Standards-conformant QR Code Model 2 and Micro QR library for Zig with an
-> allocation-free core, zero package dependencies, and built-in PNG/SVG
-> rendering.
+> QR Code Model 2 and Micro QR for Zig, with an allocation-free core, zero
+> package dependencies, built-in PNG/SVG rendering, and ISO/IEC 18004:2024
+> conformance.
 
 [readme]: ../README.md
 [release-checklist]: v1-release-checklist.md
