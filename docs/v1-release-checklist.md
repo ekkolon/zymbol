@@ -113,7 +113,7 @@ After the preceding gates pass:
 1. change `build.zig.zon` from `0.1.0` to `1.0.0`;
 2. replace `Unreleased` in `CHANGELOG.md` with
    `1.0.0 - YYYY-MM-DD`;
-3. change the README status from release candidate to stable `v1.0.0`;
+3. change the README version badge and status from `0.1.0` release candidate to stable `v1.0.0`;
 4. run:
    ```sh
    python3 tools/release.py v1.0.0

@@ -1,4 +1,4 @@
-# fuzz qualification
+# Fuzz qualification
 
 Zymbol requires Zig 0.17.0. The same compiler baseline is used for ordinary
 builds, tests, portability checks, release qualification, and sustained fuzzing.
