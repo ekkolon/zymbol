@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Dual-licensed Zymbol under MIT or Apache-2.0, at the user's option.
+- Added GitHub immutable-release attestation verification to the tag-publish workflow.
+
 - Corrected the ISO/IEC 18004:2024 FNC1/ECI header ordering and added direct regression coverage.
 - Enforced Table 9 misdecoded-protection-codeword correction limits, including error-detection-only Micro QR M1.
 - Completed the normative ISO/IEC 18004:2024 component review and tightened the documented conformance boundary.

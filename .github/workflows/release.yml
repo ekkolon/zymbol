@@ -101,3 +101,19 @@ jobs:
             --verify-tag \
             --title "$RELEASE_TAG" \
             --notes-file release-notes.md
+
+      - name: Verify GitHub release attestation
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          for attempt in {1..10}; do
+            if gh release verify "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"; then
+              exit 0
+            fi
+            sleep 3
+          done
+
+          echo "::error::No valid GitHub release attestation was found. Ensure release immutability is enabled."
+          exit 1

@@ -34,6 +34,13 @@ For changes that affect release behavior, portability, external
 interoperability, or the public contract, follow the additional gates in the
 [release checklist][release-checklist].
 
+## Licensing
+
+Unless explicitly stated otherwise, any contribution intentionally submitted
+for inclusion in Zymbol is licensed under either the MIT License or the Apache
+License, Version 2.0, at the recipient's option, without additional terms or
+conditions.
+
 ## Documentation
 
 User-facing behavior belongs in the [README][readme] or [API reference][api].

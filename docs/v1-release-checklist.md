@@ -75,9 +75,13 @@ Before creating the first public release:
 5. enable GitHub Actions;
 6. enable private vulnerability reporting so `SECURITY.md` has a private
    reporting path;
-7. mark the release-candidate PR ready only after the local structural qualification passes;
-8. let the staged CI workflow pass on the public repository;
-9. protect `main` and require the CI checks before merge.
+7. enable **release immutability** under repository Settings -> General ->
+   Releases. This is required for GitHub's automatic release attestation;
+8. verify the package contains `LICENSE`, `LICENSE-MIT`, and
+   `LICENSE-APACHE` and documents `MIT OR Apache-2.0`;
+9. mark the release-candidate PR ready only after the local structural qualification passes;
+10. let the staged CI workflow pass on the public repository;
+11. protect `main` and require the CI checks before merge.
 
 Do not create `v1.0.0` merely to test the release workflow.
 
@@ -133,11 +137,15 @@ After the preceding gates pass:
 
 Only after the manual release dry run passes, create `v1.0.0` on the exact release commit.
 
-The tag-triggered workflow repeats the release checks before the GitHub Release is created. It verifies
-release metadata, deterministic qualification, QEMU runtime portability,
-PNG/SVG validation, the local external-consumer fixture, ZXing-cpp
-interoperability, and a real `zig fetch --save` against the tagged GitHub
-archive.
+The tag-triggered workflow repeats the release checks before the GitHub Release
+is created. It verifies release metadata, deterministic qualification, QEMU
+runtime portability, PNG/SVG validation, the local external-consumer fixture,
+ZXing-cpp interoperability, and a real `zig fetch --save` against the tagged
+GitHub archive.
+
+After publication, the workflow runs `gh release verify`. With release
+immutability enabled, GitHub automatically creates the cryptographic release
+attestation. The workflow fails if that attestation cannot be verified.
 
 The GitHub tag/archive is the canonical Zig package source. See
 `docs/distribution.md`.
