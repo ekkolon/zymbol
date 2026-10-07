@@ -7,6 +7,8 @@ and releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-07
+
 ### Added
 
 - QR Code Model 2 versions 1 through 40 with L/M/Q/H error correction.
@@ -37,4 +39,3 @@ and releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Enforced ISO/IEC 18004:2024 Table 9 protection-codeword limits, including error-detection-only Micro QR M1.
 - Corrected the normative initial ECI/FNC1 header ordering.
 - Included every file required by declared build steps in published source packages.
-
