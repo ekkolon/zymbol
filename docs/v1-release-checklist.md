@@ -73,18 +73,15 @@ Before creating the first public release:
 4. add the topics `zig`, `zig-package`, `qr-code`, `qrcode`, and
    `micro-qr`;
 5. enable GitHub Actions;
-6. under Settings -> Actions -> General -> Workflow permissions, enable
-   **Allow GitHub Actions to create and approve pull requests** so the
-   repository-scoped `GITHUB_TOKEN` can maintain `release/next`;
-7. enable private vulnerability reporting so `SECURITY.md` has a private
+6. enable private vulnerability reporting so `SECURITY.md` has a private
    reporting path;
-8. enable **release immutability** under repository Settings -> General ->
+7. enable **release immutability** under repository Settings -> General ->
    Releases. This is required for GitHub's automatic release attestation;
-9. verify the package contains `LICENSE`, `LICENSE-MIT`, and
+8. verify the package contains `LICENSE`, `LICENSE-MIT`, and
    `LICENSE-APACHE` and documents `MIT OR Apache-2.0`;
-10. mark the release-candidate PR ready only after the local structural qualification passes;
-11. let the staged CI workflow pass on the public repository;
-12. protect `main` and require the CI checks before merge.
+9. mark the release-candidate PR ready only after the local structural qualification passes;
+10. let the staged CI workflow pass on the public repository;
+11. protect `main` and require the CI checks before merge.
 
 Do not create `v1.0.0` merely to test the release workflow.
 
@@ -115,11 +112,16 @@ The normative review was completed against ISO/IEC 18004:2024 on 2026-10-07.
 The resulting fixes passed structural qualification, closing the v1 normative
 review within the documented component boundary.
 
-## 5. Automated release preparation
+## 5. Signed release preparation
 
-For the initial stable release, run **Prepare Release** manually with
-`version=1.0.0`. After `v1.0.0` exists, the workflow maintains
-`release/next` automatically from conventional squash-commit titles:
+For the initial stable release:
+
+```sh
+python3 tools/prepare_release_candidate.py --version 1.0.0
+```
+
+After `v1.0.0`, the version is normally derived from conventional squash
+commit titles since the latest tag:
 
 - `feat:` selects a minor release;
 - `fix:`, `perf:`, `refactor:`, `revert:`, and `security:` select a
@@ -127,20 +129,19 @@ For the initial stable release, run **Prepare Release** manually with
 - a conventional `!` or `BREAKING CHANGE:` selects a major release;
 - docs/test/build/CI/chore-only changes do not create a release.
 
-The generated `release/next` PR stays in draft while new releasable changes
-accumulate. Marking it ready is the explicit release-intent step and triggers
-normal PR CI. The PR updates the semantic version, Keep a Changelog release
-section, README version/status, and distribution metadata. The changelog is
-therefore part of the reviewed release commit rather than being mutated after
-publication.
+The command requires a clean, up-to-date local `main`. It creates
+`release/vX.Y.Z`, updates the semantic version and Keep a Changelog metadata,
+commits those files with the configured GPG key, verifies the commit
+signature, pushes the branch, and opens a draft PR.
 
-Before the repository becomes public, run the **Release** workflow manually on
-`release/next` with `publish=false`. The private dry run executes the same
-qualification gates and package smoke using a locally served source archive.
+The changelog is therefore reviewed as part of the signed release commit rather
+than being mutated after publication. Run the **Release** workflow manually on
+the candidate branch with `publish=false` when an additional publication dry
+run is wanted.
 
 ## 6. Tag and publish
 
-Merging the generated `release/next` PR triggers the Release workflow. On a
+Merging a generated `release/vX.Y.Z` PR triggers the Release workflow. On a
 public repository, the workflow:
 
 1. validates release metadata and the exact source tree;
