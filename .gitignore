@@ -20,3 +20,6 @@ node_modules/
 /packages/qr/test-results/
 /packages/qr/playwright-report/
 /packages/qr/*.tgz
+
+# Static website build
+/site/dist/
