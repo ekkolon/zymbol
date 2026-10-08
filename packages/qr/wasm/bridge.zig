@@ -64,11 +64,31 @@ fn status(err: anyerror) u32 {
     };
 }
 
+// API levels use L=0, M=1, Q=2, H=3. Zig's backing enum stores QR format bits.
+fn levelFromApi(value: u32) ?core.EcLevel {
+    return switch (value) {
+        0 => .l,
+        1 => .m,
+        2 => .q,
+        3 => .h,
+        else => null,
+    };
+}
+
+fn levelToApi(value: core.EcLevel) u32 {
+    return switch (value) {
+        .l => 0,
+        .m => 1,
+        .q => 2,
+        .h => 3,
+    };
+}
+
 fn saveSymbol(symbol: core.Symbol) void {
     @memset(meta[0..], 0);
     meta[0] = symbol.size;
     meta[1] = symbol.version;
-    meta[2] = @intFromEnum(symbol.ec_level);
+    meta[2] = levelToApi(symbol.ec_level);
     meta[3] = symbol.mask;
     meta[4] = if (symbol.family == .qr) 0 else 1;
     for (symbol.cells, 0..) |cell, i| grid[i] = @intFromBool(cell.dark);
@@ -90,7 +110,7 @@ pub export fn zymbol_encode(
     if (input_length > max_input or kind > 1 or family > 1) return invalid_input;
     if (level > 3 or boost > 1 or mask < -1 or mask > 7) return invalid_options;
     if (min_version == 0 or min_version > max_version) return invalid_options;
-    const ec: core.EcLevel = @enumFromInt(@as(u2, @intCast(level)));
+    const ec = levelFromApi(level) orelse return invalid_options;
     const bytes = input[0..input_length];
     if (family == 0) {
         if (max_version > 40 or controls[6] > 2 or controls[8] > 1) return invalid_options;
@@ -164,7 +184,7 @@ pub export fn zymbol_decode(side: u32) u32 {
         .qr => |value| {
             meta[0] = side;
             meta[1] = value.version;
-            meta[2] = @intFromEnum(value.ec_level);
+            meta[2] = levelToApi(value.ec_level);
             meta[3] = value.mask;
             meta[4] = 0;
             meta[5] = @intCast(value.len);
@@ -198,7 +218,7 @@ pub export fn zymbol_decode(side: u32) u32 {
         .micro_qr => |value| {
             meta[0] = side;
             meta[1] = @intFromEnum(value.version);
-            meta[2] = @intFromEnum(value.ec_level);
+            meta[2] = levelToApi(value.ec_level);
             meta[3] = value.mask;
             meta[4] = 1;
             meta[5] = @intCast(value.len);
@@ -318,7 +338,7 @@ pub export fn zymbol_render(
         .size = @intCast(side),
         .version = @intCast(version),
         .family = if (family == 0) .qr else .micro_qr,
-        .ec_level = @enumFromInt(@as(u2, @intCast(level))),
+        .ec_level = levelFromApi(level) orelse return invalid_options,
         .mask = @intCast(mask),
     };
     const quiet_zone: ?u16 = if (quiet < 0) null else @intCast(quiet);
@@ -449,7 +469,7 @@ pub export fn zymbol_encode_segments() u32 {
     if (first == 0 or first > last or last > (if (family == 1) @as(u32, 4) else 40)) return invalid_options;
     if (family == 1 and (level == 3 or fnc1 != 0 or append_flag != 0)) return invalid_options;
     if (family == 0 and (first != last or boost != 0)) return invalid_options;
-    const ec: core.EcLevel = @enumFromInt(@as(u2, @intCast(level)));
+    const ec = levelFromApi(level) orelse return invalid_options;
     const mask: ?u3 = if (forced == 0xffffffff) null else @intCast(forced);
 
     var micro_segments: [max_segments]core.MicroSegment = undefined;

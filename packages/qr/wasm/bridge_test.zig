@@ -2,6 +2,15 @@ const std = @import("std");
 const zymbol = @import("zymbol");
 const bridge = @import("bridge.zig");
 
+fn apiLevel(level: zymbol.EcLevel) u32 {
+    return switch (level) {
+        .l => 0,
+        .m => 1,
+        .q => 2,
+        .h => 3,
+    };
+}
+
 fn input() []u8 {
     const ptr: [*]u8 = @ptrFromInt(bridge.zymbol_input_ptr());
     return ptr[0..bridge.zymbol_input_capacity()];
@@ -25,7 +34,7 @@ fn output() []const u8 {
 fn expectGrid(symbol: zymbol.Symbol) !void {
     try std.testing.expectEqual(@as(u32, symbol.size), metadata()[0]);
     try std.testing.expectEqual(@as(u32, symbol.version), metadata()[1]);
-    try std.testing.expectEqual(@as(u32, @intFromEnum(symbol.ec_level)), metadata()[2]);
+    try std.testing.expectEqual(apiLevel(symbol.ec_level), metadata()[2]);
     try std.testing.expectEqual(@as(u32, symbol.mask), metadata()[3]);
     for (symbol.cells, 0..) |cell, index| {
         try std.testing.expectEqual(@as(u8, @intFromBool(cell.dark)), grid()[index]);
@@ -60,7 +69,7 @@ test "QR bridge matches native encoding and decoding across versions levels and 
                     0,
                     version,
                     version,
-                    @intFromEnum(level),
+                    apiLevel(level),
                     0,
                     mask,
                 ));
@@ -104,7 +113,7 @@ test "Micro QR bridge matches native masks for supported versions and EC levels"
                     1,
                     @intFromEnum(version),
                     @intFromEnum(version),
-                    @intFromEnum(level),
+                    apiLevel(level),
                     0,
                     mask,
                 ));
@@ -137,7 +146,7 @@ test "SVG and PNG bridge output matches native renderer exactly" {
     defer std.testing.allocator.free(svg_buffer);
     const expected_svg = try zymbol.render.renderSvg(&symbol, svg_buffer, svg_options);
     try std.testing.expectEqual(@as(u32, 0), bridge.zymbol_render(
-        0, symbol.size, 0, symbol.version, @intFromEnum(symbol.ec_level),
+        0, symbol.size, 0, symbol.version, apiLevel(symbol.ec_level),
         symbol.mask, 1, -1, 0, 0xffffff, 0, 0, 16 * 1024 * 1024, 4096,
     ));
     try std.testing.expectEqualSlices(u8, expected_svg, output());
@@ -148,7 +157,7 @@ test "SVG and PNG bridge output matches native renderer exactly" {
     defer std.testing.allocator.free(png_buffer);
     const expected_png = try zymbol.render.renderPng(&symbol, png_buffer, png_options);
     try std.testing.expectEqual(@as(u32, 0), bridge.zymbol_render(
-        1, symbol.size, 0, symbol.version, @intFromEnum(symbol.ec_level),
+        1, symbol.size, 0, symbol.version, apiLevel(symbol.ec_level),
         symbol.mask, 4, -1, 0, 0xffffff, 0, 0, 16 * 1024 * 1024, 4096,
     ));
     try std.testing.expectEqualSlices(u8, expected_png, output());
