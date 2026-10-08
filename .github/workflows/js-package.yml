@@ -91,7 +91,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm pack --json > "$RUNNER_TEMP/package.json"
+          node scripts/check-dist.mjs
+          npm pack --ignore-scripts --json > "$RUNNER_TEMP/package.json"
           node -e "
             const fs = require('node:fs');
             const files = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/package.json'))[0].files.map(f => f.path);
@@ -151,7 +152,7 @@ jobs:
             process.stdin.on('end', () => {
               const pkg = JSON.parse(raw);
               if (pkg.name !== '@zymbol/qr' || pkg.private ||
-                  !/^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(pkg.version)) {
+                  !/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(pkg.version)) {
                 throw new Error('Unexpected package identity or version');
               }
               console.log(pkg.version);
