@@ -20,7 +20,7 @@
     "build:js": "tsc -p tsconfig.build.json",
     "build": "node scripts/build.mjs",
     "test": "pnpm check:api && pnpm build:js && node --test test/*.test.mjs",
-    "test:runtime": "pnpm build && node scripts/check-dist.mjs",
+    "test:runtime": "pnpm build && zig build test-bridge && node scripts/check-dist.mjs",
     "prepack": "node scripts/check-dist.mjs"
   },
   "devDependencies": {
