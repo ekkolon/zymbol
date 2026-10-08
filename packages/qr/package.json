@@ -17,7 +17,8 @@
   "scripts": {
     "check:api": "tsc -p design/tsconfig.json && tsc -p design/tsconfig.node.json && tsc -p design/tsconfig.bundler.json",
     "build:js": "tsc -p tsconfig.build.json",
-    "test:loader": "pnpm build:js && node --test test/wasm.test.mjs"
+    "test:loader": "pnpm build:js && node --test test/wasm.test.mjs",
+    "test:bridge": "pnpm build:js && node --test test/*.test.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.1",
