@@ -16,12 +16,41 @@
   },
   "scripts": {
     "check:api": "tsc -p design/tsconfig.json && tsc -p design/tsconfig.node.json && tsc -p design/tsconfig.bundler.json",
+    "check:types": "tsc -p tsconfig.build.json --noEmit",
     "build:js": "tsc -p tsconfig.build.json",
-    "test:loader": "pnpm build:js && node --test test/wasm.test.mjs",
-    "test:bridge": "pnpm build:js && node --test test/*.test.mjs"
+    "build": "node scripts/build.mjs",
+    "test": "pnpm check:api && pnpm build:js && node --test test/*.test.mjs",
+    "test:runtime": "pnpm build && node scripts/check-dist.mjs",
+    "prepack": "node scripts/check-dist.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.1",
     "typescript": "7.0.2"
-  }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/node.d.ts",
+      "node": "./dist/node.js",
+      "browser": "./dist/browser.js",
+      "default": "./dist/browser.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "default": "./dist/core.js"
+    },
+    "./zymbol.wasm": "./dist/zymbol.wasm",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "sideEffects": false,
+  "main": "./dist/node.js",
+  "module": "./dist/browser.js",
+  "types": "./dist/node.d.ts"
 }
