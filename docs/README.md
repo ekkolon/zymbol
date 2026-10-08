@@ -22,6 +22,9 @@ decode and render symbols.
 | [Performance](testing/performance.md) | Running benchmarks and understanding the recorded results |
 | [Reference data](../tests/reference/README.md) | Where the conformance fixtures come from |
 
+The [website](../site/) provides a live WebAssembly playground built from the
+published JavaScript package.
+
 ## Maintenance
 
 The [JavaScript integration](maintaining/javascript.md) documents the
