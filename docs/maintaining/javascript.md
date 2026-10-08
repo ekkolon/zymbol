@@ -305,27 +305,55 @@ the first release. If npm requires a maintainer-authenticated bootstrap, make
 that a single explicit step; do not keep an automation token in the repository.
 No registry publish or account configuration occurs in this design milestone.
 
-Implement as squash-mergeable PRs, each with local evidence:
+Implement in small, squash-mergeable PRs. Each PR must have a concrete
+local test command and independent acceptance criteria. Do not merge an
+incomplete runtime or publish the design-only package.
 
-1. **API design:** this audit, declarations and positive/negative consumer
-   type checks. Done when the API and ownership decisions are accepted.
-2. **First runtime:** private package build, versioned bridge, loading, QR
-   encode/decode, owned results and release-scope isolation. Prove native
-   parity, growth/error behavior and real Node/browser execution.
-3. **Feature completion:** Micro QR, manual segments, all metadata, rendering,
-   fused PNG/SVG operations and resource limits. Qualify their native parity
-   and independent fixtures before claiming complete API coverage.
-4. **Distribution:** packed consumers, browser/worker/bundler/SSR fixtures,
-   Deno/Bun evaluation, benchmarks, reproducible artifacts and user docs.
-   Establish and enforce the measured size/performance budgets.
-5. **Publication:** tag/version checks, trusted publisher setup, manual release
-   workflow dry run and one hosted qualification checkpoint. Publish only an
-   explicitly approved version after the checks pass.
+1. **API proposal (this PR):** audit, declarations, positive and negative
+   consumer type checks. The draft PR is a review checkpoint, not a release.
+2. **Native release and CI isolation:** exclude `npm`-scoped commits, including
+   breaking changes, from Zig version selection and changelog generation.
+   Test mixed native/npm histories. Restrict native CI paths so package-only
+   changes on `main` do not run the cross-platform Zig matrix. This PR must
+   land before the API proposal is merged. Its workflow change may run the
+   existing CI once as a deliberate checkpoint.
+3. **WASM foundation:** private package build, Zig bridge, documented ABI
+   version and status codes, bounded linear-memory workspace, explicit loader
+   and default Node/browser loaders. Prove import-free compilation, ABI
+   mismatch handling, malformed buffer rejection, memory growth and loading
+   from a real browser and Node. No encoding API is claimed yet.
+4. **QR encode/decode:** automatic text and byte encoding, selected metadata,
+   module-grid decoding, JS-owned results and classified failures. Compare
+   native and WASM modules and decoded bytes across fixed vectors, edge cases
+   and repeated calls. Never expose borrowed WASM views.
+5. **Micro QR and segments:** automatic Micro encoding, QR and Micro manual
+   segments, FNC1, ECI, Structured Append and all supported decode metadata.
+   Test legal version/level/mask combinations and invalid combinations
+   against native behavior and the existing independent conformance corpus.
+6. **Rendering:** SVG, PNG and RGBA output, transparency and reflectance,
+   resource limits, and fused encode-to-PNG/SVG operations. Compare against
+   native output and independently parse PNG/SVG. Check retained results and
+   the costs of intermediate-buffer copies.
+7. **Packed consumers:** build and inspect the tarball, then install it in
+   isolated Node, browser, worker, Vite, webpack, esbuild and SSR fixtures.
+   Verify exports, asset URLs, Node-free browser bundles, `skipLibCheck: false`,
+   errors and CSP. Check Deno and Bun separately; document unsupported
+   configurations instead of silently widening support claims.
+8. **Qualification and docs:** clean reproducible builds, pinned dependencies,
+   bundle sizes, cold-start and warm-operation benchmarks, memory ceilings,
+   and concise developer examples. Establish measurable regression budgets
+   from these results. Do not modify the native package allowlist.
+9. **npm release:** dedicated manually dispatched workflow, tag and version
+   verification, packed-tarball publishing, scoped OIDC permissions and npm
+   provenance. Run the complete hosted package checks once at the release
+   checkpoint. Publish a prerelease on `next` only after the publisher and
+   artifacts are verified; stable publication requires explicit approval.
 
-Commit each working slice to the feature branch. Keep PRs draft during local
-iteration. Do not add broad push triggers or run the native cross-platform
-matrix for each npm commit. At qualification, use one manually dispatched
-package workflow; run native qualification when native code actually changes.
+Commit each passing slice on its own branch, keep implementation PRs draft
+while iterating, and squash on merge. Use local checks as the default. The
+package workflow stays dispatch-only until qualification; do not add broad
+push or PR triggers. Run the native matrix for native changes and deliberate
+integration checkpoints, not for each package commit.
 
 ## Sources
 
