@@ -8,6 +8,8 @@ function fake() {
   const meta = new DataView(memory.buffer, 42000, 72);
   let count = 0;
   let family = 0;
+  let renderBytes = 0;
+  let renderSide = 0;
   const bridge = {
     memory, zymbol_abi_version: () => 1,
     zymbol_input_ptr: () => 0, zymbol_grid_ptr: () => 8192,
@@ -19,6 +21,23 @@ function fake() {
       for (let i = 0; i < side * side; i++) bytes[8192 + i] = (i + count) % 2;
       [side, fam ? 2 : 1, ec, 0, fam].forEach((v, i) => meta.setUint32(i * 4, v, true));
       count++;
+      return 0;
+    },
+    zymbol_output_ptr: () => 50000,
+    zymbol_output_len: () => renderBytes,
+    zymbol_output_side: () => renderSide,
+    zymbol_structured_append_parity: length => {
+      let parity = 0;
+      for (let i = 0; i < length; i++) parity ^= bytes[i];
+      return parity;
+    },
+    zymbol_render: (format, side, family, version, level, mask, scale, quiet, foreground, background, reversed, size, maxOutput, maxSide) => {
+      renderSide = 2;
+      const value = format === 0 ? new TextEncoder().encode('<svg />')
+        : format === 1 ? new Uint8Array([137, 80, 78, 71])
+        : new Uint8Array([1, 2, 3, 255, 1, 2, 3, 255, 1, 2, 3, 255, 1, 2, 3, 255]);
+      bytes.set(value, 50000);
+      renderBytes = value.length;
       return 0;
     },
     zymbol_decode: side => {
@@ -70,4 +89,20 @@ test('ABI failures and traps are classified', () => {
   const qr = createEngine({ ...bridge, zymbol_encode() { throw new Error('trap'); } });
   assert.throws(() => qr.encode('a'), { code: 'WASM_TRAP' });
   assert.throws(() => qr.encode('a'), { code: 'INSTANCE_UNUSABLE' });
+});
+
+test('renderers return owned buffers and preserve API shapes', () => {
+  const qr = createEngine(fake().bridge);
+  const symbol = qr.encode('render');
+  assert.equal(qr.renderSvg(symbol), '<svg />');
+  assert.deepEqual([...qr.renderPng(symbol)], [137, 80, 78, 71]);
+  const raster = qr.renderRaster(symbol);
+  assert.equal(raster.width, 2);
+  assert.equal(raster.height, 2);
+  assert.ok(raster.data instanceof Uint8ClampedArray);
+  assert.deepEqual([...raster.data].slice(0, 4), [1, 2, 3, 255]);
+  assert.equal(qr.svg('a'), '<svg />');
+  assert.deepEqual([...qr.png('a')], [137, 80, 78, 71]);
+  assert.equal(qr.structuredAppendParity(new Uint8Array([1, 2, 3])), 0);
+  assert.throws(() => qr.renderSvg(symbol, { background: null, reflectance: 'reversed' }), { code: 'INVALID_OPTIONS' });
 });
