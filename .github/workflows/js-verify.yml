@@ -44,3 +44,6 @@ jobs:
       - name: Install and exercise packed package
         working-directory: packages/qr
         run: node scripts/check-pack.mjs
+      - name: Browser and worker smoke
+        working-directory: packages/qr
+        run: node scripts/check-browser.mjs
