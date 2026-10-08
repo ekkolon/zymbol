@@ -230,16 +230,16 @@ fn reservePixels(required: usize) error{OutOfMemory}![]u32 {
     return next;
 }
 
-fn rgb(packed: u32) core.render.Rgb {
+fn rgb(color: u32) core.render.Rgb {
     return .{
-        .r = @truncate(packed),
-        .g = @truncate(packed >> 8),
-        .b = @truncate(packed >> 16),
+        .r = @truncate(color),
+        .g = @truncate(color >> 8),
+        .b = @truncate(color >> 16),
     };
 }
 
-fn rgba(packed: u32, alpha: u8) u32 {
-    return (packed & 0x00ffffff) | (@as(u32, alpha) << 24);
+fn rgba(color: u32, alpha: u8) u32 {
+    return (color & 0x00ffffff) | (@as(u32, alpha) << 24);
 }
 
 fn renderError(err: anyerror) u32 {
