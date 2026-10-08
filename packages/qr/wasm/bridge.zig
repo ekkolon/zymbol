@@ -53,9 +53,11 @@ export fn zymbol_grid_capacity() u32 {
 
 fn status(err: anyerror) u32 {
     return switch (err) {
-        error.DataTooLong, error.OutputTooSmall => too_long,
-        error.InvalidVersionRange, error.UnsupportedEcLevel => invalid_options,
-        error.InvalidUtf8, error.InvalidCharacter, error.EmptyInput => invalid_input,
+        error.DataTooLong, error.OutputTooSmall, error.BufferFull => too_long,
+        error.InvalidVersionRange, error.UnsupportedEcLevel,
+        error.InvalidStructuredAppend, error.InvalidApplicationIndicator => invalid_options,
+        error.InvalidUtf8, error.InvalidCharacter, error.EmptyInput,
+        error.InvalidKanjiByte, error.OddKanjiLength, error.UnsupportedMode => invalid_input,
         error.InvalidSize, error.InvalidFormatInfo, error.InvalidVersionInfo,
         error.UnrecoverableBlock, error.MalformedDataStream => decode_failed,
         else => internal_error,
@@ -368,4 +370,137 @@ export fn zymbol_render(
 export fn zymbol_structured_append_parity(length: u32) u32 {
     if (length > max_input) return 256;
     return core.structuredAppendParity(input[0..length]);
+}
+
+
+const max_segments = 128;
+var controls: [14]u32 = @splat(0);
+
+// Control fields are family, min/exact version, max version, EC level,
+// mask (0xffffffff means automatic), boost, FNC1 kind, FNC1 indicator,
+// Structured Append flag/index/count/parity, packet length and segment count.
+export fn zymbol_controls_ptr() usize {
+    return @intFromPtr(&controls);
+}
+
+fn appendQrSegment(writer: *core.BitWriter, version: u6, mode: u8, data: []const u8) anyerror!void {
+    switch (mode) {
+        0 => try core.appendNumeric(writer, version, data),
+        1 => try core.appendAlphanumeric(writer, version, data),
+        2 => try core.appendByte(writer, version, data),
+        3 => try core.appendKanji(writer, version, data),
+        4 => {
+            if (data.len != 4) return error.InvalidDataLength;
+            const assignment: u32 = @as(u32, data[0]) |
+                (@as(u32, data[1]) << 8) |
+                (@as(u32, data[2]) << 16) |
+                (@as(u32, data[3]) << 24);
+            if (assignment > 999999) return error.InvalidEciAssignment;
+            try core.appendEci(writer, @intCast(assignment));
+        },
+        else => return error.UnsupportedMode,
+    }
+}
+
+// Packet format: one mode byte (0 numeric, 1 alphanumeric, 2 byte,
+// 3 Kanji, 4 ECI), u16 little-endian byte length, then the payload.
+export fn zymbol_encode_segments() u32 {
+    const family = controls[0];
+    const first = controls[1];
+    const last = controls[2];
+    const level = controls[3];
+    const forced = controls[4];
+    const boost = controls[5];
+    const fnc1 = controls[6];
+    const indicator = controls[7];
+    const append_flag = controls[8];
+    const append_index = controls[9];
+    const append_count = controls[10];
+    const append_parity = controls[11];
+    const payload_length = controls[12];
+    const segment_count = controls[13];
+    if (family > 1 or level > 3 or boost > 1 or fnc1 > 2 or append_flag > 1 or
+        segment_count > max_segments or payload_length > max_input or
+        forced != 0xffffffff and forced > (if (family == 1) @as(u32, 3) else 7)) return invalid_options;
+    if (first == 0 or first > last or last > (if (family == 1) @as(u32, 4) else 40)) return invalid_options;
+    if (family == 1 and (level == 3 or fnc1 != 0 or append_flag != 0)) return invalid_options;
+    if (family == 0 and (first != last or boost != 0)) return invalid_options;
+    const ec: core.EcLevel = @enumFromInt(@as(u2, @intCast(level)));
+    const mask: ?u3 = if (forced == 0xffffffff) null else @intCast(forced);
+
+    var micro_segments: [max_segments]core.MicroSegment = undefined;
+    const data_length: usize = payload_length;
+    var cursor: usize = 0;
+    var index: usize = 0;
+
+    if (family == 0) {
+        const capacity = core.dataCodewords(@intCast(first), ec);
+        var codewords: [core.dataCodewords(40, .l)]u8 = undefined;
+        var writer = core.BitWriter.init(codewords[0..capacity]);
+        if (append_flag == 1) {
+            if (append_index > 15 or append_count < 1 or append_count > 16 or
+                append_index >= append_count or append_parity > 255) return invalid_options;
+            core.appendStructuredAppend(&writer, .{
+                .index = @intCast(append_index),
+                .count = @intCast(append_count),
+                .parity = @intCast(append_parity),
+            }) catch |err| return status(err);
+        }
+        const fnc1_value: core.Fnc1 = switch (fnc1) {
+            0 => .none,
+            1 => .first_position,
+            2 => blk: {
+                if (indicator > 255) return invalid_options;
+                const value = core.ApplicationIndicator.fromEncoded(@intCast(indicator)) orelse return invalid_options;
+                break :blk .{ .second_position = value };
+            },
+            else => unreachable,
+        };
+        core.appendFnc1(&writer, fnc1_value) catch |err| return status(err);
+
+        while (index < segment_count) : (index += 1) {
+            if (cursor + 3 > data_length) return invalid_input;
+            const mode = input[cursor];
+            const length: usize = @as(usize, input[cursor + 1]) |
+                (@as(usize, input[cursor + 2]) << 8);
+            cursor += 3;
+            if (length > data_length - cursor) return invalid_input;
+            appendQrSegment(&writer, @intCast(first), mode, input[cursor..][0..length]) catch |err| return status(err);
+            cursor += length;
+        }
+        if (cursor != data_length) return invalid_input;
+        core.finalizeSegments(&writer) catch |err| return status(err);
+        const symbol = core.encodeRaw(codewords[0..capacity], @intCast(first), ec, mask, &cells, &encode_scratch) catch |err| return status(err);
+        saveSymbol(symbol);
+        return success;
+    }
+
+    while (index < segment_count) : (index += 1) {
+        if (cursor + 3 > data_length) return invalid_input;
+        const mode = input[cursor];
+        const length: usize = @as(usize, input[cursor + 1]) |
+            (@as(usize, input[cursor + 2]) << 8);
+        cursor += 3;
+        if (length > data_length - cursor) return invalid_input;
+        const data = input[cursor..][0..length];
+        micro_segments[index] = switch (mode) {
+            0 => .{ .numeric = data },
+            1 => .{ .alphanumeric = data },
+            2 => .{ .byte = data },
+            3 => .{ .kanji = data },
+            else => return invalid_input,
+        };
+        cursor += length;
+    }
+    if (cursor != data_length) return invalid_input;
+    const opts: core.MicroEncodeOptions = .{
+        .min_version = @enumFromInt(@as(u3, @intCast(first))),
+        .max_version = @enumFromInt(@as(u3, @intCast(last))),
+        .ec_level = ec,
+        .boost_ec_level = boost == 1,
+        .mask = if (mask) |m| @intCast(m) else null,
+    };
+    const symbol = core.encodeMicroSegments(micro_segments[0..segment_count], opts, &cells) catch |err| return status(err);
+    saveSymbol(symbol);
+    return success;
 }
