@@ -1,0 +1,14 @@
+.{
+    .name = .zymbol_qr_wasm,
+    .version = "0.0.0",
+    .fingerprint = 0xd8b3283143c5a017,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{
+        .zymbol = .{ .path = "../.." },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "wasm",
+    },
+}
