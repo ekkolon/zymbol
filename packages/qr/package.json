@@ -1,7 +1,6 @@
 {
   "name": "@zymbol/qr",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.0.0",
   "description": "QR Code and Micro QR encoding, decoding and rendering.",
   "license": "(MIT OR Apache-2.0)",
   "type": "module",
@@ -21,7 +20,8 @@
     "build": "node scripts/build.mjs",
     "test": "pnpm check:api && pnpm build:js && node --test test/*.test.mjs",
     "test:runtime": "pnpm build && zig build test-bridge && node scripts/check-dist.mjs",
-    "prepack": "node scripts/check-dist.mjs"
+    "prepack": "node scripts/check-dist.mjs",
+    "test:consumers": "node scripts/check-pack.mjs && node scripts/check-browser.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.1",
@@ -52,5 +52,21 @@
   "sideEffects": false,
   "main": "./dist/node.js",
   "module": "./dist/browser.js",
-  "types": "./dist/node.d.ts"
+  "types": "./dist/node.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://github.com/ekkolon/zymbol#readme",
+  "bugs": {
+    "url": "https://github.com/ekkolon/zymbol/issues"
+  },
+  "keywords": [
+    "qr",
+    "qr-code",
+    "micro-qr",
+    "zig",
+    "webassembly",
+    "wasm",
+    "typescript"
+  ]
 }
