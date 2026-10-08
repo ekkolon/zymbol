@@ -7,6 +7,12 @@ and releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-08
+
+### Fixed
+
+- Ship minimal Zig package (#42).
+
 ## [1.0.1] - 2026-10-07
 
 ### Fixed

@@ -11,7 +11,7 @@ renders PNG, SVG and raster images, without external dependencies.
 Requires Zig 0.17.0.
 
 ```sh
-zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.1.tar.gz
+zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.2.tar.gz
 ```
 
 Add the `zymbol` module to your build ([example](tests/consumer/build.zig)),
