@@ -174,6 +174,24 @@ jobs:
             echo "::error::Package version and release tag do not match"
             exit 1
           fi
+          export PACKAGE_VERSION="$version"
+          source_sha="$(tar -xOzf "${files[0]}" package/dist/build.json | node -e "
+            let raw = '';
+            process.stdin.setEncoding('utf8');
+            process.stdin.on('data', chunk => { raw += chunk; });
+            process.stdin.on('end', () => {
+              const build = JSON.parse(raw);
+              if (build.package !== '@zymbol/qr' || build.version !== process.env.PACKAGE_VERSION ||
+                  build.abi !== 1 || !/^[a-f0-9]{40}$/.test(build.source)) {
+                throw new Error('Unexpected WebAssembly build identity');
+              }
+              console.log(build.source);
+            });
+          ")"
+          if [[ "$source_sha" != "$GITHUB_SHA" ]]; then
+            echo "::error::Tarball was not built from the tagged commit"
+            exit 1
+          fi
           if [[ "$version" == *-* ]]; then
             dist_tag=next
           else
