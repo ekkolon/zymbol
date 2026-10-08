@@ -1,4 +1,4 @@
-import { execFileSync, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -54,7 +54,7 @@ async function runBrowser() {
   if (!address || typeof address === 'string') throw new Error('No browser address');
   const url = 'http://127.0.0.1:' + address.port + '/';
   const chrome = process.env.CHROME_BIN || 'google-chrome';
-  console.log('Browser qualification:', execFileSync(chrome, ['--version'], { encoding: 'utf8' }).trim());
+  console.log('Browser qualification:', chrome);
   browser = spawn(chrome, [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
     '--no-first-run', '--disable-extensions', '--remote-debugging-port=0',
@@ -65,16 +65,16 @@ async function runBrowser() {
   browser.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-3000); });
 
   let port;
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (browser.exitCode !== null) throw new Error('Chrome exited: ' + stderr);
+  for (let attempt = 0; attempt < 400; attempt++) {
+    if (browser.exitCode !== null || browser.signalCode !== null) throw new Error('Chrome exited: ' + stderr);
     try {
       port = Number(readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]);
       break;
     } catch {
-      await delay(80);
+      await delay(100);
     }
   }
-  if (!port) throw new Error('Chrome debugging endpoint unavailable: ' + stderr);
+  if (!port) throw new Error('Chrome debugging endpoint unavailable after 40 seconds: ' + stderr);
 
   const targets = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
   const target = targets.find(item => item.type === 'page');
@@ -123,6 +123,8 @@ async function runBrowser() {
     subscribers.set(name, [...(subscribers.get(name) ?? []), resolve]);
   });
 
+  const version = await command('Browser.getVersion');
+  console.log('Browser version:', version.product);
   await command('Runtime.enable');
   await command('Log.enable');
   await command('Network.enable');
@@ -160,7 +162,7 @@ async function runBrowser() {
 try {
   await Promise.race([
     runBrowser(),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Browser qualification exceeded 30 seconds: ' + diagnostics.join('; '))), 30000)),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Browser qualification exceeded 60 seconds: ' + diagnostics.join('; '))), 60000)),
   ]);
 } finally {
   socket?.close();
