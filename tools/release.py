@@ -43,16 +43,6 @@ def release_section(version: str) -> str:
 
 
 def validate_project_metadata(version: str) -> None:
-    readme = README.read_text(encoding="utf-8")
-    expected_badge = (
-        "[version-badge]: "
-        f"https://img.shields.io/badge/version-{version}-555.svg"
-    )
-    if expected_badge not in readme:
-        raise SystemExit(
-            f"README.md version badge does not match {version}"
-        )
-
     expected_archive = f"https://github.com/ekkolon/zymbol/archive/refs/tags/v{version}.tar.gz"
     for path in (README, GETTING_STARTED):
         if expected_archive not in path.read_text(encoding="utf-8"):

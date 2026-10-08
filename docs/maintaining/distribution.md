@@ -23,10 +23,15 @@ dated changelog section and GitHub Release must identify the same release.
 module wiring.
 
 The consuming project's manifest pins the package with a content hash.
+The fetched package contains `build.zig`, `build.zig.zon`, `src/` and the
+license files. Tests, benchmarks, examples and documentation remain in the
+source repository but are excluded from the Zig package cache.
 
 The package exports `zymbol`, including `zymbol.render`.
 [`tests/consumer`](../../tests/consumer/) checks that import in a separate
-project. [`package_smoke.py`](../../tools/package_smoke.py) fetches an archive
+project. [`test_package_layout.py`](../../tools/test_package_layout.py)
+checks the package contents and imports offline.
+[`package_smoke.py`](../../tools/package_smoke.py) fetches an archive
 into a temporary project and builds it using the same fixture.
 
 ## Verify a release
