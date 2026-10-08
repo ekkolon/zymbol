@@ -42,7 +42,7 @@ function wordmark() {
   const rects = [...'ZYMBOL'].flatMap((letter, i) => letters[letter].flatMap((line, y) => [...line].flatMap((cell, x) => cell === '1' ? `<rect x="${i * 6 + x}" y="${y}" width="1" height="1"/>` : []))).join('');
   return `<svg class="wordmark" viewBox="0 0 35 7" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
 }
-const brandMark = `<svg class="brand-mark" viewBox="0 0 19 19" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M0 0h7v7H0zM12 0h7v7h-7zM0 12h7v7H0zM8 0h2v2H8zM9 4h2v3H9zM13 9h2v2h-2zM8 9h3v2H8zM16 12h3v2h-3zM9 14h2v5H9zM12 16h3v3h-3zM16 16h3v3h-3z"/><path fill="var(--bg)" d="M2 2h3v3H2zM14 2h3v3h-3zM2 14h3v3H2z"/></svg>`;
+const brandMark = `<svg class="brand-mark" viewBox="0 0 19 19" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M0 0h7v7H0zM12 0h7v7h-7zM0 12h7v7H0zM8 0h2v2H8zM9 4h2v3H9zM13 9h2v2h-2zM8 9h3v2H8zM16 12h3v2h-3zM9 14h2v5H9zM12 16h3v3h-3zM16 16h3v3h-3z"/><path fill="var(--bg)" d="M1 1h5v5H1zM13 1h5v5h-5zM1 13h5v5H1z"/><path fill="currentColor" d="M2 2h3v3H2zM14 2h3v3h-3zM2 14h3v3H2z"/></svg>`;
 const docs = [
   { slug: '', label: 'Overview', title: 'Documentation', desc: 'Install Zymbol, encode QR codes, and work with the Zig or JavaScript API.' },
   { slug: 'getting-started', label: 'Getting started', title: 'Getting started', desc: 'Install Zymbol in JavaScript or Zig and produce your first QR code.' },
@@ -111,7 +111,7 @@ const text = new TextDecoder().decode(result.bytes);`)}<h2>What it does not do</
 
 function head({title,description,slug='',root=''}) {
   const url = origin + slug;
-  return `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b0c09"><meta name="description" content="${escape(description)}"><meta name="robots" content="index,follow"><link rel="canonical" href="${url}"><meta property="og:type" content="website"><meta property="og:site_name" content="Zymbol"><meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}"><meta property="og:url" content="${url}"><meta name="twitter:card" content="summary"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"><link rel="stylesheet" href="${root}styles.css"><title>${escape(title)} | Zymbol</title>`;
+  return `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b0c09"><meta name="description" content="${escape(description)}"><meta name="robots" content="index,follow"><link rel="canonical" href="${url}"><meta property="og:type" content="website"><meta property="og:site_name" content="Zymbol"><meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}"><meta property="og:url" content="${url}"><meta name="twitter:card" content="summary"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'"><link rel="icon" href="${root}favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="${root}styles.css"><title>${escape(title)} | Zymbol</title>`;
 }
 function navigation(root, current) {
   const selected = key => current === key ? ' aria-current="page"' : '';
@@ -137,7 +137,7 @@ function matrix(size, seed, compact=false) {
     if(reserved(x,y))continue;
     if(next()>.51)modules+=`<rect x="${x}" y="${y}" width="1" height="1" class="module-delay-${((x*3+y*7)%6)}"/>`;
   }
-  const finder=(x,y)=>`<path d="M${x} ${y}h7v7h-7z M${x+2} ${y+2}h3v3h-3z" fill-rule="evenodd"/>`;
+  const finder=(x,y)=>`<path d="M${x} ${y}h7v7h-7z M${x+1} ${y+1}h5v5h-5z M${x+2} ${y+2}h3v3h-3z" fill-rule="evenodd"/>`;
   const patterns=finder(0,0)+(compact?'':finder(size-7,0)+finder(0,size-7));
   return `<svg viewBox="-2 -2 ${size+4} ${size+4}" shape-rendering="crispEdges" aria-hidden="true" class="matrix-svg"><g class="matrix-modules">${modules}</g><g class="matrix-finders">${patterns}</g></svg>`;
 }
