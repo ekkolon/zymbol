@@ -23,31 +23,31 @@ const too_long: u32 = 3;
 const decode_failed: u32 = 4;
 const internal_error: u32 = 5;
 
-export fn zymbol_abi_version() u32 {
+pub export fn zymbol_abi_version() u32 {
     return 1;
 }
 
-export fn zymbol_input_ptr() usize {
+pub export fn zymbol_input_ptr() usize {
     return @intFromPtr(&input);
 }
 
-export fn zymbol_grid_ptr() usize {
+pub export fn zymbol_grid_ptr() usize {
     return @intFromPtr(&grid);
 }
 
-export fn zymbol_payload_ptr() usize {
+pub export fn zymbol_payload_ptr() usize {
     return @intFromPtr(&payload);
 }
 
-export fn zymbol_meta_ptr() usize {
+pub export fn zymbol_meta_ptr() usize {
     return @intFromPtr(&meta);
 }
 
-export fn zymbol_input_capacity() u32 {
+pub export fn zymbol_input_capacity() u32 {
     return max_input;
 }
 
-export fn zymbol_grid_capacity() u32 {
+pub export fn zymbol_grid_capacity() u32 {
     return max_modules;
 }
 
@@ -77,7 +77,7 @@ fn saveSymbol(symbol: core.Symbol) void {
 // The caller writes at most input_capacity() bytes into input_ptr().
 // family: 0 = QR, 1 = Micro; kind: 0 = text, 1 = bytes.
 // version bounds are 1..40 or 1..4; level: 0..3; mask: -1 = automatic.
-export fn zymbol_encode(
+pub export fn zymbol_encode(
     input_length: u32,
     kind: u32,
     family: u32,
@@ -149,7 +149,7 @@ export fn zymbol_encode(
 }
 
 // The caller writes a square binary grid into grid_ptr(). No quiet zone.
-export fn zymbol_decode(side: u32) u32 {
+pub export fn zymbol_decode(side: u32) u32 {
     if (side > 177 or (side != 11 and side != 13 and side != 15 and side != 17 and
         (side < 21 or (side - 17) % 4 != 0))) return invalid_input;
     const count: usize = @as(usize, side) * side;
@@ -220,15 +220,15 @@ var output_pointer: usize = 0;
 var output_length: usize = 0;
 var output_side: u32 = 0;
 
-export fn zymbol_output_ptr() usize {
+pub export fn zymbol_output_ptr() usize {
     return output_pointer;
 }
 
-export fn zymbol_output_len() u32 {
+pub export fn zymbol_output_len() u32 {
     return @intCast(output_length);
 }
 
-export fn zymbol_output_side() u32 {
+pub export fn zymbol_output_side() u32 {
     return output_side;
 }
 
@@ -280,7 +280,7 @@ fn renderError(err: anyerror) u32 {
 // Format: 0 SVG, 1 PNG, 2 RGBA. Colors are low-byte-first RGB triples.
 // A background of -1 is transparent; a quiet zone of -1 uses native defaults.
 // Result bytes are valid only until the next render operation.
-export fn zymbol_render(
+pub export fn zymbol_render(
     format: u32,
     side: u32,
     family: u32,
@@ -391,7 +391,7 @@ export fn zymbol_render(
     return success;
 }
 
-export fn zymbol_structured_append_parity(length: u32) u32 {
+pub export fn zymbol_structured_append_parity(length: u32) u32 {
     if (length > max_input) return 256;
     return core.structuredAppendParity(input[0..length]);
 }
@@ -403,7 +403,7 @@ var controls: [14]u32 = @splat(0);
 // Control fields are family, min/exact version, max version, EC level,
 // mask (0xffffffff means automatic), boost, FNC1 kind, FNC1 indicator,
 // Structured Append flag/index/count/parity, packet length and segment count.
-export fn zymbol_controls_ptr() usize {
+pub export fn zymbol_controls_ptr() usize {
     return @intFromPtr(&controls);
 }
 
@@ -428,7 +428,7 @@ fn appendQrSegment(writer: *core.BitWriter, version: u6, mode: u8, data: []const
 
 // Packet format: one mode byte (0 numeric, 1 alphanumeric, 2 byte,
 // 3 Kanji, 4 ECI), u16 little-endian byte length, then the payload.
-export fn zymbol_encode_segments() u32 {
+pub export fn zymbol_encode_segments() u32 {
     const family = controls[0];
     const first = controls[1];
     const last = controls[2];
