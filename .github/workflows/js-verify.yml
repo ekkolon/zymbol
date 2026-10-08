@@ -41,6 +41,6 @@ jobs:
       - name: Build and exercise real WebAssembly
         working-directory: packages/qr
         run: pnpm test:runtime
-      - name: Check packed package contents
+      - name: Install and exercise packed package
         working-directory: packages/qr
-        run: npm pack --dry-run
+        run: node scripts/check-pack.mjs
