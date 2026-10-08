@@ -1,7 +1,7 @@
 .{
     .name = .zymbol_qr_wasm,
     .version = "0.0.0",
-    .fingerprint = 0xd8b3283143c5a017,
+    .fingerprint = 0x4220c9e0f3effe4b,
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .zymbol = .{ .path = "../.." },
