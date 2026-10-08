@@ -57,8 +57,16 @@ try {
     process.stderr.setEncoding('utf8');
     process.stdout.on('data', data => { stdout += data; });
     process.stderr.on('data', data => { stderr += data; });
-    process.once('error', rejectChrome);
+    const timeout = setTimeout(() => {
+      process.kill('SIGKILL');
+      rejectChrome(new Error('Chrome browser smoke exceeded its time limit'));
+    }, 30000);
+    process.once('error', error => {
+      clearTimeout(timeout);
+      rejectChrome(error);
+    });
     process.once('close', code => {
+      clearTimeout(timeout);
       if (code !== 0) rejectChrome(new Error('Chrome exited ' + code + ': ' + stderr.slice(-1000)));
       else resolveChrome(stdout);
     });
