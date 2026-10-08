@@ -8,6 +8,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import tarfile
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -41,9 +42,20 @@ def main() -> None:
         )
         if fetched.returncode:
             raise SystemExit(f"zig fetch failed:\n{fetched.stderr.strip()}")
-        package = cache / "p" / fetched.stdout.strip()
-        if not package.is_dir():
-            raise SystemExit("zig fetch did not produce a cached package")
+        package_hash = fetched.stdout.strip()
+        archive = cache / "p" / f"{package_hash}.tar.gz"
+        if not archive.is_file():
+            raise SystemExit(f"zig fetch did not create {archive}")
+
+        consumer = root / "consumer"
+        consumer.mkdir()
+        shutil.copy2(CONSUMER / "build.zig", consumer / "build.zig")
+        shutil.copytree(CONSUMER / "src", consumer / "src")
+
+        package = consumer / "deps" / "zymbol"
+        package.mkdir(parents=True)
+        with tarfile.open(archive, "r:gz") as source:
+            source.extractall(package, filter="data")
 
         actual = {entry.name for entry in package.iterdir()}
         if actual != PACKAGE_ENTRIES:
@@ -51,13 +63,6 @@ def main() -> None:
                 f"unexpected package contents: missing={sorted(PACKAGE_ENTRIES - actual)}, "
                 f"extra={sorted(actual - PACKAGE_ENTRIES)}"
             )
-
-        consumer = root / "consumer"
-        consumer.mkdir()
-        shutil.copy2(CONSUMER / "build.zig", consumer / "build.zig")
-        shutil.copytree(CONSUMER / "src", consumer / "src")
-        (consumer / "deps").mkdir()
-        shutil.copytree(package, consumer / "deps" / "zymbol")
 
         manifest = (CONSUMER / "build.zig.zon").read_text(encoding="utf-8")
         old_path = '.path = "../.."'
