@@ -2,7 +2,11 @@
 
 QR Code and Micro QR encoding, decoding, and rendering for JavaScript and TypeScript. Powered by [Zymbol](https://github.com/ekkolon/zymbol), compiled from Zig to WebAssembly.
 
-This package is under development and is not published.
+Install from npm once the first release is published:
+
+```sh
+npm install @zymbol/qr
+```
 
 ## Usage
 
@@ -58,6 +62,6 @@ pnpm test
 pnpm test:runtime
 ```
 
-`test:runtime` builds the WASM module, compares the bridge with native Zig, and runs real WASM smoke tests. Additional packaged-consumer and browser checks are defined in the manual qualification workflow.
+`test:runtime` builds the WASM module, compares the bridge with native Zig, and runs real WASM smoke tests. For installed-package and browser checks, run `pnpm test:consumers`. The browser check requires Chrome.
 
 Licensed under MIT or Apache-2.0, at your option. QR Code is a registered trademark of DENSO WAVE INCORPORATED.
