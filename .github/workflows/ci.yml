@@ -47,7 +47,7 @@ concurrency:
 
 jobs:
   preflight:
-    if: ${{ (github.event_name == 'workflow_dispatch' || github.event.repository.private == false) && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    if: ${{ (github.event_name == 'workflow_dispatch' || github.event.repository.private == false) && (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.pull_request.head.ref != 'integration/js')) }}
     name: Preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 10

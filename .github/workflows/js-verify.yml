@@ -1,0 +1,46 @@
+name: JavaScript Qualification
+
+on:
+  pull_request:
+    types:
+      - ready_for_review
+    branches:
+      - main
+    paths:
+      - "packages/qr/**"
+      - ".github/workflows/js-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'integration/js' }}
+    name: Zig WASM and TypeScript
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ekkolon/setup-zig@1f953e071575c3853be36200a320538d76d24e4f # v1.0.1
+        with:
+          version: 0.17.0
+          cache: 'false'
+      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3
+        with:
+          working-directory: packages/qr
+          version: 12.10.1
+          runtime: node@24.21.0
+          require-lockfile: true
+          cache: false
+      - name: API, loader, and bridge tests
+        working-directory: packages/qr
+        run: pnpm test
+      - name: Build and exercise real WebAssembly
+        working-directory: packages/qr
+        run: pnpm test:runtime
+      - name: Check packed package contents
+        working-directory: packages/qr
+        run: npm pack --dry-run
