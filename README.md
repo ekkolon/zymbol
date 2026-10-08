@@ -1,14 +1,12 @@
-# zymbol
+# Zymbol
 
 [![CI][ci-badge]][ci]
-[![Version][version-badge]][changelog]
-[![Zig][zig-badge]][zig]
 [![License][license-badge]][license]
 
-Zymbol is a QR code library for Zig. It generates and decodes QR and Micro QR
-codes, with PNG and SVG output built in and no external dependencies.
+Zymbol encodes and decodes QR Code Model 2 and Micro QR symbols in Zig. It also
+renders PNG, SVG and raster images, without external dependencies.
 
-## Installation
+## Getting started
 
 Requires Zig 0.17.0.
 
@@ -16,81 +14,28 @@ Requires Zig 0.17.0.
 zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.1.tar.gz
 ```
 
-After creating your executable in `build.zig`, add the dependency to its module:
-
-```zig
-const zymbol_dep = b.dependency("zymbol", .{
-    .target = target,
-    .optimize = optimize,
-});
-
-exe.root_module.addImport("zymbol", zymbol_dep.module("zymbol"));
-```
-
-## Usage
-
-### Encode
+Add the `zymbol` module to your build ([example](tests/consumer/build.zig)),
+then create a PNG:
 
 ```zig
 const zymbol = @import("zymbol");
-const max_version: zymbol.Version = 10;
 
-var cells: [zymbol.requiredCells(max_version)]zymbol.Cell = undefined;
-var scratch: [zymbol.requiredEncodeScratch(max_version)]u8 = undefined;
-
-const symbol = try zymbol.encodeText(
-    "https://example.com",
-    .{ .max_version = max_version },
-    &cells,
-    &scratch,
-);
-```
-
-`encodeText` accepts UTF-8 and adds ECI assignment 26 for non-ASCII text.
-Use `encodeBytes` for raw bytes without ECI.
-
-### Render PNG
-
-Supply your allocator to the convenience helper:
-
-```zig
 var png = try zymbol.render.pngText(allocator, "https://example.com", .{});
 defer png.deinit();
-
-// The PNG is in png.bytes.
 ```
 
-Raster, SVG and PNG also have APIs that write into caller-owned buffers.
-SVG can stream to `std.Io.Writer`.
+The PNG is in `png.bytes`. Use `encodeText` or `encodeBytes` to create
+symbols without rendering. `decodeAny` decodes QR Code and Micro QR from
+sampled module grids, not directly from image files.
 
-### Decode
-
-Decoding takes a sampled, oriented module grid. The buffers below accommodate
-QR symbols up to version 10:
-
-```zig
-var cells: [zymbol.requiredCells(10)]zymbol.Cell = undefined;
-var scratch: [zymbol.requiredDecodeScratch(10)]u8 = undefined;
-var output: [512]u8 = undefined;
-
-const decoded = try zymbol.decode(modules, side, &cells, &scratch, &output);
-const payload = output[0..decoded.len];
-```
-
-`modules` is a row-major square `[]const bool` grid; `side` is its width.
-The result includes payload length, symbol details and control metadata.
-Use `decodeAny` for grids that may contain QR Code or Micro QR.
+See [Getting started](docs/getting-started.md) for caller-owned buffers and
+decoding.
 
 ## ISO/IEC 18004:2024
 
-The QR Code Model 2 and Micro QR implementation was reviewed against
-ISO/IEC 18004:2024 for encoding, sampled-grid decoding and default digital
-quiet zones.
-
-**Legend**
-
-- ✅ **Implemented** for supported versions and valid mode/error-correction combinations.
-- 🚫 **Not applicable** to this symbol family.
+Zymbol implements digital symbol encoding and sampled-grid decoding for QR Code
+Model 2 and Micro QR. The matrix covers valid version, mode and error-correction
+combinations. ✅ means implemented; 🚫 means not applicable.
 
 | Feature | QR Code | Micro QR |
 | --- | --- | --- |
@@ -118,38 +63,28 @@ quiet zones.
 | Mirror and reversed-reflectance normalization | ✅ | ✅ |
 | Symbology identifier metadata | ✅ | ✅ |
 
-See the [conformance scope and test evidence][conformance] for details.
+See [conformance and test evidence](docs/testing/conformance.md) for the
+scope, test cases and limits. Image detection, physical printing and print
+quality grading are outside the library.
 
 ## Documentation
 
-[Overview][docs]\
-[Examples][examples]\
-[API reference][api]\
-[Benchmarks][performance]
+[Getting started](docs/getting-started.md) ·
+[API reference](docs/reference/api.md) ·
+[Examples](examples/) ·
+[Benchmarks](docs/testing/performance.md) ·
+[Documentation index](docs/README.md)
 
-For development and security reporting, see [CONTRIBUTING.md][contributing]
-and [SECURITY.md][security].
+[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) ·
+[Security](SECURITY.md)
 
 ## License
 
-Licensed under [MIT][mit-license] or [Apache 2.0][apache-license], at your option.
+Licensed under [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE), at your option.
 
 QR Code is a registered trademark of DENSO WAVE INCORPORATED.
 
-[api]: docs/reference/api.md
-[changelog]: CHANGELOG.md
 [ci]: https://github.com/ekkolon/zymbol/actions/workflows/ci.yml
 [ci-badge]: https://github.com/ekkolon/zymbol/actions/workflows/ci.yml/badge.svg?branch=main
-[conformance]: docs/testing/conformance.md
-[contributing]: CONTRIBUTING.md
-[docs]: docs/README.md
-[examples]: examples/
 [license]: LICENSE
-[mit-license]: LICENSE-MIT
-[apache-license]: LICENSE-APACHE
 [license-badge]: https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg
-[performance]: docs/testing/performance.md
-[security]: SECURITY.md
-[version-badge]: https://img.shields.io/badge/version-1.0.1-555.svg
-[zig]: https://ziglang.org/
-[zig-badge]: https://img.shields.io/badge/Zig-0.17.0-f7a41d.svg?logo=zig&logoColor=white

@@ -1,11 +1,9 @@
 # API reference
 
-Import `zymbol` for encoding and decoding. Rendering is under `zymbol.render`.
-See [Getting started](../getting-started.md) for installation and a PNG example.
+Encoding and decoding are exported from `zymbol`; rendering is under
+`zymbol.render`. Each entry links to the public declaration and its source.
 
-Each name links to its public declaration. The **Source** column links to the
-function or type definition, including its signature, fields and errors.
-Import the public module; these implementation files are linked for reading.
+See [Getting started](../getting-started.md) for installation and an example.
 
 - [QR encoding](#qr-encoding)
 - [Micro QR encoding](#micro-qr-encoding)

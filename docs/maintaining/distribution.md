@@ -12,13 +12,8 @@ optimization mode. Releases are available from
 | Version | `1.0.1` |
 | Minimum Zig | `0.17.0` |
 | Runtime package dependencies | None |
-| Maintainer | Nelson Dominguez |
 | License | `MIT OR Apache-2.0` |
 | Source | `github.com/ekkolon/zymbol` |
-
-The Zig manifest records the package identity, version and dependencies.
-Author and license details belong in the repository and license files; they
-are not standard `build.zig.zon` fields.
 
 ## Source archives
 
@@ -27,8 +22,7 @@ dated changelog section and GitHub Release must identify the same release.
 [Getting started](../getting-started.md) shows the installation command and
 module wiring.
 
-`zig fetch --save` records the archive's URL and content hash in the consuming
-project's manifest. Keep the hash for reproducible builds.
+The consuming project's manifest pins the package with a content hash.
 
 The package exports `zymbol`, including `zymbol.render`.
 [`tests/consumer`](../../tests/consumer/) checks that import in a separate
