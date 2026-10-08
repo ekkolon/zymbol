@@ -144,9 +144,21 @@ jobs:
             echo "::error::Exactly one qualified tarball is required"
             exit 1
           fi
-          version="$(node -p "require('node:path').basename(process.argv[1]).match(/([0-9]+\\.[0-9]+\\.[0-9]+(?:-[^.]+)?)\\.tgz$/)?.[1]||''" "${files[0]}")"
-          if [[ -z "$version" ]]; then
-            echo "::error::Cannot derive package version"
+          version="$(tar -xOzf "${files[0]}" package/package.json | node -e "
+            let raw = '';
+            process.stdin.setEncoding('utf8');
+            process.stdin.on('data', chunk => { raw += chunk; });
+            process.stdin.on('end', () => {
+              const pkg = JSON.parse(raw);
+              if (pkg.name !== '@zymbol/qr' || pkg.private ||
+                  !/^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(pkg.version)) {
+                throw new Error('Unexpected package identity or version');
+              }
+              console.log(pkg.version);
+            });
+          ")"
+          if [[ "$GITHUB_REF" != "refs/tags/npm/qr/v$version" ]]; then
+            echo "::error::Package version and release tag do not match"
             exit 1
           fi
           if [[ "$version" == *-* ]]; then
