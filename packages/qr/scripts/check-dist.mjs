@@ -56,6 +56,27 @@ if (headerResult.family !== 'qr' || headerResult.fnc1?.position !== 'first'
   throw new Error('Automatic encoding QR control headers were lost');
 }
 
+for (const correction of ['L', 'M', 'Q', 'H']) {
+  const symbol = qr.encode('TEST', {
+    version: 2,
+    errorCorrection: correction,
+    boostErrorCorrection: false,
+  });
+  const decoded = qr.decode(symbol);
+  if (symbol.errorCorrection !== correction || decoded.errorCorrection !== correction) {
+    throw new Error('QR correction-level mapping is incorrect: ' + correction);
+  }
+}
+const microQ = qr.encode('12', {
+  family: 'micro',
+  version: 'M4',
+  errorCorrection: 'Q',
+  boostErrorCorrection: false,
+});
+if (microQ.errorCorrection !== 'Q' || qr.decode(microQ).errorCorrection !== 'Q') {
+  throw new Error('Micro QR correction-level mapping is incorrect');
+}
+
 const micro = qr.encode('12345', { family: 'micro' });
 if (qr.decode(micro).family !== 'micro') throw new Error('Micro QR round trip failed');
 const manual = qr.encodeSegments([{ mode: 'numeric', data: '12345' }], { version: 1, errorCorrection: 'L' });
