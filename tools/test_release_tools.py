@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import os
 import pathlib
 import shutil
 import subprocess
@@ -16,6 +17,16 @@ class ReleaseToolsTest(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory(prefix="zymbol-release-tools-")
         self.root = pathlib.Path(self.tempdir.name)
         (self.root / "tools").mkdir()
+        (self.root / "git-template").mkdir()
+        self.env = os.environ.copy()
+        self.env.update(
+            {
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_TEMPLATE_DIR": str(self.root / "git-template"),
+                "GIT_TERMINAL_PROMPT": "0",
+            }
+        )
         (self.root / "docs" / "maintaining").mkdir(parents=True)
 
         for name in ("prepare_release.py", "release.py", "check_pr_title.py"):
@@ -79,14 +90,24 @@ Initial project baseline.
         self.tempdir.cleanup()
 
     def run_cmd(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            args,
-            cwd=self.root,
-            check=check,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                args,
+                cwd=self.root,
+                env=self.env,
+                capture_output=True,
+                text=True,
+                errors="replace",
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise AssertionError(f"command timed out: {args!r}") from exc
+        if check and result.returncode:
+            raise AssertionError(
+                f"command failed ({result.returncode}): {args!r}\n"
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+        return result
 
     def git(self, *args: str) -> subprocess.CompletedProcess[str]:
         return self.run_cmd("git", *args)

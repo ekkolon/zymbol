@@ -30,13 +30,17 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="zymbol-package-layout-") as temp:
         root = pathlib.Path(temp)
         cache = root / "cache"
+        env = os.environ.copy()
+        env["ZIG_GLOBAL_CACHE_DIR"] = str(cache)
         fetched = subprocess.run(
-            [args.zig, "fetch", "--global-cache-dir", str(cache), str(ROOT)],
+            [args.zig, "fetch", str(ROOT)],
             cwd=ROOT,
-            check=True,
+            env=env,
             capture_output=True,
             text=True,
         )
+        if fetched.returncode:
+            raise SystemExit(f"zig fetch failed:\n{fetched.stderr.strip()}")
         package = cache / "p" / fetched.stdout.strip()
         if not package.is_dir():
             raise SystemExit("zig fetch did not produce a cached package")
@@ -52,16 +56,16 @@ def main() -> None:
         consumer.mkdir()
         shutil.copy2(CONSUMER / "build.zig", consumer / "build.zig")
         shutil.copytree(CONSUMER / "src", consumer / "src")
+        (consumer / "deps").mkdir()
+        shutil.copytree(package, consumer / "deps" / "zymbol")
 
         manifest = (CONSUMER / "build.zig.zon").read_text(encoding="utf-8")
         old_path = '.path = "../.."'
         if manifest.count(old_path) != 1:
             raise SystemExit("consumer dependency path changed")
-        manifest = manifest.replace(old_path, f'.path = "../cache/p/{package.name}"')
+        manifest = manifest.replace(old_path, '.path = "deps/zymbol"')
         (consumer / "build.zig.zon").write_text(manifest, encoding="utf-8")
 
-        env = os.environ.copy()
-        env["ZIG_GLOBAL_CACHE_DIR"] = str(cache)
         subprocess.run([args.zig, "build", "test"], cwd=consumer, env=env, check=True)
 
     print("package layout and consumer smoke passed")
