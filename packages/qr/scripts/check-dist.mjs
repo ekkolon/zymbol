@@ -44,6 +44,18 @@ for (const input of ['12345', 'hello', new Uint8Array([0, 128, 255])]) {
   const raster = qr.renderRaster(symbol);
   if (raster.data.length !== raster.width * raster.height * 4) throw new Error('Invalid raster');
 }
+
+const withHeaders = qr.encode('01012345', {
+  errorCorrection: 'M',
+  fnc1: { position: 'first' },
+  structuredAppend: { index: 0, count: 2, parity: 7 },
+});
+const headerResult = qr.decode(withHeaders);
+if (headerResult.family !== 'qr' || headerResult.fnc1?.position !== 'first'
+    || headerResult.structuredAppend?.count !== 2 || headerResult.structuredAppend.parity !== 7) {
+  throw new Error('Automatic encoding QR control headers were lost');
+}
+
 const micro = qr.encode('12345', { family: 'micro' });
 if (qr.decode(micro).family !== 'micro') throw new Error('Micro QR round trip failed');
 const manual = qr.encodeSegments([{ mode: 'numeric', data: '12345' }], { version: 1, errorCorrection: 'L' });

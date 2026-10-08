@@ -93,13 +93,35 @@ export fn zymbol_encode(
     const ec: core.EcLevel = @enumFromInt(@as(u2, @intCast(level)));
     const bytes = input[0..input_length];
     if (family == 0) {
-        if (max_version > 40) return invalid_options;
+        if (max_version > 40 or controls[6] > 2 or controls[8] > 1) return invalid_options;
+        const fnc1: core.Fnc1 = switch (controls[6]) {
+            0 => .none,
+            1 => .first_position,
+            2 => blk: {
+                if (controls[7] > 255) return invalid_options;
+                const value = core.ApplicationIndicator.fromEncoded(@intCast(controls[7])) orelse return invalid_options;
+                break :blk .{ .second_position = value };
+            },
+            else => unreachable,
+        };
+        var append: ?core.StructuredAppend = null;
+        if (controls[8] == 1) {
+            if (controls[9] >= controls[10] or controls[10] < 1 or controls[10] > 16 or
+                controls[11] > 255) return invalid_options;
+            append = .{
+                .index = @intCast(controls[9]),
+                .count = @intCast(controls[10]),
+                .parity = @intCast(controls[11]),
+            };
+        }
         const options: core.EncodeOptions = .{
             .min_version = @intCast(min_version),
             .max_version = @intCast(max_version),
             .ec_level = ec,
             .boost_ec_level = boost == 1,
             .mask = if (mask == -1) null else @intCast(mask),
+            .fnc1 = fnc1,
+            .structured_append = append,
         };
         const symbol = (if (kind == 0)
             core.encodeText(bytes, options, &cells, &encode_scratch)
@@ -108,7 +130,9 @@ export fn zymbol_encode(
         saveSymbol(symbol);
         return success;
     }
-    if (max_version > 4 or level == 3 or mask > 3) return invalid_options;
+    if (max_version > 4 or level == 3 or mask > 3 or controls[6] != 0 or controls[8] != 0) {
+        return invalid_options;
+    }
     const options: core.MicroEncodeOptions = .{
         .min_version = @enumFromInt(@as(u3, @intCast(min_version))),
         .max_version = @enumFromInt(@as(u3, @intCast(max_version))),

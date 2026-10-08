@@ -5,7 +5,7 @@ import type {
   MicroOptions, MicroSymbol, MicroVersion, ModuleGrid, QrDecodeResult,
   PngOptions, PngEncodeOptions, RasterOptions, Raster, Rgb, Limits,
   SvgOptions, SvgEncodeOptions, QrOptions, QrSymbol, QrVersion, Symbol,
-  MicroSegment, QrSegment, QrSegmentOptions,
+  MicroSegment, QrSegment, QrSegmentOptions, Fnc1, StructuredAppend,
 } from './types.js';
 import type { WasmExports } from './wasm.js';
 
@@ -67,6 +67,28 @@ function versionNumber(value: QrVersion | MicroVersion | undefined, micro: boole
   }
   if (!isIndex(value, 40) || value < 1) return invalidOption('Invalid QR version');
   return value;
+}
+
+function qrHeaderFields(fnc1: Fnc1 | undefined, append: StructuredAppend | undefined): [number, number, number, number, number, number] {
+  let fnc1Kind = 0;
+  let indicator = 0;
+  if (fnc1 !== undefined) {
+    if (!fnc1 || typeof fnc1 !== 'object') invalidOption('Invalid FNC1 header');
+    if (fnc1.position === 'first') fnc1Kind = 1;
+    else if (fnc1.position === 'second') {
+      fnc1Kind = 2;
+      const raw = fnc1.applicationIndicator;
+      if (typeof raw === 'number' && isIndex(raw, 99)) indicator = raw;
+      else if (typeof raw === 'string' && /^[A-Za-z]$/.test(raw)) indicator = raw.charCodeAt(0) + 100;
+      else invalidOption('Invalid FNC1 application indicator');
+    } else invalidOption('Invalid FNC1 position');
+  }
+  if (append !== undefined && (!append || typeof append !== 'object'
+    || !isIndex(append.index, 15) || !isIndex(append.count, 16)
+    || append.count < 1 || append.index >= append.count || !isIndex(append.parity, 255))) {
+    invalidOption('Invalid Structured Append header');
+  }
+  return [fnc1Kind, indicator, append ? 1 : 0, append?.index ?? 0, append?.count ?? 0, append?.parity ?? 0];
 }
 
 function validateUnicode(value: string): void {
@@ -160,9 +182,6 @@ export function createEngine(wasm: WasmExports, limits: Limits = {}): QrEngine {
       invalidOption('Exact version cannot be combined with version ranges');
     }
     if (micro && ('fnc1' in options || 'structuredAppend' in options)) invalidOption('Micro QR does not support QR control headers');
-    if (!micro && ('fnc1' in options || 'structuredAppend' in options) && (options.fnc1 !== undefined || options.structuredAppend !== undefined)) {
-      invalidOption('QR control headers require the advanced segment bridge');
-    }
     const first = versionNumber(options.version ?? options.minVersion, micro, 1);
     const last = versionNumber(options.version ?? options.maxVersion, micro, micro ? 4 : 40);
     if (first > last) invalidOption('Invalid version range');
@@ -180,6 +199,10 @@ export function createEngine(wasm: WasmExports, limits: Limits = {}): QrEngine {
     const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
     if (bytes.byteLength > capacity) throw new ZymbolError('DATA_TOO_LONG', 'encode', 'Payload exceeds WebAssembly input workspace');
     memoryView(bridge.memory, bridge.zymbol_input_ptr(), bytes.byteLength).set(bytes);
+    const headers = micro ? [0, 0, 0, 0, 0, 0] : qrHeaderFields(options.fnc1, options.structuredAppend);
+    const headerMemory = memoryView(bridge.memory, bridge.zymbol_controls_ptr() + 6 * 4, 6 * 4);
+    const headerView = new DataView(headerMemory.buffer, headerMemory.byteOffset, headerMemory.byteLength);
+    headers.forEach((value, index) => headerView.setUint32(index * 4, value, true));
     call('encode', () => bridge.zymbol_encode(bytes.byteLength, typeof input === 'string' ? 0 : 1, Number(micro), first, last, ec, Number(boost), mask));
     return readSymbol(micro, first, last);
   }
