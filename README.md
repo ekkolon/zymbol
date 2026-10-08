@@ -31,6 +31,27 @@ sampled module grids, not directly from image files.
 See [Getting started](docs/getting-started.md) for caller-owned buffers and
 decoding.
 
+## TypeScript and WebAssembly
+
+Install the published JavaScript/TypeScript package:
+
+\`\`\`sh
+npm install @zymbol/qr
+\`\`\`
+
+\`\`\`ts
+import { createZymbol } from '@zymbol/qr';
+
+const qr = await createZymbol();
+const svg = qr.svg('https://example.com');
+\`\`\`
+
+Use [\`@zymbol/qr\`](https://www.npmjs.com/package/@zymbol/qr) in Node,
+browsers and workers. The JavaScript package uses the Zig implementation
+compiled to WebAssembly. See the [package README](packages/qr/README.md)
+and [website playground](site/).
+
+
 ## ISO/IEC 18004:2024
 
 Zymbol implements digital symbol encoding and sampled-grid decoding for QR Code
