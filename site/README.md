@@ -1,12 +1,24 @@
 # Zymbol website
 
-Static documentation landing page and WebAssembly playground built from the
-published `@zymbol/qr` package. Encoding and rendering run locally in the
-visitor's browser. The website does not implement any QR algorithms.
+Static multi-page website and browser generator. All pages are produced from
+shared templates in `scripts/pages.mjs`. No server framework or client router
+is required.
 
-## Build
+## Routes
 
-Requires Node 24, npm and `tar`. From the repository root:
+- `/`: library overview
+- `/create/`: QR Code and Micro QR generator
+- `/create-qr-code/`: QR Code generator
+- `/create-micro-qr/`: Micro QR generator
+- `/docs/`: documentation with seven additional articles
+
+GitHub Pages hosts the site below `/zymbol/`. Links use relative paths, so
+nothing depends on a particular host at runtime. Canonical URLs and the
+sitemap point to the published address.
+
+## Build and test
+
+Requires Node 24, npm, `tar`, and Chrome for the browser check.
 
 ```sh
 node site/scripts/build.mjs
@@ -14,25 +26,18 @@ node site/scripts/check.mjs
 node site/scripts/check-browser.mjs
 ```
 
-The browser check requires Google Chrome (or set `CHROME_BIN`).
-Serve `site/dist` with any static web server. Opening `index.html` directly
-from a `file:` URL is not supported because WebAssembly is fetched as a module.
+Set `CHROME_BIN` if Chrome is installed under another name. The built site is
+in `site/dist/`. Serve that directory under `/zymbol/`, not from `file:` URLs.
 
-The builder retrieves only `@zymbol/qr@1.0.0`, compares the archive against
-the release's recorded digest, and copies its compiled runtime into
-`site/dist/vendor`. Change the pinned package version and digest together
-when adopting a newer npm release. Generated files are not committed.
+The build downloads exactly `@zymbol/qr@1.0.0` and compares the archive digest
+to its pinned release value. The WASM runtime is copied unchanged. The browser
+generator uses this package and never sends input to a server.
 
-## Deployment
+## Content and styling
 
-The [Website workflow](../.github/workflows/website.yml) builds, checks and
-deploys to GitHub Pages on changes to `site/`. In repository Settings → Pages,
-select **GitHub Actions** as the publishing source. Restrict the
-`github-pages` deployment environment to `main`.
+Edit `scripts/pages.mjs` to update page content or routes. Styles are shared in
+`styles.css`; the generator controller lives in `app.js`. The generator has
+one implementation and three entry pages. No tracking or remote fonts are used.
 
-The intended address is `https://ekkolon.github.io/zymbol/` after Pages is
-enabled and the first deployment succeeds. The site uses relative asset paths
-and does not require a custom domain.
-
-No analytics or remote QR processing is included. QR inputs are kept in the
-browser and are not persisted.
+The website workflow builds and tests pull requests. Deployment happens on
+`main` only.
