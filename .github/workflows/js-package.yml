@@ -144,10 +144,12 @@ jobs:
           cache: false
 
       - name: Install OIDC-capable npm
+        shell: bash
         run: |
-          npm install --global npm@11.21.0
-          npm --version
-          node -e "const v = require('child_process').execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(); if (v !== '11.21.0') process.exit(1)"
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/npm-cli" --no-save --ignore-scripts --no-package-lock --no-audit --no-fund npm@11.21.0
+          cli="$RUNNER_TEMP/npm-cli/node_modules/npm/bin/npm-cli.js"
+          test "$(node "$cli" --version)" = 11.21.0
 
       - name: Verify qualified tarball digest
         working-directory: artifact
@@ -157,7 +159,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm --version
+          cli="$RUNNER_TEMP/npm-cli/node_modules/npm/bin/npm-cli.js"
+          test "$(node "$cli" --version)" = 11.21.0
           files=(artifact/*.tgz)
           if [[ "${#files[@]}" != "1" || ! -f "${files[0]}" ]]; then
             echo "::error::Exactly one qualified tarball is required"
@@ -203,4 +206,4 @@ jobs:
           else
             dist_tag=latest
           fi
-          npm publish "./${files[0]}" --access public --tag "$dist_tag" --provenance
+          node "$cli" publish "./${files[0]}" --access public --tag "$dist_tag" --provenance
