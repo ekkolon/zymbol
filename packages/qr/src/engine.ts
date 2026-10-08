@@ -1,8 +1,10 @@
 import { ZymbolError } from './errors.js';
+import type { Operation } from './errors.js';
 import type {
   DecodeResult, EncodeOptions, ErrorCorrection, Input, MicroErrorCorrection,
   MicroOptions, MicroSymbol, MicroVersion, ModuleGrid, QrDecodeResult,
-  QrOptions, QrSymbol, QrVersion, Symbol,
+  PngOptions, PngEncodeOptions, RasterOptions, Raster, Rgb,
+  SvgOptions, SvgEncodeOptions, QrOptions, QrSymbol, QrVersion, Symbol,
 } from './types.js';
 import type { WasmExports } from './wasm.js';
 
@@ -15,6 +17,11 @@ interface BridgeExports extends WasmExports {
   zymbol_grid_capacity(): number;
   zymbol_encode(length: number, kind: number, family: number, min: number, max: number, ec: number, boost: number, mask: number): number;
   zymbol_decode(side: number): number;
+  zymbol_render(format: number, side: number, family: number, version: number, level: number, mask: number, scale: number, quiet: number, foreground: number, background: number, reversed: number, svgSize: number, maxOutput: number, maxSide: number): number;
+  zymbol_output_ptr(): number;
+  zymbol_output_len(): number;
+  zymbol_output_side(): number;
+  zymbol_structured_append_parity(length: number): number;
 }
 
 export interface QrEngine {
@@ -22,6 +29,12 @@ export interface QrEngine {
   encode(input: Input, options: MicroOptions): MicroSymbol;
   encode(input: Input, options: EncodeOptions): Symbol;
   decode(grid: ModuleGrid): DecodeResult;
+  renderSvg(symbol: Symbol, options?: SvgOptions): string;
+  renderPng(symbol: Symbol, options?: PngOptions): Uint8Array<ArrayBuffer>;
+  renderRaster(symbol: Symbol, options?: RasterOptions): Raster;
+  svg(input: Input, options?: SvgEncodeOptions): string;
+  png(input: Input, options?: PngEncodeOptions): Uint8Array<ArrayBuffer>;
+  structuredAppendParity(bytes: Uint8Array): number;
 }
 
 const EC_LEVELS = ['L', 'M', 'Q', 'H'] as const;
@@ -76,7 +89,9 @@ export function createEngine(wasm: WasmExports): QrEngine {
   const functions = [
     'zymbol_input_ptr', 'zymbol_grid_ptr', 'zymbol_payload_ptr',
     'zymbol_meta_ptr', 'zymbol_input_capacity', 'zymbol_grid_capacity',
-    'zymbol_encode', 'zymbol_decode',
+    'zymbol_encode', 'zymbol_decode', 'zymbol_render',
+    'zymbol_output_ptr', 'zymbol_output_len', 'zymbol_output_side',
+    'zymbol_structured_append_parity',
   ] as const;
   for (const name of functions) {
     if (typeof bridge[name] !== 'function') {
@@ -90,7 +105,7 @@ export function createEngine(wasm: WasmExports): QrEngine {
   }
   let alive = true;
 
-  function call(operation: 'encode' | 'decode', run: () => number): void {
+  function call(operation: Operation, run: () => number): void {
     if (!alive) throw new ZymbolError('INSTANCE_UNUSABLE', operation, 'WebAssembly instance is unusable after a trap');
     let code: number;
     try {
@@ -103,6 +118,7 @@ export function createEngine(wasm: WasmExports): QrEngine {
     const errorCodes = {
       1: 'INVALID_INPUT', 2: 'INVALID_OPTIONS', 3: 'DATA_TOO_LONG',
       4: 'DECODE_FAILED', 5: 'INTERNAL_ERROR',
+      6: 'OUTPUT_LIMIT', 7: 'OUT_OF_MEMORY',
     } as const;
     const errorCode = errorCodes[code as keyof typeof errorCodes];
     if (!errorCode) {
@@ -227,5 +243,83 @@ export function createEngine(wasm: WasmExports): QrEngine {
       symbologyIdentifier: (`]Q${modifier}` as QrDecodeResult['symbologyIdentifier']) };
   }
 
-  return { encode, decode } as QrEngine;
+
+  function packRgb(rgb: Rgb | undefined): number {
+    if (rgb === undefined) return 0;
+    if (!Array.isArray(rgb) || rgb.length !== 3 || !rgb.every(value => isIndex(value, 255))) {
+      throw new ZymbolError('INVALID_OPTIONS', 'renderPng', 'RGB must contain three integer channels from 0 to 255');
+    }
+    return rgb[0]! | (rgb[1]! << 8) | (rgb[2]! << 16);
+  }
+
+  function renderBytes(symbol: Symbol, format: 0 | 1 | 2, options: SvgOptions | PngOptions | RasterOptions = {}): { bytes: Uint8Array<ArrayBuffer>; side: number } {
+    const operation = format === 0 ? 'renderSvg' : format === 1 ? 'renderPng' : 'renderRaster';
+    if (!symbol || (symbol.family !== 'qr' && symbol.family !== 'micro') || !(symbol.modules instanceof Uint8Array)) {
+      throw new ZymbolError('INVALID_SYMBOL', operation, 'Expected a QR or Micro QR symbol');
+    }
+    const micro = symbol.family === 'micro';
+    const version = micro ? MICRO_VERSIONS.indexOf(symbol.version as MicroVersion) + 1 : symbol.version;
+    const expectedSide = micro ? 9 + version * 2 : 17 + version * 4;
+    const level = EC_LEVELS.indexOf(symbol.errorCorrection);
+    if (version < 1 || version > (micro ? 4 : 40) || level < 0 || (micro && level > 2)
+      || !isIndex(symbol.mask, micro ? 3 : 7) || symbol.size !== expectedSide
+      || symbol.modules.length !== expectedSide * expectedSide || symbol.modules.some(value => value > 1)) {
+      throw new ZymbolError('INVALID_SYMBOL', operation, 'Invalid symbol geometry or metadata');
+    }
+    const quiet = options.quietZone ?? -1;
+    const scale = 'scale' in options ? (options.scale ?? (format === 1 ? 4 : 1)) : 1;
+    const intrinsic = 'size' in options ? (options.size ?? 0) : 0;
+    if (!Number.isInteger(quiet) || quiet < -1 || quiet > 65535 || (format !== 0 && (!Number.isInteger(scale) || scale < 1 || scale > 65535))
+      || !isIndex(intrinsic, 0xffffffff)) {
+      throw new ZymbolError('INVALID_OPTIONS', operation, 'Invalid rendering dimensions');
+    }
+    const foreground = packRgb(options.foreground);
+    const background = options.background === null ? -1 : options.background === undefined ? 0xffffff : packRgb(options.background);
+    const reversed = options.reflectance === 'reversed' ? 1 : 0;
+    if ((options.reflectance !== undefined && options.reflectance !== 'normal' && options.reflectance !== 'reversed')
+      || (reversed === 1 && background === -1)) {
+      throw new ZymbolError('INVALID_OPTIONS', operation, 'Invalid reflectance settings');
+    }
+    memoryView(bridge.memory, bridge.zymbol_grid_ptr(), symbol.modules.length).set(symbol.modules);
+    call(operation, () => bridge.zymbol_render(format, symbol.size, Number(micro), version, level, symbol.mask, scale, quiet, foreground, background, reversed, intrinsic, 16 * 1024 * 1024, 4096));
+    const length = bridge.zymbol_output_len();
+    const side = bridge.zymbol_output_side();
+    if (!isIndex(length, 16 * 1024 * 1024) || (format !== 0 && (!isIndex(side, 4096) || side < 1))
+      || (format === 2 && length !== side * side * 4)) {
+      throw new ZymbolError('WASM_ABI_MISMATCH', operation, 'Invalid WASM rendering output dimensions');
+    }
+    return { bytes: memoryView(bridge.memory, bridge.zymbol_output_ptr(), length).slice(), side };
+  }
+
+  function renderSvg(symbol: Symbol, options?: SvgOptions): string {
+    return new TextDecoder('utf-8', { fatal: true }).decode(renderBytes(symbol, 0, options).bytes);
+  }
+
+  function renderPng(symbol: Symbol, options?: PngOptions): Uint8Array<ArrayBuffer> {
+    return renderBytes(symbol, 1, options).bytes;
+  }
+
+  function renderRaster(symbol: Symbol, options?: RasterOptions): Raster {
+    const { bytes, side } = renderBytes(symbol, 2, options);
+    return { width: side, height: side, data: Uint8ClampedArray.from(bytes) };
+  }
+
+  function structuredAppendParity(bytes: Uint8Array): number {
+    if (!(bytes instanceof Uint8Array)) invalid('Expected bytes', 'encode');
+    if (bytes.byteLength > capacity) throw new ZymbolError('DATA_TOO_LONG', 'structuredAppendParity', 'Payload exceeds WebAssembly input workspace');
+    memoryView(bridge.memory, bridge.zymbol_input_ptr(), bytes.length).set(bytes);
+    const parity = bridge.zymbol_structured_append_parity(bytes.length);
+    if (!isIndex(parity, 255)) throw new ZymbolError('WASM_ABI_MISMATCH', 'structuredAppendParity', 'Invalid native parity result');
+    return parity;
+  }
+
+  function svg(input: Input, options?: SvgEncodeOptions): string {
+    return renderSvg(encode(input, options?.encode), options?.render);
+  }
+
+  function png(input: Input, options?: PngEncodeOptions): Uint8Array<ArrayBuffer> {
+    return renderPng(encode(input, options?.encode), options?.render);
+  }
+
+  return { encode, decode, renderSvg, renderPng, renderRaster, svg, png, structuredAppendParity } as QrEngine;
 }
