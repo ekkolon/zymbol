@@ -83,6 +83,14 @@ jobs:
       - name: Native library qualification
         run: zig build qualify
 
+      - name: Verify installed archive consumers
+        working-directory: packages/qr
+        run: node scripts/check-pack.mjs
+
+      - name: Verify browser and module worker
+        working-directory: packages/qr
+        run: node scripts/check-browser.mjs
+
       - name: Pack exact artifacts
         working-directory: packages/qr
         shell: bash
@@ -97,13 +105,16 @@ jobs:
               if (!files.includes(file)) throw Error('Missing tarball entry: ' + file);
             }
           "
-          sha256sum ./*.tgz
+          sha256sum ./*.tgz | sed 's#  ./#  #' > npm-package.sha256
+          cat npm-package.sha256
 
       - name: Preserve qualified archive
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: zymbol-qr-tarball
-          path: packages/qr/*.tgz
+          path: |
+            packages/qr/*.tgz
+            packages/qr/npm-package.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -131,6 +142,10 @@ jobs:
           runtime: node@24.21.0
           install: false
           cache: false
+
+      - name: Verify qualified tarball digest
+        working-directory: artifact
+        run: sha256sum --check npm-package.sha256
 
       - name: Publish with provenance
         shell: bash
