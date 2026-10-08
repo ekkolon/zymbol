@@ -16,7 +16,6 @@ permissions:
 
 jobs:
   package:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'integration/js' }}
     name: Zig WASM and TypeScript
     runs-on: ubuntu-24.04
     timeout-minutes: 20
