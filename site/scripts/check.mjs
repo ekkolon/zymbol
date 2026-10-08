@@ -13,7 +13,7 @@ const routes = [
 ];
 const ids = ['payload', 'play-form', 'qr-image', 'download-svg', 'download-png', 'copy-code', 'play-status'];
 
-for (const file of ['app.js', 'styles.css', 'THIRD_PARTY_NOTICES.txt', 'sitemap.xml', 'robots.txt', 'vendor/browser.js', 'vendor/node.js', 'vendor/engine.js', 'vendor/wasm.js', 'vendor/zymbol.wasm']) {
+for (const file of ['app.js', 'styles.css', 'THIRD_PARTY_NOTICES.txt', 'favicon.svg', 'sitemap.xml', 'robots.txt', 'vendor/browser.js', 'vendor/node.js', 'vendor/engine.js', 'vendor/wasm.js', 'vendor/zymbol.wasm']) {
   assert.ok(existsSync(join(dist, file)), `Missing site asset: ${file}`);
 }
 for (const route of routes) {
@@ -21,6 +21,7 @@ for (const route of routes) {
   assert.ok(existsSync(path), `Missing route: ${route}`);
   const html = readFileSync(path, 'utf8');
   assert.match(html, /rel="canonical"/);
+  assert.match(html, /rel="icon"/);
   assert.match(html, /name="description"/);
   assert.match(html, /property="og:title"/);
   assert.match(html, /QR Code is a registered trademark of DENSO WAVE INCORPORATED\./);

@@ -38,7 +38,7 @@ try {
   rmSync(output, { recursive: true, force: true });
   mkdirSync(output, { recursive: true });
   const routes = writePages(output);
-  for (const name of ['styles.css', 'app.js', 'THIRD_PARTY_NOTICES.txt']) cpSync(join(site, name), join(output, name));
+  for (const name of ['styles.css', 'app.js', 'favicon.svg', 'THIRD_PARTY_NOTICES.txt']) cpSync(join(site, name), join(output, name));
   cpSync(packageDir, join(output, 'vendor'), { recursive: true });
   writeFileSync(join(output, '.nojekyll'), '');
   console.log(`Built ${routes.length} pages using ${packageName}@${version}`);

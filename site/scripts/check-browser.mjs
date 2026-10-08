@@ -80,6 +80,34 @@ try {
     assert.ok(result.enabled,`${route} WASM failed: ${JSON.stringify(result)}`);
     assert.ok(result.family.includes(expected==='micro'?'Micro QR':'QR Code'),`Incorrect family on ${route}: ${result.family}`);
     assert.ok(result.src.startsWith('blob:'),`Missing locally-rendered preview on ${route}`);
+    const exported = await evaluate(`(async () => {
+      const originalCreate = URL.createObjectURL;
+      const originalClick = HTMLAnchorElement.prototype.click;
+      let generated = null;
+      let name = '';
+      URL.createObjectURL = blob => { generated = blob; return originalCreate.call(URL, blob); };
+      HTMLAnchorElement.prototype.click = function() { name = this.download; };
+      try {
+        const results = [];
+        for (const format of ['svg', 'png']) {
+          generated = null;
+          name = '';
+          document.getElementById('download-' + format).click();
+          if (!generated) return { error: 'No exported blob: ' + format };
+          const bytes = new Uint8Array(await generated.arrayBuffer());
+          const first = [...bytes.subarray(0, 8)].map(x => x.toString(16).padStart(2, '0')).join('');
+          const svg = format === 'svg' ? new TextDecoder().decode(bytes) : '';
+          results.push({ format, name, size: bytes.length, first, validSvg: svg.includes('<svg') && svg.includes('</svg>') });
+        }
+        return results;
+      } finally {
+        URL.createObjectURL = originalCreate;
+        HTMLAnchorElement.prototype.click = originalClick;
+      }
+    })()`);
+    assert.ok(Array.isArray(exported), `${route}: exports failed: ${JSON.stringify(exported)}`);
+    assert.ok(exported[0].name.endsWith('.svg') && exported[0].validSvg && exported[0].size > 50, `${route}: invalid SVG export`);
+    assert.ok(exported[1].name.endsWith('.png') && exported[1].first === '89504e470d0a1a0a' && exported[1].size > 50, `${route}: invalid PNG export`);
     if(route==='create/'){
       const changed=await evaluate(`new Promise(resolve=>{document.getElementById('payload').value='12345';document.querySelector('input[value="micro"][name="family"]').click();const end=Date.now()+3500;const poll=()=>{const text=document.getElementById('symbol-description')?.textContent;if(text?.includes('Micro QR'))resolve(true);else if(Date.now()>end)resolve(false);else setTimeout(poll,45)};poll()})`);
       assert.ok(changed,'Changing to Micro QR did not re-render');
