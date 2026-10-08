@@ -1,0 +1,7 @@
+allowBuilds: {}
+strictDepBuilds: true
+minimumReleaseAge: 1440
+minimumReleaseAgeIgnoreMissingTime: false
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+savePrefix: ''

@@ -9,15 +9,33 @@ on:
       - synchronize
       - ready_for_review
     paths:
-      - "**"
-      - "!**/*.md"
+      - ".github/actions/setup-qemu/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/release.yml"
+      - "build.zig"
+      - "build.zig.zon"
+      - "src/**"
+      - "tests/**"
+      - "examples/**"
+      - "benchmarks/**"
+      - "tools/**"
+      - "uv.toml"
       - "docs/reference/api.md"
   push:
     branches:
       - main
     paths:
-      - "**"
-      - "!**/*.md"
+      - ".github/actions/setup-qemu/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/release.yml"
+      - "build.zig"
+      - "build.zig.zon"
+      - "src/**"
+      - "tests/**"
+      - "examples/**"
+      - "benchmarks/**"
+      - "tools/**"
+      - "uv.toml"
       - "docs/reference/api.md"
 
 permissions:
@@ -29,7 +47,7 @@ concurrency:
 
 jobs:
   preflight:
-    if: ${{ (github.event_name == 'workflow_dispatch' || github.event.repository.private == false) && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    if: ${{ (github.event_name == 'workflow_dispatch' || github.event.repository.private == false) && (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.pull_request.head.ref != 'integration/js')) }}
     name: Preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 10

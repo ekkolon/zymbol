@@ -1,0 +1,200 @@
+name: JavaScript Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the qualified npm tarball
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: javascript-package-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: Qualify package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install Zig
+        uses: ekkolon/setup-zig@1f953e071575c3853be36200a320538d76d24e4f # v1.0.1
+        with:
+          version: 0.17.0
+          cache: 'false'
+
+      - name: Install pnpm and Node
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3
+        with:
+          working-directory: packages/qr
+          version: 12.10.1
+          runtime: node@24.21.0
+          require-lockfile: true
+          cache: false
+
+      - name: Verify release identity
+        shell: bash
+        env:
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          if [[ "$PUBLISH" != "true" ]]; then
+            exit 0
+          fi
+          version="$(node -p "JSON.parse(require('fs').readFileSync('packages/qr/package.json')).version")"
+          expected="refs/tags/npm/qr/v$version"
+          if [[ "$GITHUB_REF" != "$expected" ]]; then
+            echo "::error::Publishing requires the immutable release tag $expected"
+            exit 1
+          fi
+          if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
+            echo "::error::Tag commit does not match workflow commit"
+            exit 1
+          fi
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo "::error::Only commits merged to main can publish"
+            exit 1
+          }
+          node -e "const p=require('./packages/qr/package.json'); if (p.private || p.version==='0.0.0') process.exit(1)"
+
+      - name: Static checks
+        working-directory: packages/qr
+        run: |
+          pnpm check:api
+          pnpm check:types
+          pnpm build:js
+          node --test test/*.test.mjs
+
+      - name: Build and verify WASM
+        working-directory: packages/qr
+        run: pnpm test:runtime
+
+      - name: Native library qualification
+        run: zig build qualify
+
+      - name: Verify installed archive consumers
+        working-directory: packages/qr
+        run: node scripts/check-pack.mjs
+
+      - name: Verify browser and module worker
+        working-directory: packages/qr
+        run: node scripts/check-browser.mjs
+
+      - name: Pack exact artifacts
+        working-directory: packages/qr
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-dist.mjs
+          npm pack --ignore-scripts --json > "$RUNNER_TEMP/package.json"
+          node -e "
+            const fs = require('node:fs');
+            const files = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/package.json'))[0].files.map(f => f.path);
+            for (const file of ['dist/zymbol.wasm', 'dist/node.js', 'dist/browser.js', 'dist/core.js', 'LICENSE', 'LICENSE-MIT', 'LICENSE-APACHE']) {
+              if (!files.includes(file)) throw Error('Missing tarball entry: ' + file);
+            }
+          "
+          sha256sum ./*.tgz | sed 's#  ./#  #' > npm-package.sha256
+          cat npm-package.sha256
+
+      - name: Preserve qualified archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zymbol-qr-tarball
+          path: |
+            packages/qr/*.tgz
+            packages/qr/npm-package.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish npm package
+    needs: qualify
+    if: ${{ inputs.publish }}
+    environment: npm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Retrieve qualified archive
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: zymbol-qr-tarball
+          path: artifact
+
+      - name: Install npm publishing runtime
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3
+        with:
+          version: 12.10.1
+          runtime: node@24.21.0
+          install: false
+          cache: false
+
+      - name: Verify qualified tarball digest
+        working-directory: artifact
+        run: sha256sum --check npm-package.sha256
+
+      - name: Publish with provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --version
+          files=(artifact/*.tgz)
+          if [[ "${#files[@]}" != "1" || ! -f "${files[0]}" ]]; then
+            echo "::error::Exactly one qualified tarball is required"
+            exit 1
+          fi
+          version="$(tar -xOzf "${files[0]}" package/package.json | node -e "
+            let raw = '';
+            process.stdin.setEncoding('utf8');
+            process.stdin.on('data', chunk => { raw += chunk; });
+            process.stdin.on('end', () => {
+              const pkg = JSON.parse(raw);
+              if (pkg.name !== '@zymbol/qr' || pkg.private ||
+                  !/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/.test(pkg.version)) {
+                throw new Error('Unexpected package identity or version');
+              }
+              console.log(pkg.version);
+            });
+          ")"
+          if [[ "$GITHUB_REF" != "refs/tags/npm/qr/v$version" ]]; then
+            echo "::error::Package version and release tag do not match"
+            exit 1
+          fi
+          export PACKAGE_VERSION="$version"
+          source_sha="$(tar -xOzf "${files[0]}" package/dist/build.json | node -e "
+            let raw = '';
+            process.stdin.setEncoding('utf8');
+            process.stdin.on('data', chunk => { raw += chunk; });
+            process.stdin.on('end', () => {
+              const build = JSON.parse(raw);
+              if (build.package !== '@zymbol/qr' || build.version !== process.env.PACKAGE_VERSION ||
+                  build.abi !== 1 || !/^[a-f0-9]{40}$/.test(build.source)) {
+                throw new Error('Unexpected WebAssembly build identity');
+              }
+              console.log(build.source);
+            });
+          ")"
+          if [[ "$source_sha" != "$GITHUB_SHA" ]]; then
+            echo "::error::Tarball was not built from the tagged commit"
+            exit 1
+          fi
+          if [[ "$version" == *-* ]]; then
+            dist_tag=next
+          else
+            dist_tag=latest
+          fi
+          npm publish "${files[0]}" --access public --tag "$dist_tag" --provenance

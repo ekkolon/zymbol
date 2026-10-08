@@ -1,0 +1,76 @@
+name: JavaScript Qualification
+
+on:
+  pull_request:
+    types:
+      - ready_for_review
+    branches:
+      - main
+    paths:
+      - "packages/qr/**"
+      - ".github/workflows/js-verify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'integration/js' }}
+    name: Zig WASM and TypeScript
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ekkolon/setup-zig@1f953e071575c3853be36200a320538d76d24e4f # v1.0.1
+        with:
+          version: 0.17.0
+          cache: 'false'
+      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3
+        with:
+          working-directory: packages/qr
+          version: 12.10.1
+          runtime: node@24.21.0
+          require-lockfile: true
+          cache: false
+      - name: API, loader, and bridge tests
+        working-directory: packages/qr
+        run: pnpm test
+      - name: Build and exercise real WebAssembly
+        working-directory: packages/qr
+        run: pnpm test:runtime
+      - name: Install and exercise packed package
+        working-directory: packages/qr
+        run: node scripts/check-pack.mjs
+      - name: Preserve built WebAssembly and JavaScript
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zymbol-js-dist
+          path: packages/qr/dist/
+          if-no-files-found: error
+          retention-days: 3
+
+  browser:
+    name: Browser and worker
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3
+        with:
+          version: 12.10.1
+          runtime: node@24.21.0
+          install: false
+          cache: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: zymbol-js-dist
+          path: packages/qr/dist/
+      - name: Browser and module worker smoke
+        working-directory: packages/qr
+        run: node scripts/check-browser.mjs

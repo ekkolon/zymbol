@@ -24,6 +24,10 @@ decode and render symbols.
 
 ## Maintenance
 
+The [JavaScript integration](maintaining/javascript.md) documents the
+TypeScript API, WASM boundary and qualification. The
+[release guide](maintaining/javascript-release.md) covers npm publishing.
+
 | Page | What it covers |
 | --- | --- |
 | [Releases](maintaining/releases.md) | Preparing, testing and publishing a release |

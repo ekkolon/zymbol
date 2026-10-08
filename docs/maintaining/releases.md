@@ -19,6 +19,10 @@ Conventional squash-commit titles determine the next version:
 | `!` before the colon or `BREAKING CHANGE:` | Major |
 | `docs:`, `test:`, `build:`, `ci:`, `chore:` only | No release |
 
+JavaScript package changes use the `js` scope, for example `feat(js):`.
+They do not affect the Zig version or changelog, even when marked as breaking.
+The JavaScript package has its own release process.
+
 Additive public API work needs tests and documentation. An incompatible change
 to the documented API requires a major version. See
 [Compatibility](../reference/compatibility.md).

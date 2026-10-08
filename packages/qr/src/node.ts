@@ -1,0 +1,29 @@
+import { readFile } from 'node:fs/promises';
+import { createEngine } from './engine.js';
+import type { InitOptions, Zymbol } from './types.js';
+import type { WasmInit } from './wasm.js';
+
+export { ZymbolError } from './errors.js';
+export type * from './types.js';
+import { compileWasm, instantiateWasm } from './wasm.js';
+
+let defaultModule: Promise<WebAssembly.Module> | undefined;
+
+async function loadDefault(): Promise<WebAssembly.Module> {
+  if (!defaultModule) {
+    defaultModule = readFile(new URL('./zymbol.wasm', import.meta.url))
+      .then(bytes => compileWasm({ wasm: bytes }))
+      .catch(error => {
+        defaultModule = undefined;
+        throw error;
+      });
+  }
+  return defaultModule;
+}
+
+/** Load the packaged WASM asset from disk and create an isolated runtime. */
+export async function createZymbol(options: InitOptions = {}): Promise<Zymbol> {
+  const explicit = 'wasm' in options || 'module' in options;
+  const module = explicit ? await compileWasm(options as WasmInit) : await loadDefault();
+  return createEngine(await instantiateWasm(module), options.limits);
+}
