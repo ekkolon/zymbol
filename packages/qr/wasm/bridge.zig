@@ -364,3 +364,8 @@ export fn zymbol_render(
     output_side = @intCast(dimensions.width);
     return success;
 }
+
+export fn zymbol_structured_append_parity(length: u32) u32 {
+    if (length > max_input) return 256;
+    return core.structuredAppendParity(input[0..length]);
+}
