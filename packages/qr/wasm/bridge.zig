@@ -184,3 +184,183 @@ export fn zymbol_decode(side: u32) u32 {
     }
     return success;
 }
+
+
+const std = @import("std");
+
+var output: ?[]u8 = null;
+var raster_pixels: ?[]u32 = null;
+var output_pointer: usize = 0;
+var output_length: usize = 0;
+var output_side: u32 = 0;
+
+export fn zymbol_output_ptr() usize {
+    return output_pointer;
+}
+
+export fn zymbol_output_len() u32 {
+    return @intCast(output_length);
+}
+
+export fn zymbol_output_side() u32 {
+    return output_side;
+}
+
+fn reserveBytes(required: usize) error{OutOfMemory}![]u8 {
+    if (output) |old| {
+        if (old.len >= required) return old;
+        std.heap.page_allocator.free(old);
+        output = null;
+    }
+    const next = try std.heap.page_allocator.alloc(u8, required);
+    output = next;
+    return next;
+}
+
+fn reservePixels(required: usize) error{OutOfMemory}![]u32 {
+    if (raster_pixels) |old| {
+        if (old.len >= required) return old;
+        std.heap.page_allocator.free(old);
+        raster_pixels = null;
+    }
+    const next = try std.heap.page_allocator.alloc(u32, required);
+    raster_pixels = next;
+    return next;
+}
+
+fn rgb(packed: u32) core.render.Rgb {
+    return .{
+        .r = @truncate(packed),
+        .g = @truncate(packed >> 8),
+        .b = @truncate(packed >> 16),
+    };
+}
+
+fn rgba(packed: u32, alpha: u8) u32 {
+    return (packed & 0x00ffffff) | (@as(u32, alpha) << 24);
+}
+
+fn renderError(err: anyerror) u32 {
+    return switch (err) {
+        error.InvalidScale, error.InvalidSize, error.InvalidDimensions,
+        error.InvalidReflectance, error.InvalidVersion => invalid_options,
+        error.InvalidSymbol => invalid_input,
+        error.DimensionOverflow, error.SizeOverflow => 6,
+        error.OutOfMemory => 7,
+        else => internal_error,
+    };
+}
+
+// Format: 0 SVG, 1 PNG, 2 RGBA. Colors are low-byte-first RGB triples.
+// A background of -1 is transparent; a quiet zone of -1 uses native defaults.
+// Result bytes are valid only until the next render operation.
+export fn zymbol_render(
+    format: u32,
+    side: u32,
+    family: u32,
+    version: u32,
+    level: u32,
+    mask: u32,
+    scale: u32,
+    quiet: i32,
+    foreground: u32,
+    background: i32,
+    reversed: u32,
+    svg_size: u32,
+    max_output: u32,
+    max_side: u32,
+) u32 {
+    output_length = 0;
+    output_side = 0;
+    output_pointer = 0;
+    if (format > 2 or family > 1 or level > 3 or mask > 7 or
+        reversed > 1 or quiet < -1 or quiet > 65535 or
+        foreground > 0xffffff or background < -1 or background > 0xffffff or
+        scale == 0 or scale > 65535) return invalid_options;
+    if ((family == 0 and (version < 1 or version > 40 or mask > 7 or side != 17 + version * 4)) or
+        (family == 1 and (version < 1 or version > 4 or level == 3 or mask > 3 or side != 9 + version * 2))) return invalid_options;
+    if (background < 0 and reversed == 1) return invalid_options;
+
+    const required: usize = @as(usize, side) * side;
+    if (required > grid.len) return invalid_input;
+    for (grid[0..required], 0..) |value, i| {
+        if (value > 1) return invalid_input;
+        cells[i] = .{ .dark = value == 1 };
+    }
+    const symbol: core.Symbol = .{
+        .cells = cells[0..required],
+        .size = @intCast(side),
+        .version = @intCast(version),
+        .family = if (family == 0) .qr else .micro_qr,
+        .ec_level = @enumFromInt(@as(u2, @intCast(level))),
+        .mask = @intCast(mask),
+    };
+    const quiet_zone: ?u16 = if (quiet < 0) null else @intCast(quiet);
+    const colors = rgb(foreground);
+    const background_color: ?core.render.Rgb = if (background < 0) null else rgb(@intCast(background));
+    const reflectance: core.render.Reflectance = if (reversed == 1) .reversed else .normal;
+
+    if (format == 0) {
+        const options: core.render.SvgOptions = .{
+            .quiet_zone = quiet_zone,
+            .foreground = colors,
+            .background = background_color,
+            .reflectance = reflectance,
+            .explicit_size = if (svg_size == 0) null else svg_size,
+        };
+        const length = core.render.requiredSvgBytes(&symbol, options) catch |err| return renderError(err);
+        if (length > max_output) return 6;
+        const buffer = reserveBytes(length) catch return 7;
+        const bytes = core.render.renderSvg(&symbol, buffer, options) catch |err| return renderError(err);
+        output_pointer = @intFromPtr(bytes.ptr);
+        output_length = bytes.len;
+        return success;
+    }
+    if (scale > max_side) return 6;
+    if (format == 1) {
+        const options: core.render.PngOptions = .{
+            .quiet_zone = quiet_zone,
+            .scale = @intCast(scale),
+            .foreground = colors,
+            .background = background_color,
+            .reflectance = reflectance,
+        };
+        const dimensions = core.render.rasterDimensions(&symbol, .{
+            .scale = @intCast(scale),
+            .quiet_zone = quiet_zone,
+            .reflectance = reflectance,
+        }) catch |err| return renderError(err);
+        if (dimensions.width > max_side or dimensions.height > max_side) return 6;
+        const length = core.render.requiredPngBytes(&symbol, options) catch |err| return renderError(err);
+        if (length > max_output) return 6;
+        const buffer = reserveBytes(length) catch return 7;
+        const bytes = core.render.renderPng(&symbol, buffer, options) catch |err| return renderError(err);
+        output_pointer = @intFromPtr(bytes.ptr);
+        output_length = bytes.len;
+        output_side = @intCast(dimensions.width);
+        return success;
+    }
+
+    const raster_options: core.render.RasterOptions = .{
+        .scale = @intCast(scale),
+        .quiet_zone = quiet_zone,
+        .reflectance = reflectance,
+    };
+    const dimensions = core.render.rasterDimensions(&symbol, raster_options) catch |err| return renderError(err);
+    if (dimensions.width > max_side or dimensions.height > max_side) return 6;
+    const pixel_count = core.render.requiredRasterPixels(&symbol, raster_options) catch |err| return renderError(err);
+    if (pixel_count > @as(usize, max_output) / 4) return 6;
+    const pixels = reservePixels(pixel_count) catch return 7;
+    _ = core.render.renderRaster(
+        u32,
+        &symbol,
+        pixels,
+        rgba(foreground, 255),
+        rgba(if (background < 0) 0 else @intCast(background), if (background < 0) 0 else 255),
+        raster_options,
+    ) catch |err| return renderError(err);
+    output_pointer = @intFromPtr(pixels.ptr);
+    output_length = pixel_count * 4;
+    output_side = @intCast(dimensions.width);
+    return success;
+}
