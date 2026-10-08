@@ -13,7 +13,7 @@ function command(name, args) {
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
-command('zig', ['build', '-Doptimize=ReleaseSafe']);
+command('zig', ['build']);
 command('pnpm', ['exec', 'tsc', '-p', 'tsconfig.build.json']);
 
 copyFileSync(resolve(root, 'zig-out/bin/zymbol.wasm'), resolve(dist, 'zymbol.wasm'));
