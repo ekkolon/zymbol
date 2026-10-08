@@ -81,10 +81,7 @@ jobs:
         run: pnpm test:runtime
 
       - name: Native library qualification
-        run: |
-          zig build test
-          zig build conformance
-          zig build qualify
+        run: zig build qualify
 
       - name: Pack exact artifacts
         working-directory: packages/qr
