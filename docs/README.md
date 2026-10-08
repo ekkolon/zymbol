@@ -24,8 +24,9 @@ decode and render symbols.
 
 ## Maintenance
 
-The [JavaScript package design](maintaining/javascript.md) describes the
-proposed npm API, WASM boundary and implementation milestones.
+The [JavaScript integration](maintaining/javascript.md) documents the
+TypeScript API, WASM boundary and qualification. The
+[release guide](maintaining/javascript-release.md) covers npm publishing.
 
 | Page | What it covers |
 | --- | --- |
