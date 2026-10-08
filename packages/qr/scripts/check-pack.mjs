@@ -19,7 +19,7 @@ if (artifact.name !== '@zymbol/qr' || !artifact.filename) {
 }
 const required = [
   'package.json', 'dist/zymbol.wasm', 'dist/node.js', 'dist/node.d.ts',
-  'dist/browser.js', 'dist/core.js', 'LICENSE', 'LICENSE-MIT', 'LICENSE-APACHE',
+  'dist/browser.js', 'dist/core.js', 'dist/build.json', 'LICENSE', 'LICENSE-MIT', 'LICENSE-APACHE',
 ];
 const packedFiles = new Set(artifact.files.map(file => file.path));
 for (const name of required) {
@@ -65,6 +65,44 @@ try {
     cwd: temporary,
     stdio: 'inherit',
   });
+
+  writeFileSync(join(temporary, 'consumer.mts'), [
+    "import { createZymbol, type QrSymbol, type MicroSymbol } from '@zymbol/qr';",
+    "import { createZymbol as createCore } from '@zymbol/qr/core';",
+    "async function verify() {",
+    "  const qr = await createZymbol();",
+    "  const symbol: QrSymbol = qr.encode('hello');",
+    "  const micro: MicroSymbol = qr.encode('123', { family: 'micro' });",
+    "  const svg: string = qr.renderSvg(symbol);",
+    "  const png: Uint8Array = qr.renderPng(micro);",
+    "  const decoded = qr.decode(symbol);",
+    "  if (decoded.family === 'qr') { void decoded.eci; void decoded.fnc1; }",
+    "  const second = await createCore({ wasm: new Uint8Array(8) });",
+    "  void second; void svg; void png;",
+    "  // @ts-expect-error Micro QR does not support level H",
+    "  qr.encode('123', { family: 'micro', errorCorrection: 'H' });",
+    "  // @ts-expect-error Micro QR versions use M1 through M4",
+    "  qr.encode('123', { family: 'micro', version: 4 });",
+    "}",
+    "void verify;",
+  ].join('\\n'));
+  writeFileSync(join(temporary, 'tsconfig.json'), JSON.stringify({
+    compilerOptions: {
+      target: 'ES2022',
+      module: 'NodeNext',
+      moduleResolution: 'NodeNext',
+      lib: ['ES2022', 'DOM'],
+      strict: true,
+      noEmit: true,
+      skipLibCheck: false,
+    },
+    files: ['consumer.mts'],
+  }));
+  execFileSync('pnpm', ['exec', 'tsc', '--project', join(temporary, 'tsconfig.json')], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+  console.log('Installed TypeScript declarations passed');
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
