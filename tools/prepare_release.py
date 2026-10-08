@@ -12,7 +12,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "build.zig.zon"
 CHANGELOG = ROOT / "CHANGELOG.md"
 README = ROOT / "README.md"
-DISTRIBUTION = ROOT / "docs" / "distribution.md"
+DISTRIBUTION = ROOT / "docs" / "maintaining" / "distribution.md"
+GETTING_STARTED = ROOT / "docs" / "getting-started.md"
 
 SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 CONVENTIONAL_RE = re.compile(
@@ -225,15 +226,18 @@ def update_metadata(version: str) -> None:
     if count != 1:
         raise SystemExit("could not update README version badge")
 
+    archive_pattern = r"https://github\.com/ekkolon/zymbol/archive/refs/tags/v\d+\.\d+\.\d+\.tar\.gz"
+    archive_url = f"https://github.com/ekkolon/zymbol/archive/refs/tags/v{version}.tar.gz"
     readme, count = re.subn(
-        r"https://github\.com/ekkolon/zymbol/archive/refs/tags/v\d+\.\d+\.\d+\.tar\.gz",
-        f"https://github.com/ekkolon/zymbol/archive/refs/tags/v{version}.tar.gz",
+        archive_pattern,
+        archive_url,
         readme,
         count=1,
     )
     if count != 1:
         raise SystemExit("could not update README installation URL")
     README.write_text(readme, encoding="utf-8")
+    replace_once(GETTING_STARTED, archive_pattern, archive_url)
 
     replace_once(
         DISTRIBUTION,

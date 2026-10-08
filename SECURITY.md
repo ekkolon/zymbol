@@ -4,28 +4,28 @@
 
 | Version | Support |
 | --- | --- |
-| `main` / pre-1.0 | Security fixes target `main` |
-| Current stable 1.x | Supported after `v1.0.0` |
-| Older release lines | Evaluated based on severity and practical impact |
+| Development on `main` | Security fixes target `main` |
+| Current stable 1.x | Supported |
+| Older release lines | Considered according to severity and impact |
 
-## Reporting a vulnerability
+## Report a vulnerability
 
-Do not open a public issue for a suspected vulnerability.
+Use GitHub's private [Report a vulnerability][report] form. Do not open a public
+issue for a suspected vulnerability.
 
-Use GitHub's private [Report a vulnerability][report] flow. Include enough
-information to reproduce and assess the issue:
+Include:
 
-- the affected Zymbol version or commit;
-- a minimal reproducer when practical;
-- expected and observed behavior;
-- the security impact and any known preconditions.
+- the affected version or commit;
+- a small reproducer, when possible;
+- the expected and observed behavior;
+- the security impact and conditions needed to trigger it.
 
-Public disclosure should wait until a fix or mitigation is available.
+Wait until a fix or mitigation is available before public disclosure.
 
-For the project's documented trust and API boundaries, see the
-[ISO/IEC 18004:2024 conformance ledger][conformance] and
-[v1 compatibility contract][contract].
+[Compatibility][compatibility] describes supported behavior and the work left
+to the application. [ISO conformance][conformance] records the reviewed scope
+and tests.
 
-[conformance]: docs/iso-18004-2024-conformance.md
-[contract]: docs/v1-contract.md
+[compatibility]: docs/reference/compatibility.md
+[conformance]: docs/testing/conformance.md
 [report]: https://github.com/ekkolon/zymbol/security/advisories/new

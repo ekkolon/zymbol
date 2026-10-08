@@ -14,8 +14,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 RELEASE_FILES = (
     "CHANGELOG.md",
     "README.md",
+    "docs/getting-started.md",
     "build.zig.zon",
-    "docs/distribution.md",
+    "docs/maintaining/distribution.md",
 )
 
 

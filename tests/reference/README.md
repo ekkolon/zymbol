@@ -1,31 +1,61 @@
-# Conformance fixture provenance
+# Reference data
 
-The matrices used by `tests/conformance.zig` are external reference data. Zymbol does not generate the expected matrices with its own encoder.
+[`conformance.zig`](../conformance.zig) compares Zymbol with external tables and
+matrices. Expected matrices come from other implementations, rather than
+Zymbol's own encoder.
 
-Pinned sources:
+## Sources
 
-- `heuer/segno@b11dc2913c22b22b3bc0a6efaa989904c44977bf`
-- `zxing-cpp/zxing-cpp@2c3dcfeffa7878950a58c1703c86774a428b0c91` for ECI/FNC1 decoder streams.
-- `nayuki/QR-Code-generator@3c6d0b3cefb4e049dc337e82237c9644399716a8` for independent QR ECC/block-layout and raw-module formulas.
+The fixtures use these commits:
 
-Current fixtures:
+- [heuer/segno](https://github.com/heuer/segno/tree/b11dc2913c22b22b3bc0a6efaa989904c44977bf).
+- [zxing-cpp/zxing-cpp](https://github.com/zxing-cpp/zxing-cpp/tree/2c3dcfeffa7878950a58c1703c86774a428b0c91),
+  for ECI and FNC1 decoder streams.
+- [nayuki/QR-Code-generator](https://github.com/nayuki/QR-Code-generator/tree/3c6d0b3cefb4e049dc337e82237c9644399716a8),
+  for correction-block tables and raw-module formulas.
 
-- `qr_tables.zig`: QR versions 1-40 data-codeword capacities for L/M/Q/H, transcribed from Segno `SYMBOL_CAPACITY` at the pinned commit.
-- `ecc_tables.zig`: QR format/version BCH tables and Annex A Reed-Solomon generator exponents for every degree used by QR Code, transcribed from Segno at the pinned commit.
-- `qr_structure.zig`: all QR alignment positions plus ECC-codewords-per-block and block-count tables, pinned from Segno/Nayuki.
-- `tests/ref_matrix/iso-fig-1.txt`: QR Code Symbol, QR version 1-M.
-- `tests/ref_matrix/iso-i2.txt`: 01234567, QR version 1-M, mask 2.
-- `tests/ref_matrix/iso-i3.txt`: 01234567, Micro QR M2-L.
-- ISO-derived Structured Append sequence: four version 1-M, mask 4 matrices from Segno `seq-iso-04-01` through `seq-iso-04-04`, reproduced inline in `tests/conformance.zig`. Symbols 1-2 are exact encode/decode goldens. Symbols 3-4 are decode/interoperability fixtures only because the pinned Segno encoder exhibits the known byte-aligned padding defect documented in `heuer/segno#148`; Zymbol separately checks the standards-correct final `0xEC` pad codeword for those aligned streams.
-- `tests/ref_matrix/issue-33-m1-12345.txt`: Micro QR M1.
-- `tests/ref_matrix/issue-33-m3-l-12345678901234567890123.txt`: Micro QR M3-L maximum numeric payload.
-- `tests/ref_matrix/issue-33-m3-l-to-m4-l-jump.txt`: Micro QR M4-L capacity transition.
-- `tests/ref_matrix/issue-33-m3-l-to-m4-m-jump.txt`: Micro QR M4-M boosted-level reference.
+## Tables and matrices
 
-Segno identifies the first three matrices as examples derived from ISO/IEC 18004:2015. They are retained here as independent interoperability evidence, not as the final ISO/IEC 18004:2024 clause audit.
+| Fixture | Contents |
+| --- | --- |
+| [`qr_tables.zig`](qr_tables.zig) | QR 1–40 data capacity for L/M/Q/H, from Segno's `SYMBOL_CAPACITY` |
+| [`ecc_tables.zig`](ecc_tables.zig) | QR format/version BCH tables and Annex A generator exponents, from Segno |
+| [`qr_structure.zig`](qr_structure.zig) | Alignment positions, correction codewords per block and block counts, from Segno and Nayuki |
+| `iso-fig-1.txt` | QR version 1-M, mask 5 |
+| `iso-i2.txt` | `01234567`, QR version 1-M, mask 2 |
+| `iso-i3.txt` | `01234567`, Micro QR M2-L |
+| `issue-33-m1-12345.txt` | Micro QR M1 |
+| `issue-33-m3-l-12345678901234567890123.txt` | Maximum M3-L numeric payload |
+| `issue-33-m3-l-to-m4-l-jump.txt` | Transition from M3-L to M4-L |
+| `issue-33-m3-l-to-m4-m-jump.txt` | M4-M after error-correction boosting |
 
-For the QR Figure 1 fixture, mask 5 is pinned as part of the external matrix. Annex I / worked symbol examples are informative, and external implementations differ on whether the surrounding quiet zone participates in QR N3 mask scoring. Zymbol automatic mask selection is therefore tested against the normative Step 6 / Table 11 rules over the QR symbol itself; the quiet zone is not part of the symbol size. The fixture still independently verifies data construction, masking, format information, exact matrix output, and decoding for the specified mask.
+The `.txt` matrices come from Segno's `tests/ref_matrix` directory and are
+stored inline in `conformance.zig` here.
 
-ZXing-cpp reference streams cover ECI assignment 2 plus FNC1 first- and second-position decoding semantics.
+Segno identifies the three `iso-*` matrices as examples from
+ISO/IEC 18004:2015. They test matrix output and decoding. The
+[2024 conformance review](../../docs/testing/conformance.md) records the
+separate check against the current standard.
 
-The conformance gate includes independent QR geometry and block-layout sweeps, all QR byte/numeric/alphanumeric/Kanji capacity edges, Annex A generator checks, Annex B RS correction/rejection behavior, BCH recovery, special-header vectors, and a separately executable bidirectional ZXing-cpp differential campaign. Rendering, output-format validation, portability, fuzzing, and the normative clause review are documented separately in the repository documentation index.
+The Figure 1 matrix fixes mask 5. It checks data construction, placement,
+masking, format information and decoding for that mask. Automatic mask
+selection has separate tests against Step 6 and Table 11 over the symbol
+itself, excluding its quiet zone. The worked examples are informative, and
+external implementations differ in their treatment of the quiet zone during
+N3 scoring.
+
+## Structured Append and control headers
+
+The four-symbol Structured Append example uses QR 1-M, mask 4. Its matrices
+come from Segno's `seq-iso-04-01` through `seq-iso-04-04` and are stored in
+`conformance.zig`.
+
+Symbols 1 and 2 check exact encoding and decoding. Symbols 3 and 4 check
+decoding and interoperability because the pinned Segno encoder has a
+byte-aligned padding bug, documented in
+[segno#148](https://github.com/heuer/segno/issues/148). Zymbol separately checks
+the required final `0xEC` pad codeword for those streams.
+
+The ZXing-cpp reference streams cover ECI assignment 2 and FNC1 first- and
+second-position decoding. See the [documentation index](../../docs/README.md)
+for conformance, interoperability, renderer validation, portability and fuzzing.

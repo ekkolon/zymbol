@@ -136,11 +136,11 @@ Licensed under [MIT][mit-license] or [Apache 2.0][apache-license], at your optio
 
 QR Code is a registered trademark of DENSO WAVE INCORPORATED.
 
-[api]: docs/api.md
+[api]: docs/reference/api.md
 [changelog]: CHANGELOG.md
 [ci]: https://github.com/ekkolon/zymbol/actions/workflows/ci.yml
 [ci-badge]: https://github.com/ekkolon/zymbol/actions/workflows/ci.yml/badge.svg?branch=main
-[conformance]: docs/iso-18004-2024-conformance.md
+[conformance]: docs/testing/conformance.md
 [contributing]: CONTRIBUTING.md
 [docs]: docs/README.md
 [examples]: examples/
@@ -148,7 +148,7 @@ QR Code is a registered trademark of DENSO WAVE INCORPORATED.
 [mit-license]: LICENSE-MIT
 [apache-license]: LICENSE-APACHE
 [license-badge]: https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg
-[performance]: docs/v1-performance.md
+[performance]: docs/testing/performance.md
 [security]: SECURITY.md
 [version-badge]: https://img.shields.io/badge/version-1.0.1-555.svg
 [zig]: https://ziglang.org/

@@ -1,36 +1,32 @@
 # Documentation
 
-Zymbol keeps the README short enough to answer the first questions a user has,
-then moves detailed contracts and qualification evidence into focused
-documents.
+Start with [Getting started](getting-started.md) to add Zymbol to a Zig project
+and generate a PNG. The [examples](../examples/) show more ways to encode,
+decode and render symbols.
 
-## Using Zymbol
+## Reference
 
-| Document | Read this when you need |
+| Page | What it covers |
 | --- | --- |
-| [API reference](api.md) | Exact public functions, options, return types, and buffer requirements |
-| [v1 compatibility contract](v1-contract.md) | The supported v1 surface, boundaries, and stability rules |
-| [Distribution](distribution.md) | Package installation, source provenance, and release mechanics |
-| [Changelog](../CHANGELOG.md) | User-visible changes between releases |
+| [API](reference/api.md) | Functions, types, buffer sizes and links to their source |
+| [Compatibility](reference/compatibility.md) | Supported symbols, memory ownership and versioning rules |
+| [Changelog](../CHANGELOG.md) | Changes in each release |
 
-## Correctness and assurance
+## Tests and measurements
 
-| Document | Purpose |
+| Page | What it covers |
 | --- | --- |
-| [ISO/IEC 18004:2024 conformance](iso-18004-2024-conformance.md) | Normative claim boundary and clause-level evidence |
-| [Performance qualification](v1-performance.md) | Benchmark method, measurements, and accepted trade-offs |
-| [Fuzz qualification](v1-fuzz.md) | Durable regression corpus and sustained-fuzz policy |
-| [ZXing interoperability](../tests/INTEROP.md) | Reproducible bidirectional differential testing |
-| [Fixture provenance](../tests/reference/README.md) | Origins and role of external conformance data |
+| [ISO conformance](testing/conformance.md) | Implemented requirements, limits and test evidence |
+| [Interoperability](testing/interoperability.md) | Testing Zymbol with ZXing-cpp |
+| [Fuzzing](testing/fuzzing.md) | Replaying inputs and running longer fuzz tests |
+| [Performance](testing/performance.md) | Running benchmarks and understanding the recorded results |
+| [Reference data](../tests/reference/README.md) | Where the conformance fixtures come from |
 
-## Maintaining Zymbol
+## Maintenance
 
-| Document | Purpose |
+| Page | What it covers |
 | --- | --- |
-| [Release checklist](v1-release-checklist.md) | Exact qualification and publication sequence |
-| [Contributing](../CONTRIBUTING.md) | Change requirements and local validation |
-| [Security](../SECURITY.md) | Supported versions and private vulnerability reporting |
-
-The repository README remains the canonical entry point for new users. These
-documents provide the detail needed to evaluate, integrate, maintain, or audit
-the library without turning the front page into an API manual.
+| [Releases](maintaining/releases.md) | Preparing, testing and publishing a release |
+| [Distribution](maintaining/distribution.md) | Package identity, source archives and release verification |
+| [Contributing](../CONTRIBUTING.md) | Development checks and pull requests |
+| [Security](../SECURITY.md) | Reporting a vulnerability |
