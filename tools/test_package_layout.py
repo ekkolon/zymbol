@@ -52,17 +52,26 @@ def main() -> None:
         shutil.copy2(CONSUMER / "build.zig", consumer / "build.zig")
         shutil.copytree(CONSUMER / "src", consumer / "src")
 
-        package = consumer / "deps" / "zymbol"
-        package.mkdir(parents=True)
+        deps = consumer / "deps"
+        deps.mkdir()
         with tarfile.open(archive, "r:gz") as source:
-            source.extractall(package, filter="data")
+            source.extractall(deps, filter="data")
 
+        roots = list(deps.iterdir())
+        if len(roots) != 1 or not roots[0].is_dir():
+            raise SystemExit(
+                f"expected one package directory, found {[entry.name for entry in roots]}"
+            )
+
+        package = roots[0]
         actual = {entry.name for entry in package.iterdir()}
         if actual != PACKAGE_ENTRIES:
             raise SystemExit(
                 f"unexpected package contents: missing={sorted(PACKAGE_ENTRIES - actual)}, "
                 f"extra={sorted(actual - PACKAGE_ENTRIES)}"
             )
+        if package.name != "zymbol":
+            package.rename(deps / "zymbol")
 
         manifest = (CONSUMER / "build.zig.zon").read_text(encoding="utf-8")
         old_path = '.path = "../.."'
