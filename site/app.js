@@ -160,11 +160,12 @@ view.pngButton.addEventListener('click', () => {
 });
 
 async function copy(text, button) {
-  const label = button.textContent;
+  const labelElement = button.querySelector('.copy-label') ?? button;
+  const previousText = labelElement.textContent;
   try {
     await navigator.clipboard.writeText(text);
-    button.textContent = 'Copied';
-    setTimeout(() => { button.textContent = label; }, 1400);
+    labelElement.textContent = 'Copied';
+    setTimeout(() => { labelElement.textContent = previousText; }, 1400);
   } catch {
     status('Clipboard unavailable. Select and copy the command manually.', true);
   }

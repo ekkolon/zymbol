@@ -40,7 +40,7 @@ try {
 
   rmSync(output, { recursive: true, force: true });
   mkdirSync(output, { recursive: true });
-  for (const name of ['index.html', 'styles.css', 'app.js']) {
+  for (const name of ['index.html', 'styles.css', 'app.js', 'THIRD_PARTY_NOTICES.txt']) {
     cpSync(join(site, name), join(output, name));
   }
   cpSync(packageDir, join(output, 'vendor'), { recursive: true });
