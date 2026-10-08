@@ -36,7 +36,6 @@ Zymbol is a QR code library for Zig.
 zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v0.1.0.tar.gz
 ```
 
-[version-badge]: https://img.shields.io/badge/version-0.1.0-555.svg
 """,
             encoding="utf-8",
         )
@@ -115,10 +114,6 @@ Initial project baseline.
         self.assertIn("prepared Zymbol v1.0.0", result.stdout)
         self.assertIn('.version = "1.0.0"', (self.root / "build.zig.zon").read_text())
         readme = (self.root / "README.md").read_text()
-        self.assertIn(
-            "[version-badge]: https://img.shields.io/badge/version-1.0.0-555.svg",
-            readme,
-        )
         self.assertIn("refs/tags/v1.0.0.tar.gz", readme)
         self.assertNotIn("refs/tags/v0.1.0.tar.gz", readme)
         self.assertIn("Zymbol is a QR code library for Zig.", readme)
@@ -236,14 +231,14 @@ Initial project baseline.
             (self.root / "CHANGELOG.md").read_text(),
         )
 
-    def test_release_validation_rejects_metadata_drift(self) -> None:
+    def test_release_validation_rejects_readme_version_drift(self) -> None:
         self.prepare("--version", "1.0.0", "--date", "2026-10-07")
 
         readme = (self.root / "README.md").read_text(encoding="utf-8")
         (self.root / "README.md").write_text(
             readme.replace(
-                "version-1.0.0-555.svg",
-                "version-0.9.9-555.svg",
+                "refs/tags/v1.0.0.tar.gz",
+                "refs/tags/v0.9.9.tar.gz",
             ),
             encoding="utf-8",
         )
@@ -255,7 +250,7 @@ Initial project baseline.
             check=False,
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("version badge does not match", result.stderr)
+        self.assertIn("README.md installation URL does not match", result.stderr)
 
     def test_release_validation_rejects_stale_getting_started_url(self) -> None:
         self.prepare("--version", "1.0.0", "--date", "2026-10-07")

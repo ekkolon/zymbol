@@ -61,6 +61,9 @@ jobs:
           python3 tools/test_api_docs.py
           python3 tools/test_release_tools.py
 
+      - name: Test package contents
+        run: python3 tools/test_package_layout.py
+
   linux:
     needs: preflight
     name: Linux / Zig 0.17.0

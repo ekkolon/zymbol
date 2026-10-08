@@ -33,6 +33,7 @@ git diff --check
 python3 tools/check_api_docs.py
 python3 tools/test_api_docs.py
 python3 tools/test_release_tools.py
+python3 tools/test_package_layout.py
 
 zig build test
 zig build conformance

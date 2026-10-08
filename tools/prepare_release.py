@@ -217,15 +217,6 @@ def update_metadata(version: str) -> None:
     )
 
     readme = README.read_text(encoding="utf-8")
-    readme, count = re.subn(
-        r"\[version-badge\]:\s+https://img\.shields\.io/badge/version-[^-\s]+-555\.svg",
-        f"[version-badge]: https://img.shields.io/badge/version-{version}-555.svg",
-        readme,
-        count=1,
-    )
-    if count != 1:
-        raise SystemExit("could not update README version badge")
-
     archive_pattern = r"https://github\.com/ekkolon/zymbol/archive/refs/tags/v\d+\.\d+\.\d+\.tar\.gz"
     archive_url = f"https://github.com/ekkolon/zymbol/archive/refs/tags/v{version}.tar.gz"
     readme, count = re.subn(

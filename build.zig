@@ -25,6 +25,9 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    // Development steps reference files excluded from the published package.
+    if (b.dep_prefix.len != 0) return;
+
     const test_step = b.step("test", "Run the test suite");
     const portability_smoke_tests = b.addTest(.{ .root_module = b.createModule(.{
         .root_source_file = b.path("tests/compile_portability.zig"),
