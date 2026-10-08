@@ -40,6 +40,18 @@ function fake() {
       renderBytes = value.length;
       return 0;
     },
+    zymbol_controls_ptr: () => 44000,
+    zymbol_encode_segments: () => {
+      const control = new DataView(memory.buffer, 44000, 56);
+      const family = control.getUint32(0, true);
+      const version = control.getUint32(4, true);
+      const ec = control.getUint32(12, true);
+      const side = family === 1 ? 9 + 2 * version : 17 + 4 * version;
+      for (let i = 0; i < side * side; i++) bytes[8192 + i] = (i + count) % 2;
+      [side, version, ec, 0, family].forEach((value, index) => meta.setUint32(index * 4, value, true));
+      count++;
+      return 0;
+    },
     zymbol_decode: side => {
       [side, family ? 2 : 1, 0, 0, family, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0].forEach((v, i) => meta.setUint32(i * 4, v, true));
       bytes.set([0, 128, 255], 43000);
@@ -105,4 +117,34 @@ test('renderers return owned buffers and preserve API shapes', () => {
   assert.deepEqual([...qr.png('a')], [137, 80, 78, 71]);
   assert.equal(qr.structuredAppendParity(new Uint8Array([1, 2, 3])), 0);
   assert.throws(() => qr.renderSvg(symbol, { background: null, reflectance: 'reversed' }), { code: 'INVALID_OPTIONS' });
+});
+
+test('manual QR and Micro segments use tagged packets', () => {
+  const { bridge, bytes } = fake();
+  const qr = createEngine(bridge);
+  const symbol = qr.encodeSegments([
+    { mode: 'numeric', data: '1234' },
+    { mode: 'eci', assignment: 26 },
+    { mode: 'byte', data: new Uint8Array([0, 128, 255]) },
+  ], {
+    version: 2,
+    errorCorrection: 'Q',
+    fnc1: { position: 'first' },
+    structuredAppend: { index: 0, count: 2, parity: 9 },
+  });
+  assert.deepEqual([symbol.family, symbol.version, symbol.size, symbol.errorCorrection], ['qr', 2, 25, 'Q']);
+  assert.deepEqual([...bytes.slice(0, 7)], [0, 4, 0, 49, 50, 51, 52]);
+  assert.deepEqual([...bytes.slice(7, 14)], [4, 4, 0, 26, 0, 0, 0]);
+  const micro = qr.encodeSegments([{ mode: 'alphanumeric', data: 'Z9' }], { family: 'micro', version: 'M3' });
+  assert.deepEqual([micro.family, micro.version, micro.size], ['micro', 'M3', 15]);
+});
+
+test('manual segment validation rejects malformed modes, values, and headers', () => {
+  const qr = createEngine(fake().bridge);
+  assert.throws(() => qr.encodeSegments([{ mode: 'eci', assignment: 1000000 }], { version: 1, errorCorrection: 'L' }), { code: 'INVALID_OPTIONS' });
+  assert.throws(() => qr.encodeSegments([{ mode: 'kanji', data: 'not bytes' }], { version: 1, errorCorrection: 'L' }), { code: 'INVALID_INPUT' });
+  assert.throws(() => qr.encodeSegments([{ mode: 'eci', assignment: 26 }], { family: 'micro', version: 'M4' }), { code: 'INVALID_OPTIONS' });
+  assert.throws(() => qr.encodeSegments([{ mode: 'numeric', data: '123' }], { version: 1 }), { code: 'INVALID_OPTIONS' });
+  assert.throws(() => qr.encodeSegments([{ mode: 'numeric', data: '123' }], { version: 1, errorCorrection: 'M',
+    fnc1: { position: 'second', applicationIndicator: 400 } }), { code: 'INVALID_OPTIONS' });
 });
