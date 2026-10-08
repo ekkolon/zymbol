@@ -3,7 +3,7 @@ import type { Operation } from './errors.js';
 import type {
   DecodeResult, EncodeOptions, ErrorCorrection, Input, MicroErrorCorrection,
   MicroOptions, MicroSymbol, MicroVersion, ModuleGrid, QrDecodeResult,
-  PngOptions, PngEncodeOptions, RasterOptions, Raster, Rgb,
+  PngOptions, PngEncodeOptions, RasterOptions, Raster, Rgb, Limits,
   SvgOptions, SvgEncodeOptions, QrOptions, QrSymbol, QrVersion, Symbol,
   MicroSegment, QrSegment, QrSegmentOptions,
 } from './types.js';
@@ -89,7 +89,13 @@ function memoryView(memory: WebAssembly.Memory, pointer: number, length: number)
   return new Uint8Array(memory.buffer, pointer, length);
 }
 
-export function createEngine(wasm: WasmExports): QrEngine {
+export function createEngine(wasm: WasmExports, limits: Limits = {}): QrEngine {
+  const maxOutputBytes = limits.maxOutputBytes ?? (16 * 1024 * 1024);
+  const maxImageSide = limits.maxImageSide ?? 4096;
+  if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 64 * 1024 * 1024 ||
+      !Number.isSafeInteger(maxImageSide) || maxImageSide < 1 || maxImageSide > 65535) {
+    throw new ZymbolError('INVALID_OPTIONS', 'initialize', 'Invalid output limits');
+  }
   const bridge = wasm as BridgeExports;
   const functions = [
     'zymbol_input_ptr', 'zymbol_grid_ptr', 'zymbol_payload_ptr',
@@ -368,10 +374,10 @@ export function createEngine(wasm: WasmExports): QrEngine {
       throw new ZymbolError('INVALID_OPTIONS', operation, 'Invalid reflectance settings');
     }
     memoryView(bridge.memory, bridge.zymbol_grid_ptr(), symbol.modules.length).set(symbol.modules);
-    call(operation, () => bridge.zymbol_render(format, symbol.size, Number(micro), version, level, symbol.mask, scale, quiet, foreground, background, reversed, intrinsic, 16 * 1024 * 1024, 4096));
+    call(operation, () => bridge.zymbol_render(format, symbol.size, Number(micro), version, level, symbol.mask, scale, quiet, foreground, background, reversed, intrinsic, maxOutputBytes, maxImageSide));
     const length = bridge.zymbol_output_len();
     const side = bridge.zymbol_output_side();
-    if (!isIndex(length, 16 * 1024 * 1024) || (format !== 0 && (!isIndex(side, 4096) || side < 1))
+    if (!isIndex(length, maxOutputBytes) || (format !== 0 && (!isIndex(side, maxImageSide) || side < 1))
       || (format === 2 && length !== side * side * 4)) {
       throw new ZymbolError('WASM_ABI_MISMATCH', operation, 'Invalid WASM rendering output dimensions');
     }
