@@ -85,7 +85,7 @@ try {
     "  qr.encode('123', { family: 'micro', version: 4 });",
     "}",
     "void verify;",
-  ].join('\\n'));
+  ].join('\n'));
   writeFileSync(join(temporary, 'tsconfig.json'), JSON.stringify({
     compilerOptions: {
       target: 'ES2022',
