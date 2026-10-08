@@ -81,4 +81,32 @@ const micro = qr.encode('12345', { family: 'micro' });
 if (qr.decode(micro).family !== 'micro') throw new Error('Micro QR round trip failed');
 const manual = qr.encodeSegments([{ mode: 'numeric', data: '12345' }], { version: 1, errorCorrection: 'L' });
 if (qr.decode(manual).family !== 'qr') throw new Error('Manual segment round trip failed');
+const byteData = Uint8Array.of(0, 128, 255, 65);
+const eciSymbol = qr.encodeSegments([
+  { mode: 'eci', assignment: 26 },
+  { mode: 'byte', data: byteData },
+], { version: 2, errorCorrection: 'M' });
+const eciDecoded = qr.decode(eciSymbol);
+if (eciDecoded.family !== 'qr' || eciDecoded.eci.kind !== 'assignment'
+    || eciDecoded.eci.assignment !== 26
+    || Buffer.compare(eciDecoded.bytes, byteData) !== 0) {
+  throw new Error('ECI and binary segment metadata are inconsistent');
+}
+const secondFnc1 = qr.decode(qr.encode('AB12', {
+  fnc1: { position: 'second', applicationIndicator: 'A' },
+}));
+if (secondFnc1.family !== 'qr' || secondFnc1.fnc1?.position !== 'second'
+    || secondFnc1.fnc1.applicationIndicator !== 'A') {
+  throw new Error('FNC1 second position metadata was not preserved');
+}
+if (qr.structuredAppendParity(Uint8Array.of(1, 2, 4, 8)) !== 15) {
+  throw new Error('Native Structured Append parity is incorrect');
+}
+try {
+  qr.renderRaster(qr.encode('LIMITS'), { scale: 4096 });
+  throw new Error('Oversized raster was accepted');
+} catch (error) {
+  if (error.code !== 'OUTPUT_LIMIT') throw error;
+}
+
 console.log('Distribution smoke test passed');
