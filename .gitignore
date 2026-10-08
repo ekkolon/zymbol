@@ -12,3 +12,11 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# JavaScript package
+node_modules/
+/packages/qr/dist/
+/packages/qr/coverage/
+/packages/qr/test-results/
+/packages/qr/playwright-report/
+/packages/qr/*.tgz

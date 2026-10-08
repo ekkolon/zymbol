@@ -73,11 +73,18 @@ The proposed export paths are:
 - `@zymbol/qr/zymbol.wasm`: the binary asset for copying or bundler URL imports.
 - `@zymbol/qr/package.json`: package metadata.
 
-Both factories accept a URL, a fetch `Response`, bytes or a compiled
-`WebAssembly.Module`. Strings used as locations must be absolute URLs; relative
+Both factories accept a URL, a fetch `Response` or bytes through `wasm`, or a
+compiled `WebAssembly.Module` through `module`. These options are mutually
+exclusive. Strings used as locations must be absolute URLs; relative
 paths belong in `new URL(path, import.meta.url)`. The core entry accepts network
 URLs; file reads belong to the Node loader or the caller. A supplied module
 allows workers to share compilation without sharing mutable memory.
+
+The `module` option is typed as `object` and checked at runtime. The standard
+TypeScript `WebAssembly.Module` interface has no structural members and is
+declared in DOM typings. Referencing it would impose DOM types on Node-only
+consumers without making module identity statically checkable. URL, Response
+and AbortSignal work with either DOM or current Node declarations.
 
 Use streaming compilation for successful WASM responses with the correct MIME
 type. Otherwise compile their bytes. Do not turn an HTTP error or an actual
@@ -211,8 +218,9 @@ esbuild only to consumer fixtures. They are not package build dependencies.
 
 Verified stable versions on 2026-10-08: TypeScript 7.0.2, pnpm 12.10.1,
 Playwright 1.64.0, Vite 8.3.3, webpack 5.111.1 and esbuild 0.28.2. Pin Zig 0.17.0
-and Node 24.21.0 LTS for release builds. The design harness initially needs
-only TypeScript. Recheck fixture versions when those dependencies are added.
+and Node 24.21.0 LTS for release builds. The design harness needs TypeScript
+and Node consumer types (24.19.1). Recheck fixture versions when those
+dependencies are added.
 
 Commit a pnpm lockfile, pin direct dependencies exactly, block dependency
 lifecycle scripts unless explicitly reviewed, and use a release-age policy.
@@ -224,10 +232,11 @@ Copy licenses from the repository during packaging.
 The export map places `types` before runtime conditions and `default` last.
 The root selects a Node file loader or a portable fetch loader; `core` never
 imports either default loader. Mark JS as side-effect-free once import tests
-prove this. JS can be tree-shaken, but unused Zig exports in a single WASM
-asset cannot be removed by a consumer bundler. Start with one binary; split
-encode/decode variants only if measured download or initialization costs
-justify the extra builds and contracts.
+prove this. Unused entry points and type-only imports can be removed; using
+the factory retains its methods. Consumer bundlers cannot remove individual
+Zig exports from the WASM asset. Start with one binary; split encode/decode
+variants only if measured download or initialization costs justify the extra
+builds and contracts.
 
 ## Compatibility and qualification
 
@@ -245,9 +254,9 @@ every bundler will emit an npm dependency's WASM asset.
 Deno and Bun are qualification targets, not claimed support yet. Exercise
 their npm imports, file/network permissions, the default loader and explicit
 byte/module initialization. Test Node consumers without DOM typings as well
-as browser and bundler TypeScript configurations. Use type-only environment
-dependencies or structural types if browser-global declarations would leak
-into a Node consumer; do not add a DOM requirement to all applications.
+as browser and bundler TypeScript configurations. The design declarations
+already pass those three type checks with TypeScript 7.0.2; this does not
+establish runtime compatibility.
 
 Before release, qualify these behaviors:
 
