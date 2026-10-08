@@ -1,0 +1,57 @@
+name: Published npm consumers
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/npm-consumers.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        node:
+          - "22.16.0"
+          - "24.21.0"
+    steps:
+      - name: Install Node
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3
+        with:
+          version: 12.10.1
+          runtime: node@${{ matrix.node }}
+          install: false
+          cache: false
+
+      - name: Install and exercise registry package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/zymbol-consumer"
+          cd "$RUNNER_TEMP/zymbol-consumer"
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund --ignore-scripts --save-exact @zymbol/qr@1.0.0
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { createZymbol } from '@zymbol/qr';
+
+          const qr = await createZymbol();
+          const grid = qr.encode('Published Zymbol package');
+          const text = new TextDecoder('utf-8', { fatal: true }).decode(qr.decode(grid).bytes);
+          assert.equal(text, 'Published Zymbol package');
+          assert.match(qr.renderSvg(grid), /<svg\b/);
+          const png = qr.renderPng(grid, { scale: 3 });
+          assert.equal(Buffer.from(png.subarray(0, 8)).toString('hex'), '89504e470d0a1a0a');
+          const micro = qr.encode('1234567', { family: 'micro', errorCorrection: 'L' });
+          assert.equal(micro.family, 'micro');
+          assert.equal(new TextDecoder().decode(qr.decode(micro).bytes), '1234567');
+          console.log('Published @zymbol/qr@1.0.0 consumer passed');
+          JS
