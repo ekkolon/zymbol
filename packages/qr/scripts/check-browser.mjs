@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname, extname } from 'node:path';
@@ -46,10 +46,23 @@ try {
   const chrome = process.env.CHROME_BIN || 'google-chrome';
   const version = execFileSync(chrome, ['--version'], { encoding: 'utf8' }).trim();
   console.log('Browser qualification:', version);
-  const html = execFileSync(chrome, [
-    '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
-    '--virtual-time-budget=15000', '--dump-dom', url,
-  ], { encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024 });
+  const html = await new Promise((resolveChrome, rejectChrome) => {
+    const process = spawn(chrome, [
+      '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+      '--virtual-time-budget=15000', '--dump-dom', url,
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    process.stdout.setEncoding('utf8');
+    process.stderr.setEncoding('utf8');
+    process.stdout.on('data', data => { stdout += data; });
+    process.stderr.on('data', data => { stderr += data; });
+    process.once('error', rejectChrome);
+    process.once('close', code => {
+      if (code !== 0) rejectChrome(new Error('Chrome exited ' + code + ': ' + stderr.slice(-1000)));
+      else resolveChrome(stdout);
+    });
+  });
   if (!html.includes('id="result">PASS</')) {
     throw new Error('Browser or worker smoke test failed: ' + html.slice(-1800));
   }
