@@ -9,15 +9,33 @@ on:
       - synchronize
       - ready_for_review
     paths:
-      - "**"
-      - "!**/*.md"
+      - ".github/actions/setup-qemu/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/release.yml"
+      - "build.zig"
+      - "build.zig.zon"
+      - "src/**"
+      - "tests/**"
+      - "examples/**"
+      - "benchmarks/**"
+      - "tools/**"
+      - "uv.toml"
       - "docs/reference/api.md"
   push:
     branches:
       - main
     paths:
-      - "**"
-      - "!**/*.md"
+      - ".github/actions/setup-qemu/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/release.yml"
+      - "build.zig"
+      - "build.zig.zon"
+      - "src/**"
+      - "tests/**"
+      - "examples/**"
+      - "benchmarks/**"
+      - "tools/**"
+      - "uv.toml"
       - "docs/reference/api.md"
 
 permissions:

@@ -17,7 +17,7 @@ GETTING_STARTED = ROOT / "docs" / "getting-started.md"
 
 SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 CONVENTIONAL_RE = re.compile(
-    r"^(?P<type>[a-z]+)(?:\([^)]+\))?(?P<breaking>!)?:\s+(?P<description>.+)$"
+    r"^(?P<type>[a-z]+)(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?:\s+(?P<description>.+)$"
 )
 PR_SUFFIX_RE = re.compile(r"\s+\(#(?P<pr>\d+)\)$")
 
@@ -112,6 +112,8 @@ def parse_entry(commit: Commit) -> Entry | None:
 
     match = CONVENTIONAL_RE.fullmatch(subject)
     if not match:
+        return None
+    if match.group("scope") == "js":
         return None
 
     kind = match.group("type")

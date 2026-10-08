@@ -29,7 +29,12 @@ class ReleaseToolsTest(unittest.TestCase):
         )
         (self.root / "docs" / "maintaining").mkdir(parents=True)
 
-        for name in ("prepare_release.py", "release.py", "check_pr_title.py"):
+        for name in (
+            "prepare_release.py",
+            "prepare_release_candidate.py",
+            "release.py",
+            "check_pr_title.py",
+        ):
             shutil.copy2(ROOT / "tools" / name, self.root / "tools" / name)
 
         (self.root / "build.zig.zon").write_text(
@@ -251,6 +256,82 @@ Initial project baseline.
             "**Breaking:** Replace public decoder contract (#105).",
             (self.root / "CHANGELOG.md").read_text(),
         )
+
+    def test_js_only_commits_do_not_prepare_native_release(self) -> None:
+        self.commit_stable_v1()
+
+        subjects = (
+            ("feat(js): add WebAssembly encoding", None),
+            ("fix(js): validate byte buffers", None),
+            ("feat(js)!: redesign JavaScript decode results", None),
+            ("chore(js): update bridge ABI", "BREAKING CHANGE: JavaScript-only ABI update"),
+        )
+        for index, (subject, body) in enumerate(subjects):
+            filename = f"js-change-{index}.txt"
+            (self.root / filename).write_text(subject + "\n", encoding="utf-8")
+            self.git("add", filename)
+            args = ["commit", "-m", subject]
+            if body is not None:
+                args.extend(("-m", body))
+            self.git(*args)
+
+        output = self.root / "github-output"
+        result = self.prepare("--date", "2026-10-08", "--github-output", str(output))
+        self.assertIn("no releasable changes since v1.0.0", result.stdout)
+        self.assertEqual("changed=false\n", output.read_text(encoding="utf-8"))
+        self.assertIn('.version = "1.0.0"', (self.root / "build.zig.zon").read_text())
+
+    def test_js_breaking_change_does_not_override_native_patch(self) -> None:
+        self.commit_stable_v1()
+
+        path = self.root / "payload.txt"
+        path.write_text("fixed\n", encoding="utf-8")
+        self.git("add", "payload.txt")
+        self.git("commit", "-m", "fix(encoder): correct capacity check (#201)")
+
+        path.write_text("fixed\njs\n", encoding="utf-8")
+        self.git("add", "payload.txt")
+        self.git(
+            "commit",
+            "-m",
+            "feat(js)!: replace JavaScript public interface (#202)",
+            "-m",
+            "BREAKING CHANGE: JavaScript package API only",
+        )
+
+        self.prepare("--date", "2026-10-08")
+        changelog = (self.root / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("## [1.0.1] - 2026-10-08", changelog)
+        self.assertIn("Correct capacity check (#201).", changelog)
+        self.assertNotIn("JavaScript public interface", changelog)
+        self.assertIn('.version = "1.0.1"', (self.root / "build.zig.zon").read_text())
+
+        result = self.run_cmd(
+            sys.executable,
+            "-c",
+            "import sys; sys.path.insert(0, 'tools'); "
+            "import prepare_release_candidate as release; "
+            "print(release.target_version(None))",
+        )
+        self.assertEqual("1.0.1", result.stdout.strip())
+
+    def test_native_ci_excludes_package_only_changes(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        triggers = workflow.split("\npermissions:", 1)[0]
+        self.assertNotIn('      - "**"', triggers)
+        self.assertNotIn('      - "packages/qr/**"', triggers)
+        for source_path in (
+            "build.zig",
+            "build.zig.zon",
+            "src/**",
+            "tests/**",
+            "tools/**",
+            ".github/workflows/ci.yml",
+            "docs/reference/api.md",
+        ):
+            self.assertEqual(triggers.count(f'      - "{source_path}"'), 2)
 
     def test_release_validation_rejects_readme_version_drift(self) -> None:
         self.prepare("--version", "1.0.0", "--date", "2026-10-07")
