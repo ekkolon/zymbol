@@ -216,6 +216,7 @@ export function createEngine(wasm: WasmExports, limits: Limits = {}): QrEngine {
     const outputFamily = getField(fields, 4);
     if ((micro ? size < 11 || size > 17 || (size % 2) === 0 : size < 21 || size > 177 || (size - 17) % 4 !== 0)
       || size * size > gridCapacity || version < first || version > last
+      || size !== (micro ? 9 + 2 * version : 17 + 4 * version)
       || !isIndex(outputLevel, micro ? 2 : 3) || !isIndex(outputMask, micro ? 3 : 7)
       || outputFamily !== Number(micro)) {
       throw new ZymbolError('WASM_ABI_MISMATCH', 'encode', 'WebAssembly returned invalid symbol metadata');
@@ -330,10 +331,15 @@ export function createEngine(wasm: WasmExports, limits: Limits = {}): QrEngine {
       throw new ZymbolError('WASM_ABI_MISMATCH', 'decode', 'WebAssembly returned invalid decode metadata');
     }
     const bytes = memoryView(bridge.memory, bridge.zymbol_payload_ptr(), length).slice();
+    const mirrored = getField(fields, 15);
+    const reversed = getField(fields, 16);
+    if (!isIndex(mirrored, 1) || !isIndex(reversed, 1)) {
+      throw new ZymbolError('WASM_ABI_MISMATCH', 'decode', 'Invalid decoded transform metadata');
+    }
     const common = {
       bytes,
-      mirrored: getField(fields, 15) === 1,
-      reflectanceReversed: getField(fields, 16) === 1,
+      mirrored: mirrored === 1,
+      reflectanceReversed: reversed === 1,
       errorsCorrected: getField(fields, 17),
     };
     if (family === 1) {
@@ -341,16 +347,31 @@ export function createEngine(wasm: WasmExports, limits: Limits = {}): QrEngine {
         errorCorrection: EC_LEVELS[level]! as MicroErrorCorrection, mask: mask as MicroSymbol['mask'], symbologyIdentifier: ']Q1' };
     }
     const eciKind = getField(fields, 6);
+    if (eciKind === 1 && !isIndex(getField(fields, 7), 999999)) {
+      throw new ZymbolError('WASM_ABI_MISMATCH', 'decode', 'Invalid ECI assignment');
+    }
     const eci = eciKind === 0 ? { kind: 'none' as const }
       : eciKind === 1 ? { kind: 'assignment' as const, assignment: getField(fields, 7) }
       : eciKind === 2 ? { kind: 'multiple' as const } : invalid('Invalid decoded ECI metadata', 'decode');
     const fnc1Kind = getField(fields, 8);
     const indicator = getField(fields, 9);
+    if (fnc1Kind === 2 && !(isIndex(indicator, 99) || (indicator >= 165 && indicator <= 190) || (indicator >= 197 && indicator <= 222))) {
+      throw new ZymbolError('WASM_ABI_MISMATCH', 'decode', 'Invalid FNC1 indicator');
+    }
+    const appendFlag = getField(fields, 10);
+    const appendIndex = getField(fields, 11);
+    const appendCount = getField(fields, 12);
+    const appendParity = getField(fields, 13);
+    if (!isIndex(appendFlag, 1) || (appendFlag === 1
+      && (!isIndex(appendIndex, 15) || !isIndex(appendCount, 16) || appendCount < 1
+        || appendIndex >= appendCount || !isIndex(appendParity, 255)))) {
+      throw new ZymbolError('WASM_ABI_MISMATCH', 'decode', 'Invalid Structured Append metadata');
+    }
     const fnc1 = fnc1Kind === 0 ? null : fnc1Kind === 1 ? { position: 'first' as const }
       : fnc1Kind === 2 ? { position: 'second' as const, applicationIndicator: indicator <= 99 ? indicator : String.fromCharCode(indicator - 100) }
       : invalid('Invalid decoded FNC1 metadata', 'decode');
-    const structuredAppend = getField(fields, 10) === 0 ? null : {
-      index: getField(fields, 11), count: getField(fields, 12), parity: getField(fields, 13),
+    const structuredAppend = appendFlag === 0 ? null : {
+      index: appendIndex, count: appendCount, parity: appendParity,
     };
     const modifier = getField(fields, 14);
     if (!isIndex(modifier, 6) || modifier < 1) throw new ZymbolError('WASM_ABI_MISMATCH', 'decode', 'Invalid symbology modifier');

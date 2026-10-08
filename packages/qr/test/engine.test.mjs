@@ -148,3 +148,27 @@ test('manual segment validation rejects malformed modes, values, and headers', (
   assert.throws(() => qr.encodeSegments([{ mode: 'numeric', data: '123' }], { version: 1, errorCorrection: 'M',
     fnc1: { position: 'second', applicationIndicator: 400 } }), { code: 'INVALID_OPTIONS' });
 });
+
+test('reject malformed WASM geometry and decoding metadata', () => {
+  const badVersion = fake();
+  const rawEncode = badVersion.bridge.zymbol_encode;
+  badVersion.bridge.zymbol_encode = (...args) => {
+    const status = rawEncode(...args);
+    new DataView(badVersion.bridge.memory.buffer).setUint32(42000, 25, true);
+    return status;
+  };
+  assert.throws(() => createEngine(badVersion.bridge).encode('x'), { code: 'WASM_ABI_MISMATCH' });
+
+  const badAppend = fake();
+  const rawDecode = badAppend.bridge.zymbol_decode;
+  badAppend.bridge.zymbol_decode = size => {
+    const status = rawDecode(size);
+    const metadata = new DataView(badAppend.bridge.memory.buffer, 42000);
+    metadata.setUint32(10 * 4, 1, true);
+    metadata.setUint32(11 * 4, 3, true);
+    metadata.setUint32(12 * 4, 2, true);
+    return status;
+  };
+  const qr = createEngine(badAppend.bridge);
+  assert.throws(() => qr.decode(qr.encode('x')), { code: 'WASM_ABI_MISMATCH' });
+});
