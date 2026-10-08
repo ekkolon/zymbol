@@ -32,8 +32,8 @@ it does not describe a working or published JavaScript package.
   build files and licenses. Its allowlist can remain unchanged. A separate
   build under `packages/qr` can depend on the root package by relative path.
 - Hosted CI runs for main pushes and ready PRs. Draft PR jobs are skipped.
-  The release tooling currently classifies every `feat:` scope as a native
-  minor release; npm changes need a separate release boundary.
+  Native release tooling treats package features as Zig changes until the
+  JavaScript release boundary is merged. Package-only commits use `js`.
 
 ## Package and initialization
 
@@ -289,9 +289,9 @@ for the supported API. A bundled core change can require an npm release even
 if no TypeScript changes. Record the core version and exact source commit.
 
 Use tags such as `npm/qr/v1.0.0`, a package changelog and a dedicated
-`npm-release.yml`. Scope npm-only commits as `feat(npm):`, `fix(npm):`, etc.
-Before any runtime feature is merged, teach native release selection to ignore
-that scope and test the boundary. Native changes remain separately scoped.
+`npm-release.yml`. Scope package commits as `feat(js):`, `fix(js):`, etc.
+Native release selection must ignore that scope, including breaking changes.
+Keep unrelated Zig changes separately scoped.
 
 Publish through npm's OIDC trusted publishing from a GitHub-hosted runner.
 Pin actions by commit SHA, reuse `ekkolon/setup-zig`, restrict `id-token: write`
@@ -311,9 +311,9 @@ incomplete runtime or publish the design-only package.
 
 1. **API proposal (this PR):** audit, declarations, positive and negative
    consumer type checks. The draft PR is a review checkpoint, not a release.
-2. **Native release and CI isolation:** exclude `npm`-scoped commits, including
+2. **Native release and CI isolation:** exclude `js`-scoped commits, including
    breaking changes, from Zig version selection and changelog generation.
-   Test mixed native/npm histories. Restrict native CI paths so package-only
+   Test mixed native/JavaScript histories. Restrict native CI paths so package-only
    changes on `main` do not run the cross-platform Zig matrix. This PR must
    land before the API proposal is merged. Its workflow change may run the
    existing CI once as a deliberate checkpoint.
