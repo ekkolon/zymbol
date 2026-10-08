@@ -5,6 +5,7 @@ import type {
   MicroOptions, MicroSymbol, MicroVersion, ModuleGrid, QrDecodeResult,
   PngOptions, PngEncodeOptions, RasterOptions, Raster, Rgb,
   SvgOptions, SvgEncodeOptions, QrOptions, QrSymbol, QrVersion, Symbol,
+  MicroSegment, QrSegment, QrSegmentOptions,
 } from './types.js';
 import type { WasmExports } from './wasm.js';
 
@@ -17,6 +18,8 @@ interface BridgeExports extends WasmExports {
   zymbol_grid_capacity(): number;
   zymbol_encode(length: number, kind: number, family: number, min: number, max: number, ec: number, boost: number, mask: number): number;
   zymbol_decode(side: number): number;
+  zymbol_controls_ptr(): number;
+  zymbol_encode_segments(): number;
   zymbol_render(format: number, side: number, family: number, version: number, level: number, mask: number, scale: number, quiet: number, foreground: number, background: number, reversed: number, svgSize: number, maxOutput: number, maxSide: number): number;
   zymbol_output_ptr(): number;
   zymbol_output_len(): number;
@@ -28,6 +31,8 @@ export interface QrEngine {
   encode(input: Input, options?: QrOptions): QrSymbol;
   encode(input: Input, options: MicroOptions): MicroSymbol;
   encode(input: Input, options: EncodeOptions): Symbol;
+  encodeSegments(segments: readonly QrSegment[], options: QrSegmentOptions): QrSymbol;
+  encodeSegments(segments: readonly MicroSegment[], options: MicroOptions): MicroSymbol;
   decode(grid: ModuleGrid): DecodeResult;
   renderSvg(symbol: Symbol, options?: SvgOptions): string;
   renderPng(symbol: Symbol, options?: PngOptions): Uint8Array<ArrayBuffer>;
@@ -91,7 +96,7 @@ export function createEngine(wasm: WasmExports): QrEngine {
     'zymbol_meta_ptr', 'zymbol_input_capacity', 'zymbol_grid_capacity',
     'zymbol_encode', 'zymbol_decode', 'zymbol_render',
     'zymbol_output_ptr', 'zymbol_output_len', 'zymbol_output_side',
-    'zymbol_structured_append_parity',
+    'zymbol_structured_append_parity', 'zymbol_controls_ptr', 'zymbol_encode_segments',
   ] as const;
   for (const name of functions) {
     if (typeof bridge[name] !== 'function') {
@@ -170,6 +175,10 @@ export function createEngine(wasm: WasmExports): QrEngine {
     if (bytes.byteLength > capacity) throw new ZymbolError('DATA_TOO_LONG', 'encode', 'Payload exceeds WebAssembly input workspace');
     memoryView(bridge.memory, bridge.zymbol_input_ptr(), bytes.byteLength).set(bytes);
     call('encode', () => bridge.zymbol_encode(bytes.byteLength, typeof input === 'string' ? 0 : 1, Number(micro), first, last, ec, Number(boost), mask));
+    return readSymbol(micro, first, last);
+  }
+
+  function readSymbol(micro: boolean, first: number, last: number): Symbol {
     const fields = metadata();
     const size = getField(fields, 0);
     const version = getField(fields, 1);
@@ -187,6 +196,84 @@ export function createEngine(wasm: WasmExports): QrEngine {
     return micro
       ? { family: 'micro', size, version: MICRO_VERSIONS[version - 1]!, errorCorrection: EC_LEVELS[outputLevel]! as MicroErrorCorrection, mask: outputMask as MicroSymbol['mask'], modules }
       : { family: 'qr', size, version: version as QrVersion, errorCorrection: EC_LEVELS[outputLevel]!, mask: outputMask as QrSymbol['mask'], modules };
+  }
+
+  function encodeSegments(segments: readonly QrSegment[] | readonly MicroSegment[], options: QrSegmentOptions | MicroOptions): Symbol {
+    if (!Array.isArray(segments) || segments.length > 128 || !options || typeof options !== 'object') {
+      throw new ZymbolError('INVALID_OPTIONS', 'encodeSegments', 'Expected at most 128 segments and encoding options');
+    }
+    const micro = options.family === 'micro';
+    const first = versionNumber(options.version ?? (micro ? options.minVersion : undefined), micro, 1);
+    const last = versionNumber(options.version ?? (micro ? options.maxVersion : undefined), micro, micro ? 4 : first);
+    if (first > last || (!micro && !options.version)) invalidOption('QR manual segments require an exact version');
+    const level = EC_LEVELS.indexOf((options.errorCorrection ?? (micro ? 'L' : 'M')) as ErrorCorrection);
+    if (level < 0 || (micro && level > 2)) invalidOption('Invalid error correction level');
+    const mask = options.mask ?? -1;
+    if (mask !== -1 && !isIndex(mask, micro ? 3 : 7)) invalidOption('Invalid mask');
+    if (!micro && (options as QrSegmentOptions).errorCorrection === undefined) invalidOption('QR manual segments require error correction');
+    const boost = micro && (options.boostErrorCorrection ?? true) ? 1 : 0;
+    const fnc1 = !micro ? (options as QrSegmentOptions).fnc1 : undefined;
+    const structured = !micro ? (options as QrSegmentOptions).structuredAppend : undefined;
+    let fnc1Kind = 0;
+    let indicator = 0;
+    if (fnc1 !== undefined) {
+      if (fnc1.position === 'first') fnc1Kind = 1;
+      else if (fnc1.position === 'second') {
+        fnc1Kind = 2;
+        const raw = fnc1.applicationIndicator;
+        if (typeof raw === 'number' && isIndex(raw, 99)) indicator = raw;
+        else if (typeof raw === 'string' && /^[A-Za-z]$/.test(raw)) indicator = raw.charCodeAt(0) + 100;
+        else invalidOption('Invalid FNC1 application indicator');
+      } else invalidOption('Invalid FNC1 position');
+    }
+    if (structured !== undefined && (!isIndex(structured.index, 15) || !isIndex(structured.count, 16)
+      || structured.count < 1 || structured.index >= structured.count || !isIndex(structured.parity, 255))) {
+      invalidOption('Invalid Structured Append header');
+    }
+    const packets: Uint8Array[] = [];
+    let bytesNeeded = 0;
+    const tags = { numeric: 0, alphanumeric: 1, byte: 2, kanji: 3, eci: 4 } as const;
+    for (const segment of segments) {
+      if (!segment || typeof segment !== 'object' || !('mode' in segment) || !(segment.mode in tags)) {
+        invalid('Invalid segment mode', 'encode');
+      }
+      const mode = segment.mode as keyof typeof tags;
+      if (micro && mode === 'eci') invalidOption('Micro QR does not support ECI');
+      let data: Uint8Array;
+      if (mode === 'eci') {
+        const assignment = (segment as Extract<QrSegment, { mode: 'eci' }>).assignment;
+        if (!isIndex(assignment, 999999)) invalidOption('Invalid ECI assignment');
+        data = new Uint8Array(4);
+        new DataView(data.buffer).setUint32(0, assignment, true);
+      } else if (mode === 'numeric' || mode === 'alphanumeric') {
+        const value = (segment as { data: string }).data;
+        if (typeof value !== 'string' || /[^\x00-\x7f]/.test(value)) invalid('Expected ASCII segment text', 'encode');
+        data = new TextEncoder().encode(value);
+      } else {
+        data = (segment as { data: Uint8Array }).data;
+        if (!(data instanceof Uint8Array)) invalid('Expected bytes for byte or Kanji segment', 'encode');
+      }
+      if (data.length > 65535) throw new ZymbolError('DATA_TOO_LONG', 'encodeSegments', 'Segment exceeds packet size');
+      const packet = new Uint8Array(data.length + 3);
+      packet[0] = tags[mode];
+      packet[1] = data.length & 255;
+      packet[2] = data.length >>> 8;
+      packet.set(data, 3);
+      packets.push(packet);
+      bytesNeeded += packet.length;
+    }
+    if (bytesNeeded > capacity) throw new ZymbolError('DATA_TOO_LONG', 'encodeSegments', 'Segments exceed WASM input workspace');
+    const data = memoryView(bridge.memory, bridge.zymbol_input_ptr(), bytesNeeded);
+    let offset = 0;
+    for (const packet of packets) { data.set(packet, offset); offset += packet.length; }
+    const control = memoryView(bridge.memory, bridge.zymbol_controls_ptr(), 14 * 4);
+    const view = new DataView(control.buffer, control.byteOffset, control.byteLength);
+    const values = [Number(micro), first, last, level, mask < 0 ? 0xffffffff : mask, boost,
+      fnc1Kind, indicator, structured ? 1 : 0, structured?.index ?? 0,
+      structured?.count ?? 0, structured?.parity ?? 0, bytesNeeded, segments.length];
+    values.forEach((value, index) => view.setUint32(index * 4, value, true));
+    call('encodeSegments', () => bridge.zymbol_encode_segments());
+    return readSymbol(micro, first, last);
   }
 
   function decode(grid: ModuleGrid): DecodeResult {
@@ -321,5 +408,5 @@ export function createEngine(wasm: WasmExports): QrEngine {
     return renderPng(encode(input, options?.encode), options?.render);
   }
 
-  return { encode, decode, renderSvg, renderPng, renderRaster, svg, png, structuredAppendParity } as QrEngine;
+  return { encode, encodeSegments, decode, renderSvg, renderPng, renderRaster, svg, png, structuredAppendParity } as QrEngine;
 }
