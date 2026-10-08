@@ -1,6 +1,6 @@
 .{
     .name = .zymbol,
-    .version = "1.0.1",
+    .version = "1.0.2",
     .fingerprint = 0xcbc76731de4fe3d2,
     .minimum_zig_version = "0.17.0",
     .dependencies = .{},

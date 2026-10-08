@@ -9,7 +9,7 @@ optimization mode. Releases are available from
 | Field | Value |
 | --- | --- |
 | Package | `zymbol` |
-| Version | `1.0.1` |
+| Version | `1.0.2` |
 | Minimum Zig | `0.17.0` |
 | Runtime package dependencies | None |
 | License | `MIT OR Apache-2.0` |

@@ -5,7 +5,7 @@ Requires Zig 0.17.0.
 ## Install
 
 ```sh
-zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.1.tar.gz
+zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v1.0.2.tar.gz
 ```
 
 Add the module in `build.zig`:
