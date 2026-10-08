@@ -1,52 +1,53 @@
 # Contributing
 
-Contributions are welcome when they preserve Zymbol's core design: a small
-public API, caller-owned core memory, deterministic behavior, and evidence for
-conformance-sensitive changes.
+Changes should preserve the public API, caller-owned buffers and deterministic
+output. Include a regression test for a bug fix. Update the documentation when
+changing functions, options or behavior.
 
-## Before opening a pull request
+## Local checks
 
-Run the normal local qualification:
+Format changed Zig files, then run these checks from the repository root:
 
 ```sh
 zig fmt build.zig src tests examples benchmarks
 git diff --check
 python3 tools/check_api_docs.py
+python3 tools/test_api_docs.py
+python3 tools/test_release_tools.py
 zig build test
 zig build conformance
 zig build qualify
 ```
 
-Changes to exported declarations, public type shapes, encoding or decoding
-semantics, render output, or package wiring require corresponding tests and
-documentation.
+Changes to encoding, decoding, rendering, portability or release behavior also
+need the relevant checks in the [release guide][releases].
 
 ## Pull requests
 
-Keep a pull request focused on one coherent change. Zymbol uses squash merges,
-so intermediate commits can remain practical while the final change stays
-traceable.
+Keep each PR focused on one change. PRs are squash-merged, so the title becomes
+the commit used for release notes and version selection.
 
-Pull request titles use a Conventional Commits-style prefix because the squash
-title is also release metadata:
+Use a Conventional Commits prefix:
 
-- `feat:` for user-visible backwards-compatible functionality;
-- `fix:` for bug fixes;
-- `perf:`, `refactor:`, `revert:`, or `security:` for releasable
-  non-feature changes;
-- `docs:`, `test:`, `build:`, `ci:`, or `chore:` for changes that do
-  not create a release on their own;
-- append `!` before the colon for an intentionally breaking change.
+- `feat:` adds compatible functionality and selects a minor release.
+- `fix:`, `perf:`, `refactor:`, `revert:` and `security:` select a patch release.
+- `docs:`, `test:`, `build:`, `ci:` and `chore:` do not create a release on their own.
+- Add `!` before the colon for an incompatible change.
 
-The automated release train derives semantic-version bumps and changelog
-entries from those squash titles.
+Draft PRs skip hosted CI. Run the local checks before marking a PR ready.
+Describe the resulting behavior and the checks you ran.
 
-Draft pull requests do not run hosted CI. Qualify changes locally before
-marking a pull request ready for review.
+## Documentation
 
-For changes that affect release behavior, portability, external
-interoperability, or the public contract, follow the additional gates in the
-[release checklist][release-checklist].
+Use [Getting started][getting-started] for setup and examples, the
+[API reference][api] for functions and types, and the [testing pages][testing]
+for results and test instructions. The [documentation index][docs] lists the
+maintainer guides too.
+
+Write for someone using or changing the library. Lead with the task or behavior,
+use short sentences and name the function or command involved. Keep technical
+terms when they make the behavior precise. Link to code and test results rather
+than repeating broad claims.
 
 ## Licensing
 
@@ -55,15 +56,8 @@ for inclusion in Zymbol is licensed under either the MIT License or the Apache
 License, Version 2.0, at the recipient's option, without additional terms or
 conditions.
 
-## Documentation
-
-User-facing behavior belongs in the [README][readme] or [API reference][api].
-Correctness claims belong in the relevant qualification document rather than
-in commit messages or informal comments.
-
-The [documentation index][docs] maps the rest of the repository documentation.
-
-[api]: docs/api.md
+[api]: docs/reference/api.md
 [docs]: docs/README.md
-[readme]: README.md
-[release-checklist]: docs/v1-release-checklist.md
+[getting-started]: docs/getting-started.md
+[releases]: docs/maintaining/releases.md
+[testing]: docs/README.md#tests-and-measurements

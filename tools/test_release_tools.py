@@ -16,7 +16,7 @@ class ReleaseToolsTest(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory(prefix="zymbol-release-tools-")
         self.root = pathlib.Path(self.tempdir.name)
         (self.root / "tools").mkdir()
-        (self.root / "docs").mkdir()
+        (self.root / "docs" / "maintaining").mkdir(parents=True)
 
         for name in ("prepare_release.py", "release.py", "check_pr_title.py"):
             shutil.copy2(ROOT / "tools" / name, self.root / "tools" / name)
@@ -40,7 +40,11 @@ zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v0.1.0.tar.
 """,
             encoding="utf-8",
         )
-        (self.root / "docs" / "distribution.md").write_text(
+        (self.root / "docs" / "getting-started.md").write_text(
+            "zig fetch --save https://github.com/ekkolon/zymbol/archive/refs/tags/v0.1.0.tar.gz\n",
+            encoding="utf-8",
+        )
+        (self.root / "docs" / "maintaining" / "distribution.md").write_text(
             "| Version | `0.1.0` release candidate |\n",
             encoding="utf-8",
         )
@@ -122,7 +126,11 @@ Initial project baseline.
         self.assertNotIn("## Highlights", readme)
         self.assertIn(
             "| Version | `1.0.0` |",
-            (self.root / "docs" / "distribution.md").read_text(),
+            (self.root / "docs" / "maintaining" / "distribution.md").read_text(),
+        )
+        self.assertIn(
+            "refs/tags/v1.0.0.tar.gz",
+            (self.root / "docs" / "getting-started.md").read_text(),
         )
 
         changelog = (self.root / "CHANGELOG.md").read_text()
@@ -248,6 +256,20 @@ Initial project baseline.
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("version badge does not match", result.stderr)
+
+    def test_release_validation_rejects_stale_getting_started_url(self) -> None:
+        self.prepare("--version", "1.0.0", "--date", "2026-10-07")
+
+        guide = self.root / "docs" / "getting-started.md"
+        guide.write_text(
+            guide.read_text().replace("v1.0.0.tar.gz", "v0.9.9.tar.gz"),
+            encoding="utf-8",
+        )
+        result = self.run_cmd(
+            sys.executable, "tools/release.py", "v1.0.0", check=False
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("getting-started.md installation URL does not match", result.stderr)
 
     def test_release_workflow_stages_tag_before_draft_publication(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
