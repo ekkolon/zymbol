@@ -95,9 +95,9 @@ supported Micro QR combinations, and SVG/PNG output. The release workflow
 also executes the repository's native `zig build qualify` target.
 
 The [JavaScript Qualification workflow](../../.github/workflows/js-verify.yml)
-runs only at an explicit PR review checkpoint or manual dispatch. Native
-CI ignores package-only changes. The browser job consumes the compiled
-artifact and can be rerun without rebuilding Zig.
+runs when a package-related PR is marked ready for review, or by manual
+dispatch. Native CI ignores package-only changes. The browser job consumes
+the compiled artifact and can be rerun without rebuilding Zig.
 
 Node and modern browsers are primary supported targets. Bun and Deno
 compatibility has not been established by the release tests.
@@ -109,7 +109,6 @@ It checks the exact version tag and source commit, qualifies the package,
 archives the built files, verifies the tarball checksum and publishes the
 same archive with npm OIDC provenance. No write token is stored in GitHub.
 
-See [JavaScript package releases](javascript-release.md) for the first-time
-npm bootstrap and tag procedure. Integration work stays on
-`integration/js` until qualification, then enters `main` as one
-squash merge.
+See [JavaScript package releases](javascript-release.md) for version tags,
+qualification and npm publishing. Develop on focused feature branches and
+squash-merge qualified changes into `main`.

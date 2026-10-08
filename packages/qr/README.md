@@ -2,7 +2,7 @@
 
 QR Code and Micro QR encoding, decoding, and rendering for JavaScript and TypeScript. Powered by [Zymbol](https://github.com/ekkolon/zymbol), compiled from Zig to WebAssembly.
 
-Install from npm once the first release is published:
+Install the published package:
 
 ```sh
 npm install @zymbol/qr

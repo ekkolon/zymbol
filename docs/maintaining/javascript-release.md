@@ -16,35 +16,25 @@ The packed tarball is the release artifact. The publishing job checks its
 SHA-256 digest and publishes that archive without rebuilding it. No npm
 credentials are stored in GitHub.
 
-## First-time npm setup
+## Publisher configuration
 
-An npm trusted publisher can only be assigned to a package that already
-exists on the registry. If `@zymbol/qr` has never been published, an owner
-of the `@zymbol` organization must first claim it. Publish a minimal
-bootstrap version (for example `0.0.0-bootstrap.0`) interactively with 2FA,
-using the `bootstrap` dist-tag. Do **not** publish the integration source
-as a bootstrap release.
+`@zymbol/qr` was bootstrapped on npm before the first stable release.
+The trusted publisher uses GitHub owner `ekkolon`, repository `zymbol`,
+workflow `js-package.yml` and the protected GitHub environment `npm`.
 
-Configure the package's trusted publisher on npmjs.com:
+Stable npm releases use the `latest` dist-tag, while prereleases use
+`next`. The `bootstrap` dist-tag remains separate. The publishing job
+uses short-lived GitHub OIDC credentials. It must not receive an npm token.
+Configure npm publishing access to disallow traditional tokens.
 
-- GitHub owner: `ekkolon`
-- Repository: `zymbol`
-- Workflow: `js-package.yml`
-- Environment: `npm`
-- Permission: `npm publish`
-
-Configure the matching GitHub `npm` environment with required reviewer
-approval. Configure npm publishing access to disallow traditional tokens
-once OIDC is working. Trusted publisher configurations require their first
-successful publish within two days of creation.
-
-The account owner must complete this setup; neither repository commits nor
-a dry-run workflow can establish npm account trust.
+Do not move or reuse published version tags. Published npm versions are
+immutable, and provenance identifies the exact source commit.
 
 ## Publish
 
-1. Qualify `integration/js`, then squash-merge it into `main`.
-2. Create the tag `npm/qr/v<version>` at the merged `main` commit.
+1. Qualify the feature branch, then squash-merge it into `main`.
+   Increase `packages/qr/package.json` to a version not already published.
+2. Create a new, signed tag `npm/qr/v<version>` on the merged `main` commit.
    Check that `packages/qr/package.json` contains that exact version.
 3. Run the `JavaScript Package` workflow against the tag with
    `publish=true`. The default is a nonpublishing qualification run.
