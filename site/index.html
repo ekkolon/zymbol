@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101522">
-  <meta name="description" content="Zymbol encodes, decodes and renders QR Code and Micro QR symbols. Native Zig and TypeScript through WebAssembly.">
+  <meta name="theme-color" content="#0b0c09">
+  <meta name="description" content="Zymbol is a QR Code and Micro QR library for Zig and TypeScript, powered by one Zig implementation.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
-  <title>Zymbol | QR Code and Micro QR for Zig and TypeScript</title>
+  <title>Zymbol — QR codes in Zig and TypeScript</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
 </head>
@@ -14,169 +14,81 @@
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="topbar">
     <div class="shell nav-inner">
-      <a class="brand" href="#top" aria-label="Zymbol home">
-        <svg class="brand-icon" viewBox="0 0 36 36" aria-hidden="true" fill="none">
-          <rect x="2" y="2" width="15" height="15" rx="3" stroke="currentColor" stroke-width="3"/>
-          <rect x="7" y="7" width="5" height="5" rx="1" fill="currentColor"/>
-          <rect x="21" y="2" width="13" height="13" rx="3" stroke="currentColor" stroke-width="3"/>
-          <rect x="25" y="6" width="5" height="5" rx="1" fill="currentColor"/>
-          <rect x="2" y="21" width="13" height="13" rx="3" stroke="currentColor" stroke-width="3"/>
-          <rect x="6" y="25" width="5" height="5" rx="1" fill="currentColor"/>
-          <path d="M21 21h5v5h-5zM29 21h5v5h-5zM21 29h5v5h-5zM29 29h5" fill="currentColor" stroke="currentColor" stroke-width="2"/>
-        </svg>
-        <span>Zymbol</span>
-      </a>
-      <nav class="nav-links" aria-label="Main navigation">
-        <a href="#playground">Playground</a>
-        <a href="#capabilities">Library</a>
-        <a href="#verification">Engineering</a>
-        <a href="https://github.com/ekkolon/zymbol/tree/main/docs">Docs <span aria-hidden="true">↗</span></a>
-      </nav>
+      <a class="brand" href="#top" aria-label="Zymbol home"><svg viewBox="0 0 19 19" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M0 0h7v7H0zM12 0h7v7h-7zM0 12h7v7H0z"/><path fill="var(--bg)" d="M2 2h3v3H2zM14 2h3v3h-3zM2 14h3v3H2z"/><path fill="currentColor" d="M8 0h2v2H8zM9 4h2v3H9zM13 9h2v2h-2zM8 9h3v2H8zM16 12h3v2h-3zM9 14h2v5H9zM12 16h3v3h-3zM16 16h3v3h-3z"/></svg><span>zymbol</span></a>
+      <nav class="nav-links" aria-label="Main navigation"><a href="#playground">Playground</a><a href="#library">Library</a><a href="#evidence">Evidence</a><a href="https://github.com/ekkolon/zymbol/tree/main/docs">Docs <span aria-hidden="true">↗</span></a></nav>
       <a class="nav-github" href="https://github.com/ekkolon/zymbol" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a>
     </div>
   </header>
 
   <main id="main">
-    <section class="hero shell" id="top" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <div class="eyebrow"><span class="pulse-dot"></span> Native Zig · WebAssembly · TypeScript</div>
-        <h1 id="hero-title">QR codes, <span class="accent-text">without a second implementation.</span></h1>
-        <p>Zymbol encodes, decodes and renders QR Code and Micro QR symbols. Use it from Zig or JavaScript. Both run the same core.</p>
-        <div class="hero-actions">
-          <a class="button primary" href="#playground">Try the playground <span aria-hidden="true">↗</span></a>
-          <a class="button secondary" href="https://github.com/ekkolon/zymbol/tree/main/docs/reference">Browse the API</a>
-        </div>
-        <div class="install-box">
-          <code>npm install @zymbol/qr</code>
-          <button class="copy-button" type="button" id="copy-install" aria-label="Copy npm install command">Copy</button>
-        </div>
-        <div class="version-note">Zig v1.0.2 <span aria-hidden="true">·</span> npm v1.0.0 <span aria-hidden="true">·</span> MIT OR Apache-2.0</div>
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="hero-pixels hero-pixels-left" aria-hidden="true"></div>
+      <div class="hero-pixels hero-pixels-right" aria-hidden="true"></div>
+      <div class="hero-inner shell">
+        <p class="hero-overline"><span class="square-marker" aria-hidden="true"></span> A QR CODE LIBRARY / ZIG + WASM</p>
+        <h1 id="hero-title"><span class="visually-hidden">Zymbol</span><svg class="pixel-wordmark" viewBox="0 0 35 7" role="img" aria-hidden="true" shape-rendering="crispEdges"><path id="wordmark-shape" d="M0 0h5v1h-5zM4 1h1v1h-1zM3 2h1v1h-1zM2 3h1v1h-1zM1 4h1v1h-1zM0 5h1v1h-1zM0 6h5v1h-5zM6 0h1v1h-1zM10 0h1v1h-1zM6 1h1v1h-1zM10 1h1v1h-1zM7 2h1v1h-1zM9 2h1v1h-1zM8 3h1v1h-1zM8 4h1v1h-1zM8 5h1v1h-1zM8 6h1v1h-1zM12 0h1v1h-1zM16 0h1v1h-1zM12 1h2v1h-2zM15 1h2v1h-2zM12 2h1v1h-1zM14 2h1v1h-1zM16 2h1v1h-1zM12 3h1v1h-1zM14 3h1v1h-1zM16 3h1v1h-1zM12 4h1v1h-1zM16 4h1v1h-1zM12 5h1v1h-1zM16 5h1v1h-1zM12 6h1v1h-1zM16 6h1v1h-1zM18 0h4v1h-4zM18 1h1v1h-1zM22 1h1v1h-1zM18 2h1v1h-1zM22 2h1v1h-1zM18 3h4v1h-4zM18 4h1v1h-1zM22 4h1v1h-1zM18 5h1v1h-1zM22 5h1v1h-1zM18 6h4v1h-4zM25 0h3v1h-3zM24 1h1v1h-1zM28 1h1v1h-1zM24 2h1v1h-1zM28 2h1v1h-1zM24 3h1v1h-1zM28 3h1v1h-1zM24 4h1v1h-1zM28 4h1v1h-1zM24 5h1v1h-1zM28 5h1v1h-1zM25 6h3v1h-3zM30 0h1v1h-1zM30 1h1v1h-1zM30 2h1v1h-1zM30 3h1v1h-1zM30 4h1v1h-1zM30 5h1v1h-1zM30 6h5v1h-5z"/></svg></h1>
+        <p class="hero-heading">Encode. Decode. Render.</p>
+        <p class="hero-description">QR Code and Micro QR for Zig and TypeScript.<br>One implementation, compiled to WebAssembly.</p>
+        <div class="hero-actions"><a class="button primary" href="#playground">Open playground <span aria-hidden="true">↘</span></a><a class="button secondary" href="https://github.com/ekkolon/zymbol/blob/main/docs/getting-started.md">Get started <span aria-hidden="true">↗</span></a></div>
+        <div class="hero-command"><span aria-hidden="true">$</span><code>npm install @zymbol/qr</code><button class="copy-button" type="button" id="copy-install" aria-label="Copy npm install command">Copy</button></div>
       </div>
-      <div class="hero-visual" aria-hidden="true">
-        <div class="visual-glow"></div>
-        <div class="floating-label top-label"><span class="tiny-status"></span> WASM runtime</div>
-        <div class="graphic-qr">
-          <svg viewBox="0 0 21 21" shape-rendering="crispEdges" fill="#17203a">
-            <path d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0z" fill="#17203a"/>
-            <path d="M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z" fill="#fff"/>
-            <path d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z"/>
-            <path d="M8 0h1v2H8zM10 0h2v1h-2zM12 2h1v3h-1zM8 4h3v1H8zM9 6h1v2H9zM11 6h2v1h-2zM7 8h2v1H7zM10 8h1v3h-1zM12 8h3v1h-3zM16 8h2v2h-2zM19 8h2v1h-2zM0 8h3v1H0zM4 8h2v3H4zM1 10h2v1H1zM7 10h2v2H7zM11 11h4v1h-4zM16 11h1v3h-1zM18 11h3v1h-3zM0 12h2v1H0zM3 12h2v1H3zM6 12h1v2H6zM9 13h2v1H9zM12 13h3v2h-3zM8 15h3v1H8zM12 16h2v2h-2zM15 15h2v1h-2zM18 15h3v2h-3zM8 18h2v3H8zM11 19h2v2h-2zM14 19h1v2h-1zM16 18h2v1h-2zM19 19h2v2h-2z"/>
-          </svg>
-        </div>
-        <div class="floating-label bottom-label">ISO/IEC 18004:2024</div>
-      </div>
+      <div class="hero-baseline shell"><span>01 / 04</span><span>ISO/IEC 18004:2024</span><span>ZIG v1.0.2 <span aria-hidden="true">/</span> NPM v1.0.0</span></div>
     </section>
 
-    <div class="facts-bar"><div class="shell facts-grid">
-      <div><strong>1–40</strong><span>QR Code versions</span></div>
-      <div><strong>M1–M4</strong><span>Micro QR versions</span></div>
-      <div><strong>3</strong><span>Render formats</span></div>
-      <div><strong>1</strong><span>Zig implementation</span></div>
-    </div></div>
+    <section class="intro shell" aria-labelledby="intro-title">
+      <div class="intro-index">[ ABOUT THE LIBRARY ]</div>
+      <div class="intro-body"><h2 id="intro-title">A small library for a precise format.</h2><p>Create and read QR symbols from native Zig or JavaScript. Zymbol handles encoding, error correction and rendering. The browser playground below uses the published package, not a separate implementation.</p></div>
+      <div class="intro-quote" aria-hidden="true"><span>▦</span><span>DATA IN<br>SYMBOL OUT</span></div>
+    </section>
 
-    <section class="section shell playground-section" id="playground" aria-labelledby="play-title">
-      <div class="section-heading">
-        <div><div class="section-kicker">PLAYGROUND / 01</div><h2 id="play-title">Make a symbol.</h2><p>This runs locally in your browser using the published <code>@zymbol/qr</code> WebAssembly package. No payload is sent to a server.</p></div>
-        <span class="local-tag"><span class="tiny-status"></span> Local processing</span>
-      </div>
-      <div class="play-layout">
-        <form class="controls-card" id="play-form" autocomplete="off">
-          <div class="form-heading"><h3>Content & options</h3><span class="form-heading-detail">Live preview</span></div>
-          <div class="field">
-            <label for="payload">Content</label>
-            <textarea id="payload" name="payload" spellcheck="false" maxlength="8192" rows="4">https://github.com/ekkolon/zymbol</textarea>
-            <div class="field-foot"><span>Text or URL</span><output id="byte-count">0 bytes</output></div>
-          </div>
-          <div class="field">
-            <span class="field-label" id="family-label">Symbol family</span>
-            <div class="segmented" role="group" aria-labelledby="family-label">
-              <label><input type="radio" name="family" value="qr" checked><span>QR Code</span></label>
-              <label><input type="radio" name="family" value="micro"><span>Micro QR</span></label>
+    <section class="section playground-section" id="playground" aria-labelledby="play-title">
+      <div class="shell">
+        <div class="section-heading"><div><p class="section-kicker">01 / PLAYGROUND</p><h2 id="play-title">Make a symbol.</h2><p>Runs in your browser. Nothing is uploaded.</p></div><span class="local-tag"><span class="status-square" aria-hidden="true"></span> LOCAL / WASM</span></div>
+        <div class="play-layout">
+          <form class="controls-card" id="play-form" autocomplete="off">
+            <div class="panel-top"><span>INPUT / SETTINGS</span><span>01—A</span></div>
+            <div class="panel-content">
+              <div class="field"><label for="payload">Content</label><textarea id="payload" name="payload" spellcheck="false" maxlength="8192" rows="4">https://github.com/ekkolon/zymbol</textarea><div class="field-foot"><span>Text / URL</span><output id="byte-count">0 bytes</output></div></div>
+              <div class="field"><span class="field-label" id="family-label">Symbol</span><div class="segmented" role="group" aria-labelledby="family-label"><label><input type="radio" name="family" value="qr" checked><span>QR Code</span></label><label><input type="radio" name="family" value="micro"><span>Micro QR</span></label></div></div>
+              <div class="field-row"><div class="field"><label for="error-correction">Error correction</label><select id="error-correction" name="error-correction"><option value="L">L · Low</option><option value="M" selected>M · Medium</option><option value="Q">Q · Quartile</option><option value="H">H · High</option></select></div><div class="field"><label for="scale">PNG scale <output id="scale-value">8×</output></label><input type="range" id="scale" name="scale" min="2" max="12" value="8" step="1"></div></div>
+              <div class="field-row colors"><div class="field"><label for="foreground">Foreground</label><div class="color-field"><input type="color" id="foreground" name="foreground" value="#17203a"><span>Ink</span></div></div><div class="field"><label for="background">Background</label><div class="color-field"><input type="color" id="background" name="background" value="#ffffff"><span>Paper</span></div></div></div>
+              <div class="samples" aria-label="Sample content"><span>LOAD SAMPLE</span><button type="button" data-sample="url">URL</button><button type="button" data-sample="numeric">Micro numeric</button><button type="button" data-sample="wifi">Wi-Fi</button></div>
             </div>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="error-correction">Error correction</label>
-              <select id="error-correction" name="error-correction">
-                <option value="L">L · Low</option>
-                <option value="M" selected>M · Medium</option>
-                <option value="Q">Q · Quartile</option>
-                <option value="H">H · High</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="scale">PNG scale <output id="scale-value">8×</output></label>
-              <input type="range" id="scale" name="scale" min="2" max="12" value="8" step="1">
-            </div>
-          </div>
-          <div class="field-row colors">
-            <div class="field">
-              <label for="foreground">Foreground</label>
-              <div class="color-field"><input type="color" id="foreground" name="foreground" value="#17203a"><span>Ink</span></div>
-            </div>
-            <div class="field">
-              <label for="background">Background</label>
-              <div class="color-field"><input type="color" id="background" name="background" value="#ffffff"><span>Paper</span></div>
-            </div>
-          </div>
-          <div class="samples" aria-label="Sample content">
-            <span>Samples</span>
-            <button type="button" data-sample="url">URL</button>
-            <button type="button" data-sample="numeric">Micro numeric</button>
-            <button type="button" data-sample="wifi">Wi-Fi</button>
-          </div>
-        </form>
-
-        <div class="preview-card">
-          <div class="preview-header"><span>OUTPUT / QR MATRIX</span><span class="preview-led"><span class="tiny-status"></span><span id="runtime-label">Loading WASM</span></span></div>
-          <div class="preview-stage">
-            <div id="preview-container" class="preview-container">
-              <div id="placeholder" class="placeholder" role="status" aria-label="Initializing WebAssembly"><span class="spinner"></span></div>
-              <img id="qr-image" alt="Generated QR code from the current content" hidden>
-            </div>
-          </div>
-          <div class="preview-meta"><span id="symbol-description">Initializing encoder…</span><span id="symbol-size">—</span></div>
-          <p class="play-status" id="play-status" role="status" aria-live="polite">Loading the WebAssembly module.</p>
-          <div class="download-row">
-            <button type="button" class="button primary" id="download-svg" disabled>Download SVG <span aria-hidden="true">↓</span></button>
-            <button type="button" class="button secondary" id="download-png" disabled>Download PNG <span aria-hidden="true">↓</span></button>
+          </form>
+          <div class="preview-card">
+            <div class="panel-top"><span>OUTPUT / MATRIX</span><span id="runtime-label">Loading WASM</span></div>
+            <div class="preview-stage"><div class="preview-container" id="preview-container"><div id="placeholder" class="placeholder" role="status" aria-label="Initializing WebAssembly"><span class="spinner"></span></div><img id="qr-image" alt="Generated QR code from the current content" hidden></div></div>
+            <div class="preview-meta"><span id="symbol-description">Initializing encoder…</span><span id="symbol-size">—</span></div>
+            <p class="play-status" id="play-status" role="status" aria-live="polite">Loading the WebAssembly module.</p>
+            <div class="download-row"><button type="button" class="button primary" id="download-svg" disabled>Download SVG <span aria-hidden="true">↓</span></button><button type="button" class="button secondary" id="download-png" disabled>Download PNG <span aria-hidden="true">↓</span></button></div>
           </div>
         </div>
-      </div>
-      <div class="api-snippet">
-        <div class="snippet-header"><span>TypeScript / same implementation</span><button type="button" id="copy-code" class="copy-button">Copy code</button></div>
-        <pre><code id="example-code">import { createZymbol } from '@zymbol/qr';
+        <div class="api-snippet"><div class="snippet-header"><span>EXAMPLE / TYPESCRIPT</span><button type="button" id="copy-code" class="copy-button">Copy code</button></div><pre><code id="example-code">import { createZymbol } from '@zymbol/qr';
 
 const qr = await createZymbol();
 const symbol = qr.encode('https://example.com');
-const svg = qr.renderSvg(symbol);</code></pre>
+const svg = qr.renderSvg(symbol);</code></pre></div>
       </div>
     </section>
 
-    <section class="section section-muted" id="capabilities" aria-labelledby="cap-title"><div class="shell">
-      <div class="section-heading"><div><div class="section-kicker">LIBRARY / 02</div><h2 id="cap-title">The essentials, covered.</h2><p>Encoding, decoding and rendering, with a small public interface and explicit ownership.</p></div></div>
-      <div class="feature-grid">
-        <article class="feature-card"><span class="feature-index">01</span><h3>Encode</h3><p>QR Code and Micro QR, automatic or explicit versions, error correction, masks, Kanji, ECI, FNC1 and Structured Append.</p><a href="https://github.com/ekkolon/zymbol/blob/main/packages/qr/src/types.ts">TypeScript types ↗</a></article>
-        <article class="feature-card"><span class="feature-index">02</span><h3>Decode</h3><p>Recover payload bytes and metadata from sampled module grids, with Reed-Solomon correction and orientation normalization.</p><a href="https://github.com/ekkolon/zymbol/blob/main/docs/reference/api.md">Zig API ↗</a></article>
-        <article class="feature-card"><span class="feature-index">03</span><h3>Render</h3><p>Export SVG, PNG or raw RGBA pixels. Control module scale, quiet zone and colors. No external image toolkit required.</p><a href="https://github.com/ekkolon/zymbol/tree/main/examples">Examples ↗</a></article>
+    <section class="section shell library-section" id="library" aria-labelledby="library-title">
+      <div class="section-heading"><div><p class="section-kicker">02 / LIBRARY</p><h2 id="library-title">The parts that matter.</h2><p>Encoding, decoding and rendering. Nothing to install beyond the library.</p></div></div>
+      <div class="library-list">
+        <article class="library-row"><span class="row-index">01</span><div><h3>Encode</h3><p>QR Code Model 2 and Micro QR. Automatic or explicit versions, error correction, masks and advanced modes.</p></div><a href="https://github.com/ekkolon/zymbol/blob/main/packages/qr/src/types.ts">TypeScript API <span aria-hidden="true">↗</span></a></article>
+        <article class="library-row"><span class="row-index">02</span><div><h3>Decode</h3><p>Read sampled module grids, recover data and correct errors with Reed-Solomon decoding.</p></div><a href="https://github.com/ekkolon/zymbol/blob/main/docs/reference/api.md">Zig API <span aria-hidden="true">↗</span></a></article>
+        <article class="library-row"><span class="row-index">03</span><div><h3>Render</h3><p>SVG, PNG and raw RGBA output. Set colors, scale and quiet zone without another image library.</p></div><a href="https://github.com/ekkolon/zymbol/tree/main/examples">Examples <span aria-hidden="true">↗</span></a></article>
       </div>
-      <div class="scope-note"><strong>Decoder scope.</strong> Zymbol accepts sampled QR module grids. It does not locate QR codes in photographs or perform camera capture.</div>
+      <p class="scope-note"><strong>Decoder scope:</strong> sampled QR module grids. Zymbol does not locate symbols in photographs or capture camera input.</p>
+    </section>
+
+    <section class="section evidence-section" id="evidence" aria-labelledby="evidence-title"><div class="shell">
+      <div class="section-heading"><div><p class="section-kicker">03 / EVIDENCE</p><h2 id="evidence-title">Tested, measured, published.</h2><p>The test record is part of the project. Read the methods and results.</p></div></div>
+      <div class="evidence-grid"><a href="https://github.com/ekkolon/zymbol/blob/main/docs/testing/conformance.md"><span class="row-index">01 / SPECIFICATION</span><h3>ISO conformance <span aria-hidden="true">↗</span></h3><p>Reference fixtures and encoding rules checked against ISO/IEC 18004:2024.</p></a><a href="https://github.com/ekkolon/zymbol/blob/main/docs/testing/interoperability.md"><span class="row-index">02 / INTEROPERABILITY</span><h3>ZXing-cpp <span aria-hidden="true">↗</span></h3><p>Round trips in both directions for QR Code and Micro QR.</p></a><a href="https://github.com/ekkolon/zymbol/blob/main/docs/testing/fuzzing.md"><span class="row-index">03 / RELIABILITY</span><h3>Fuzzing and portability <span aria-hidden="true">↗</span></h3><p>Regression inputs, coverage-guided fuzzing and cross-architecture checks.</p></a><a href="https://github.com/ekkolon/zymbol/blob/main/docs/testing/performance.md"><span class="row-index">04 / MEASUREMENT</span><h3>Benchmarks <span aria-hidden="true">↗</span></h3><p>Reproducible encoding, decoding and rendering workloads.</p></a></div>
+      <div class="release-line"><span class="status-square" aria-hidden="true"></span><p><strong>Published from GitHub Actions</strong><br><code>@zymbol/qr@1.0.0</code> uses npm trusted publishing.</p><a href="https://github.com/ekkolon/zymbol/actions/workflows/js-package.yml">Release workflow ↗</a></div>
     </div></section>
 
-    <section class="section shell" id="verification" aria-labelledby="proof-title">
-      <div class="section-heading"><div><div class="section-kicker">ENGINEERING / 03</div><h2 id="proof-title">Tested beyond the happy path.</h2><p>The implementation ships with reproducible engineering evidence, not just a demo.</p></div></div>
-      <div class="proof-grid">
-        <a class="proof-card" href="https://github.com/ekkolon/zymbol/blob/main/docs/testing/conformance.md"><span class="proof-mark">↗</span><h3>ISO conformance</h3><p>Reference fixtures, encoding rules and correction limits reviewed against ISO/IEC 18004:2024.</p></a>
-        <a class="proof-card" href="https://github.com/ekkolon/zymbol/blob/main/docs/testing/interoperability.md"><span class="proof-mark">↗</span><h3>Interoperability</h3><p>Bidirectional cases with ZXing-cpp across QR Code and Micro QR.</p></a>
-        <a class="proof-card" href="https://github.com/ekkolon/zymbol/blob/main/docs/testing/fuzzing.md"><span class="proof-mark">↗</span><h3>Fuzzing & portability</h3><p>Deterministic regression inputs, coverage-guided fuzzing and cross-architecture runtime checks.</p></a>
-        <a class="proof-card" href="https://github.com/ekkolon/zymbol/blob/main/docs/testing/performance.md"><span class="proof-mark">↗</span><h3>Benchmarks</h3><p>Measured encoding, decoding, rendering and correction, with repeatable workloads.</p></a>
-      </div>
-      <div class="provenance-row"><span class="provenance-icon" aria-hidden="true">✓</span><div><strong>Published with verifiable provenance</strong><p><code>@zymbol/qr@1.0.0</code> is published from GitHub Actions using npm trusted publishing.</p></div><a href="https://github.com/ekkolon/zymbol/actions/workflows/js-package.yml">Release workflow ↗</a></div>
-    </section>
-
-    <section class="closing"><div class="shell closing-inner"><div><div class="section-kicker">GET STARTED</div><h2>One core. Two ways to use it.</h2><p>Install the Zig package or the published TypeScript/WebAssembly package.</p></div><div class="closing-links"><a class="button closing-primary" href="https://www.npmjs.com/package/@zymbol/qr">npm package ↗</a><a class="button closing-secondary" href="https://github.com/ekkolon/zymbol/blob/main/docs/getting-started.md">Zig guide ↗</a></div></div></section>
+    <section class="section start-section shell" aria-labelledby="start-title"><div><p class="section-kicker">04 / GET STARTED</p><h2 id="start-title">Pick your runtime.</h2><p>Zig for native applications. TypeScript and JavaScript through WebAssembly.</p></div><div class="start-actions"><a class="button primary" href="https://www.npmjs.com/package/@zymbol/qr">npm package <span aria-hidden="true">↗</span></a><a class="button secondary" href="https://github.com/ekkolon/zymbol/blob/main/docs/getting-started.md">Zig guide <span aria-hidden="true">↗</span></a></div></section>
   </main>
-
-  <footer class="footer"><div class="shell footer-inner"><a class="brand" href="#top">Zymbol</a><p>MIT OR Apache-2.0 · QR Code is a registered trademark of DENSO WAVE INCORPORATED.</p><a href="https://github.com/ekkolon/zymbol/blob/main/SECURITY.md">Security</a></div></footer>
+  <footer class="footer"><div class="shell footer-inner"><a class="footer-brand" href="#top">▦ zymbol</a><span>MIT OR Apache-2.0</span><span>QR Code is a registered trademark of DENSO WAVE INCORPORATED.</span><a href="https://github.com/ekkolon/zymbol/blob/main/SECURITY.md">Security ↗</a></div></footer>
 </body>
 </html>
