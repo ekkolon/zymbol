@@ -5,7 +5,8 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const archives = JSON.parse(execFileSync('npm', ['pack', '--json'], {
+execFileSync(process.execPath, ['scripts/check-dist.mjs'], { cwd: root, stdio: 'inherit' });
+const archives = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json'], {
   cwd: root,
   encoding: 'utf8',
 }));
