@@ -9,8 +9,7 @@ raster output. Decoding takes a sampled module grid, not a photograph.
 See the [ISO/IEC 18004:2024 conformance review](docs/testing/conformance.md)
 for scope and test evidence.
 
-[Try the browser generator](https://ekkolon.github.io/zymbol/create/) ·
-[Documentation](docs/README.md)
+[Try the browser generator](https://ekkolon.github.io/zymbol/create/)
 
 ## Zig
 
@@ -48,16 +47,13 @@ const svg = zymbol.svg('https://example.com');
 The package runs in browsers, Node.js, and workers.
 See the [package guide](packages/qr/README.md) for options and examples.
 
-## Documentation
+## Resources
 
-[API reference](docs/reference/api.md) · [Examples](examples/) ·
-[Compatibility](docs/reference/compatibility.md)
-
-[Interoperability](docs/testing/interoperability.md) ·
-[Fuzzing](docs/testing/fuzzing.md) · [Benchmarks](docs/testing/performance.md)
-
-[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) ·
-[Security](SECURITY.md)
+- [Documentation](docs/README.md) for guides, API details, and testing.
+- [Examples](examples/) for Zig usage.
+- [Changelog](CHANGELOG.md) for release history.
+- [Contributing](CONTRIBUTING.md) for development and pull requests.
+- [Security](SECURITY.md) for vulnerability reports.
 
 Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your
 option.
