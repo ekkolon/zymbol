@@ -1,14 +1,6 @@
 # Zymbol
 
-<a href="https://codesniper.greenhats.com">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://codesniper.greenhats.com/badges/codesniper-audited-compact-dark.png">
-    <img src="https://codesniper.greenhats.com/badges/codesniper-audited-compact-light.png" alt="Audited by Code:Sniper, a project by greenhats" width="320" height="88">
-  </picture>
-</a>
-
 [![CI](https://github.com/ekkolon/zymbol/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ekkolon/zymbol/actions/workflows/ci.yml)
-[![JavaScript qualification](https://github.com/ekkolon/zymbol/actions/workflows/js-verify.yml/badge.svg?event=pull_request)](https://github.com/ekkolon/zymbol/actions/workflows/js-verify.yml)
 [![Zig release](https://img.shields.io/github/v/release/ekkolon/zymbol?label=Zig%20release)](https://github.com/ekkolon/zymbol/releases)
 [![npm package](https://img.shields.io/npm/v/%40zymbol%2Fqr?label=npm)](https://www.npmjs.com/package/@zymbol/qr)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](LICENSE)
@@ -67,6 +59,13 @@ See the [package guide](packages/qr/README.md) for options and examples.
 - [Changelog](CHANGELOG.md) for release history.
 - [Contributing](CONTRIBUTING.md) for development and pull requests.
 - [Security](SECURITY.md) for vulnerability reports.
+
+<a href="https://codesniper.greenhats.com">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://codesniper.greenhats.com/badges/codesniper-audited-compact-dark.png">
+    <img src="https://codesniper.greenhats.com/badges/codesniper-audited-compact-light.png" alt="Audited by Code:Sniper, a project by greenhats" width="144" height="40">
+  </picture>
+</a>
 
 Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your
 option.
