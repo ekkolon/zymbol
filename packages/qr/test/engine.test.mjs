@@ -149,6 +149,25 @@ test('manual segment validation rejects malformed modes, values, and headers', (
     fnc1: { position: 'second', applicationIndicator: 400 } }), { code: 'INVALID_OPTIONS' });
 });
 
+test('manual segment modes must be own tags and are rejected before WASM or memory writes', () => {
+  const { bridge, bytes } = fake();
+  let wasmCalls = 0;
+  bridge.zymbol_encode_segments = () => { wasmCalls++; throw new Error('unexpected WASM call'); };
+  const qr = createEngine(bridge);
+  const before = bytes.slice();
+  const options = { version: 1, errorCorrection: 'L' };
+
+  for (const mode of ['constructor', 'toString', '__proto__', 'unknown']) {
+    assert.throws(
+      () => qr.encodeSegments([{ mode, data: new Uint8Array([1]) }], options),
+      { code: 'INVALID_INPUT' },
+      `invalid segment mode: ${mode}`,
+    );
+    assert.equal(wasmCalls, 0, `${mode} reached WASM`);
+    assert.deepEqual(bytes, before, `${mode} wrote to WASM memory`);
+  }
+});
+
 test('reject malformed WASM geometry and decoding metadata', () => {
   const badVersion = fake();
   const rawEncode = badVersion.bridge.zymbol_encode;

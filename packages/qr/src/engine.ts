@@ -264,7 +264,7 @@ export function createEngine(wasm: WasmExports, limits: Limits = {}): QrEngine {
     let bytesNeeded = 0;
     const tags = { numeric: 0, alphanumeric: 1, byte: 2, kanji: 3, eci: 4 } as const;
     for (const segment of segments) {
-      if (!segment || typeof segment !== 'object' || !('mode' in segment) || !(segment.mode in tags)) {
+      if (!segment || typeof segment !== 'object' || !Object.hasOwn(tags, segment.mode)) {
         invalid('Invalid segment mode', 'encode');
       }
       const mode = segment.mode as keyof typeof tags;

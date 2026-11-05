@@ -3,11 +3,18 @@ name: JavaScript Qualification
 on:
   pull_request:
     types:
+      - opened
+      - synchronize
+      - reopened
       - ready_for_review
     branches:
       - main
     paths:
       - "packages/qr/**"
+      - "src/**"
+      - "tests/**"
+      - "build.zig"
+      - "build.zig.zon"
       - ".github/workflows/js-verify.yml"
   workflow_dispatch:
 
@@ -17,6 +24,7 @@ permissions:
 jobs:
   package:
     name: Zig WASM and TypeScript
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
