@@ -11,7 +11,7 @@ const output = join(site, 'dist');
 const packageName = '@zymbol/qr';
 const version = '1.0.0';
 // Pin the published npm archive and reject an unexpected package.
-const archiveSha1 = '42e6989ba0b81b631f0dbc63f178dc5d6d3f52ab';
+const archiveSha256 = 'e95d2ebe770833404e6af59c80e0166f3a6d63fa133a00399a27621777c8c5ce';
 const scratch = mkdtempSync(join(tmpdir(), 'zymbol-site-'));
 
 try {
@@ -25,8 +25,8 @@ try {
     throw new Error('Unexpected published package identity');
   }
   const archive = join(scratch, packages[0].filename);
-  const hash = createHash('sha1').update(readFileSync(archive)).digest('hex');
-  if (hash !== archiveSha1) {
+  const hash = createHash('sha256').update(readFileSync(archive)).digest('hex');
+  if (hash !== archiveSha256) {
     throw new Error('Published @zymbol/qr archive checksum does not match the pinned release');
   }
   execFileSync('tar', ['-xzf', archive, '-C', scratch]);
