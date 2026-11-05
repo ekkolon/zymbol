@@ -17,6 +17,9 @@ The seed files include binary extremes, ASCII, alternating bits and structured
 byte sequences. Inputs that uncover bugs become part of this corpus or a
 separate regression test.
 
+The raw QR parser also exercises a 513-byte boundary fixture and a valid
+2,956-codeword Version 40-L byte-mode stream, including its final payload byte.
+
 ## Run a longer test
 
 For a finite run:
